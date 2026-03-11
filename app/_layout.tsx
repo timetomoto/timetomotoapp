@@ -1,0 +1,238 @@
+// Must import background task definitions before any other local imports
+// so TaskManager.defineTask() runs at bundle-load time.
+import '../lib/backgroundTasks';
+
+import { useEffect, useRef, useState } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ONBOARDING_KEY } from './onboarding';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import { supabase } from '../lib/supabase';
+import { useAuthStore, useSafetyStore } from '../lib/store';
+import type { TrackPoint } from '../lib/gpx';
+import { CrashDetector } from '../lib/safety';
+import { endShare } from '../lib/liveShare';
+import { stopBackgroundLocation } from '../lib/backgroundTasks';
+import { Colors } from '../lib/theme';
+import CrashAlertModal from '../components/safety/CrashAlertModal';
+
+// Configure how notifications are presented when the app is in the foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// Auth guard
+// ---------------------------------------------------------------------------
+
+function AuthGuard() {
+  const { session, loading, setSession } = useAuthStore();
+  const segments = useSegments();
+  const router   = useRouter();
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => setSession(session),
+    );
+    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => setOnboardingDone(v === 'done'));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (loading || onboardingDone === null) return;
+    const inAuthGroup   = segments[0] === 'auth';
+    const inOnboarding  = segments[0] === 'onboarding';
+    const inTabs        = segments[0] === '(tabs)';
+
+    if (!session && !inAuthGroup) {
+      router.replace('/auth');
+    } else if (session && !onboardingDone && !inOnboarding) {
+      router.replace('/onboarding');
+    } else if (session && onboardingDone && (inAuthGroup || inOnboarding)) {
+      router.replace('/(tabs)/ride');
+    }
+  }, [session, loading, segments, onboardingDone]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Safety service — crash detector + location tracking + share updates
+//                + check-in timer monitoring
+// ---------------------------------------------------------------------------
+
+function SafetyService() {
+  const {
+    isMonitoring, setCrashDetected, updateLocation,
+    shareToken, shareActive,
+    checkInActive, checkInDeadline, checkInNotifId, clearCheckIn,
+    emergencyContacts, lastKnownLocation,
+    setShareToken, setShareActive, setRecording,
+    isRecording, addRecordedPoint,
+  } = useSafetyStore();
+  const { user } = useAuthStore();
+
+  const detectorRef    = useRef<CrashDetector | null>(null);
+  const locationSub    = useRef<Location.LocationSubscription | null>(null);
+  const trackSub       = useRef<Location.LocationSubscription | null>(null);
+  const checkInRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Lazy-init detector singleton
+  if (!detectorRef.current) {
+    detectorRef.current = new CrashDetector(() => setCrashDetected(true));
+  }
+
+  // ── Crash detector lifecycle ──
+  useEffect(() => {
+    if (isMonitoring) {
+      detectorRef.current!.start();
+      Location.requestForegroundPermissionsAsync().then(({ status }) => {
+        if (status !== 'granted') return;
+        Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 10_000, distanceInterval: 50 },
+          (loc) => updateLocation(loc.coords.latitude, loc.coords.longitude),
+        ).then((sub) => { locationSub.current = sub; });
+      });
+    } else {
+      detectorRef.current!.stop();
+      locationSub.current?.remove();
+      locationSub.current = null;
+    }
+    return () => {
+      detectorRef.current!.stop();
+      locationSub.current?.remove();
+    };
+  }, [isMonitoring]);
+
+  // ── Check-in timer expiry monitor ──
+  useEffect(() => {
+    clearInterval(checkInRef.current!);
+    if (!checkInActive || !checkInDeadline) return;
+
+    checkInRef.current = setInterval(async () => {
+      if (Date.now() < checkInDeadline) return;
+      clearInterval(checkInRef.current!);
+
+      // Cancel scheduled notification
+      if (checkInNotifId) {
+        Notifications.cancelScheduledNotificationAsync(checkInNotifId).catch(() => {});
+      }
+      clearCheckIn();
+
+      // Send SMS to all emergency contacts
+      const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+      const mapsUrl = `https://maps.google.com/maps?q=${loc.lat},${loc.lng}`;
+      const riderName = user?.email ?? 'A rider';
+      const timestamp = new Date().toLocaleString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit',
+      });
+      const checkInTime = checkInDeadline
+        ? new Date(checkInDeadline).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        : '—';
+
+      for (const contact of emergencyContacts) {
+        try {
+          await (await import('../lib/supabase')).supabase.functions.invoke('send-crash-alert', {
+            body: {
+              contactPhone: contact.phone,
+              contactName:  contact.name,
+              riderName,
+              lat:          loc.lat,
+              lng:          loc.lng,
+              mapsUrl,
+              timestamp,
+              // Edge function uses the message field; pass overriding body text
+              overrideBody: `TIME to MOTO: ${riderName} hasn't checked in.\nThey were last seen at: ${mapsUrl}\nCheck-in was set for: ${checkInTime}`,
+            },
+          });
+        } catch {}
+      }
+    }, 15_000); // poll every 15 s
+
+    return () => clearInterval(checkInRef.current!);
+  }, [checkInActive, checkInDeadline]);
+
+  // ── Notification response handler (user taps check-in notification) ──
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(() => {
+      // Any tap on a TTM notification = check-in
+      if (checkInNotifId) {
+        Notifications.cancelScheduledNotificationAsync(checkInNotifId).catch(() => {});
+      }
+      clearCheckIn();
+    });
+    return () => sub.remove();
+  }, [checkInNotifId]);
+
+  // ── GPS track recording — every 5 s while isRecording ──
+  useEffect(() => {
+    if (isRecording) {
+      Location.requestForegroundPermissionsAsync().then(({ status }) => {
+        if (status !== 'granted') return;
+        Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 5 },
+          (loc) => {
+            const pt: TrackPoint = {
+              lat:  loc.coords.latitude,
+              lng:  loc.coords.longitude,
+              ele:  loc.coords.altitude ?? undefined,
+              time: new Date(loc.timestamp).toISOString(),
+            };
+            addRecordedPoint(pt);
+            updateLocation(loc.coords.latitude, loc.coords.longitude);
+          },
+        ).then((sub) => { trackSub.current = sub; });
+      });
+    } else {
+      trackSub.current?.remove();
+      trackSub.current = null;
+    }
+    return () => {
+      trackSub.current?.remove();
+    };
+  }, [isRecording]);
+
+  // ── Cleanup share + background location when recording ends externally ──
+  useEffect(() => {
+    if (!isRecording && shareToken) {
+      endShare(shareToken).catch(() => {});
+      setShareToken(null);
+      setShareActive(false);
+      stopBackgroundLocation().catch(() => {});
+    }
+  }, [isRecording]);
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Root layout
+// ---------------------------------------------------------------------------
+
+export default function RootLayout() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="light" backgroundColor={Colors.TTM_DARK} />
+      <AuthGuard />
+      <SafetyService />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="onboarding" />
+      </Stack>
+      <CrashAlertModal />
+    </GestureHandlerRootView>
+  );
+}
