@@ -1,5 +1,3 @@
-const mapboxDownloadToken = process.env.MAPBOX_DOWNLOAD_TOKEN ?? '';
-
 export default {
   expo: {
     name: 'timetomoto',
@@ -61,12 +59,7 @@ export default {
         },
       ],
       'expo-sensors',
-      [
-        '@rnmapbox/maps',
-        {
-          RNMapboxMapsDownloadToken: mapboxDownloadToken,
-        },
-      ],
+      '@rnmapbox/maps',
       'expo-sharing',
       'expo-image',
       'expo-web-browser',
