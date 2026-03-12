@@ -10,11 +10,14 @@ import {
   View,
 } from 'react-native';
 import { useAuthStore } from '../lib/store';
-import { Colors } from '../lib/theme';
+import { useTheme } from '../lib/useTheme';
+import { supabase } from '../lib/supabase';
+import TimetomotoLogo from '../components/common/TimetomotoLogo';
 
-type Mode = 'signin' | 'signup';
+type Mode = 'signin' | 'signup' | 'reset';
 
 export default function AuthScreen() {
+  const { theme } = useTheme();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,91 +27,108 @@ export default function AuthScreen() {
 
   const { signIn, signUp } = useAuthStore();
 
-  async function handleSubmit() {
-    if (!email || !password) {
-      setError('Email and password are required.');
-      return;
-    }
+  function reset() {
     setError(null);
     setSuccessMsg(null);
+  }
+
+  async function handleSubmit() {
+    if (mode === 'reset') {
+      if (!email.trim()) { setError('Enter your email address.'); return; }
+      reset();
+      setLoading(true);
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim());
+      setLoading(false);
+      if (err) setError(err.message);
+      else setSuccessMsg('Password reset email sent. Check your inbox.');
+      return;
+    }
+
+    if (!email || !password) { setError('Email and password are required.'); return; }
+    reset();
     setLoading(true);
 
-    const err =
-      mode === 'signin'
-        ? await signIn(email, password)
-        : await signUp(email, password);
+    const err = mode === 'signin'
+      ? await signIn(email, password)
+      : await signUp(email, password);
 
     setLoading(false);
-
-    if (err) {
-      setError(err);
-    } else if (mode === 'signup') {
-      setSuccessMsg('Check your email to confirm your account.');
-    }
-    // On sign-in success the auth guard in _layout.tsx handles redirect
+    if (err) setError(err);
+    else if (mode === 'signup') setSuccessMsg('Check your email to confirm your account.');
   }
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: theme.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Logo */}
       <View style={styles.logoArea}>
-        <Text style={styles.logoText}>TIME</Text>
-        <Text style={[styles.logoText, styles.logoRed]}>TO</Text>
-        <Text style={styles.logoText}>MOTO</Text>
+        <TimetomotoLogo width={300} height={56} />
       </View>
 
       {/* Card */}
-      <View style={styles.card}>
-        <Text style={styles.heading}>
-          {mode === 'signin' ? 'SIGN IN' : 'CREATE ACCOUNT'}
+      <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <Text style={[styles.heading, { color: theme.textPrimary }]}>
+          {mode === 'signin' ? 'SIGN IN' : mode === 'signup' ? 'CREATE ACCOUNT' : 'RESET PASSWORD'}
         </Text>
 
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: theme.bgPanel, borderColor: theme.border, color: theme.textPrimary }]}
           placeholder="Email"
-          placeholderTextColor={Colors.TEXT_SECONDARY}
+          placeholderTextColor={theme.textSecondary}
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={Colors.TEXT_SECONDARY}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {mode !== 'reset' && (
+          <TextInput
+            style={[styles.input, { backgroundColor: theme.bgPanel, borderColor: theme.border, color: theme.textPrimary }]}
+            placeholder="Password"
+            placeholderTextColor={theme.textSecondary}
+            secureTextEntry
+            value={password}
+            onChangeText={setPassword}
+          />
+        )}
+
+        {error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
         {successMsg && <Text style={styles.successText}>{successMsg}</Text>}
 
         <Pressable
-          style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+          style={({ pressed }) => [styles.btn, { backgroundColor: theme.red }, pressed && styles.btnPressed]}
           onPress={handleSubmit}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>
-              {mode === 'signin' ? 'SIGN IN' : 'SIGN UP'}
-            </Text>
-          )}
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.btnText}>
+                {mode === 'signin' ? 'SIGN IN' : mode === 'signup' ? 'SIGN UP' : 'SEND RESET EMAIL'}
+              </Text>
+          }
         </Pressable>
 
-        {/* Toggle mode */}
-        <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); setSuccessMsg(null); }}>
-          <Text style={styles.toggleText}>
-            {mode === 'signin'
-              ? "Don't have an account? Sign up"
-              : 'Already have an account? Sign in'}
-          </Text>
-        </Pressable>
+        {/* Forgot password (sign-in only) */}
+        {mode === 'signin' && (
+          <Pressable onPress={() => { setMode('reset'); reset(); }}>
+            <Text style={[styles.toggleText, { color: theme.textSecondary }]}>Forgot password?</Text>
+          </Pressable>
+        )}
+
+        {/* Toggle signin ↔ signup */}
+        {mode !== 'reset' ? (
+          <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); reset(); }}>
+            <Text style={[styles.toggleText, { color: theme.textSecondary }]}>
+              {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => { setMode('signin'); reset(); }}>
+            <Text style={[styles.toggleText, { color: theme.textSecondary }]}>Back to sign in</Text>
+          </Pressable>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -117,54 +137,35 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.TTM_DARK,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
   logoArea: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginBottom: 40,
-  },
-  logoText: {
-    color: Colors.TEXT_PRIMARY,
-    fontSize: 36,
-    fontWeight: '700',
-    letterSpacing: 3,
-  },
-  logoRed: {
-    color: Colors.TTM_RED,
+    marginBottom: 48,
+    alignItems: 'center',
   },
   card: {
     width: '100%',
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     padding: 24,
     gap: 14,
   },
   heading: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 3,
     marginBottom: 4,
   },
   input: {
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 15,
   },
   errorText: {
-    color: Colors.TTM_RED,
     fontSize: 13,
   },
   successText: {
@@ -172,7 +173,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   btn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingVertical: 14,
     alignItems: 'center',
@@ -188,7 +188,6 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   toggleText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 4,

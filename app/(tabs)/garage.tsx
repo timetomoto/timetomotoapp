@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,51 +10,62 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAuthStore, useGarageStore, useSafetyStore } from '../../lib/store';
-import { Colors } from '../../lib/theme';
+import { useAuthStore, useGarageStore, bikeLabel } from '../../lib/store';
 import AddBikeModal from '../../components/garage/AddBikeModal';
-import EmergencyContactsSheet from '../../components/garage/EmergencyContactsSheet';
+import MaintenanceSection from '../../components/garage/MaintenanceSection';
+import ModificationsSection from '../../components/garage/ModificationsSection';
+import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSection';
+import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
+import { useTheme } from '../../lib/useTheme';
+import HamburgerButton from '../../components/navigation/HamburgerButton';
+import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 
 export default function GarageScreen() {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { bikes, selectedBikeId, loading, fetchBikes, selectBike } = useGarageStore();
-  const { emergencyContacts, loadContacts } = useSafetyStore();
+  const { bikes, selectedBikeId, loading, fetchBikes, selectBike, removeBike } = useGarageStore();
   const [showAddBike, setShowAddBike] = useState(false);
-  const [showContacts, setShowContacts] = useState(false);
+  const [editingBike, setEditingBike] = useState<typeof bikes[0] | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<'MAINTENANCE' | 'MODS' | 'SERVICE'>('MAINTENANCE');
 
   useEffect(() => {
-    if (user) loadContacts(user.id);
-  }, [user]);
-
-  useEffect(() => {
-    if (user) fetchBikes(user.id);
+    fetchBikes(user?.id ?? 'local');
   }, [user]);
 
   const selectedBike = bikes.find((b) => b.id === selectedBikeId);
 
+  function handleRemoveBike() {
+    if (!selectedBike) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'REMOVE BIKE',
+      `Remove ${selectedBike.year} ${selectedBike.make} ${selectedBike.model} from your garage? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => removeBike(selectedBike.id, !user),
+        },
+      ],
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.heading}>GARAGE</Text>
+      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+        <HamburgerButton onPress={() => setMenuOpen(true)} />
+        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={[styles.heading, { color: theme.textPrimary }]}>GARAGE</Text>
+          </View>
+        </View>
         <View style={styles.headerRight}>
-          {/* Emergency contacts shortcut */}
           <Pressable
-            style={[styles.contactsBtn, emergencyContacts.length > 0 && styles.contactsBtnActive]}
-            onPress={() => setShowContacts(true)}
-          >
-            <Feather
-              name="shield"
-              size={14}
-              color={emergencyContacts.length > 0 ? '#4CAF50' : Colors.TEXT_SECONDARY}
-            />
-            <Text style={[styles.contactsBtnText, emergencyContacts.length > 0 && styles.contactsBtnTextActive]}>
-              {emergencyContacts.length > 0 ? `${emergencyContacts.length} CONTACTS` : 'SAFETY'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.addBtn}
+            style={[styles.addBtn, { backgroundColor: theme.red }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowAddBike(true);
@@ -72,13 +84,13 @@ export default function GarageScreen() {
         </ScrollView>
       ) : bikes.length === 0 ? (
         <View style={styles.centered}>
-          <Feather name="tool" size={40} color={Colors.TTM_BORDER} />
-          <Text style={styles.emptyTitle}>YOUR GARAGE IS EMPTY</Text>
-          <Text style={styles.emptySubtitle}>
+          <Feather name="tool" size={40} color={theme.border} />
+          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>YOUR GARAGE IS EMPTY</Text>
+          <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
             Add your first bike to get started →
           </Text>
           <Pressable
-            style={styles.emptyBtn}
+            style={[styles.emptyBtn, { backgroundColor: theme.red }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowAddBike(true);
@@ -102,11 +114,19 @@ export default function GarageScreen() {
               {bikes.map((bike) => (
                 <Pressable
                   key={bike.id}
-                  style={[styles.chip, bike.id === selectedBikeId && styles.chipActive]}
+                  style={[
+                    styles.chip,
+                    { borderColor: theme.border, backgroundColor: theme.bgCard },
+                    bike.id === selectedBikeId && { borderColor: theme.red, backgroundColor: 'rgba(211,47,47,0.12)' },
+                  ]}
                   onPress={() => selectBike(bike.id)}
                 >
-                  <Text style={[styles.chipText, bike.id === selectedBikeId && styles.chipTextActive]}>
-                    {bike.year} {bike.make}
+                  <Text style={[
+                    styles.chipText,
+                    { color: theme.textSecondary },
+                    bike.id === selectedBikeId && { color: theme.red },
+                  ]}>
+                    {bikeLabel(bike)}
                   </Text>
                 </Pressable>
               ))}
@@ -115,36 +135,84 @@ export default function GarageScreen() {
 
           {/* Selected bike card */}
           {selectedBike && (
-            <View style={styles.bikeCard}>
-              <View style={styles.bikeCardHeader}>
-                <View>
-                  <Text style={styles.bikeYear}>{selectedBike.year}</Text>
-                  <Text style={styles.bikeName}>
-                    {selectedBike.make} {selectedBike.model}
-                  </Text>
+            <View style={[styles.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <View style={[styles.bikeCardHeader, { borderBottomColor: theme.border }]}>
+                <View style={styles.bikeNameContainer}>
+                  {selectedBike.nickname ? (
+                    <>
+                      <Text style={[styles.bikeNickname, { color: theme.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        {selectedBike.nickname}
+                      </Text>
+                      <Text style={[styles.bikeRealName, { color: theme.textSecondary }]}>
+                        {selectedBike.year} {selectedBike.make} {selectedBike.model}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.bikeYear, { color: theme.textSecondary }]}>{selectedBike.year}</Text>
+                      <Text style={[styles.bikeName, { color: theme.textPrimary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        {selectedBike.make} {selectedBike.model}
+                      </Text>
+                    </>
+                  )}
                 </View>
-                <View style={styles.odoBadge}>
-                  <Text style={styles.odoValue}>
-                    {selectedBike.odometer?.toLocaleString() ?? '—'}
-                  </Text>
-                  <Text style={styles.odoLabel}>MI</Text>
+                <View style={styles.bikeCardActions}>
+                  <View style={[styles.odoBadge, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+                    <Text style={[styles.odoValue, { color: theme.textPrimary }]}>
+                      {selectedBike.odometer?.toLocaleString() ?? '—'}
+                    </Text>
+                    <Text style={[styles.odoLabel, { color: theme.textSecondary }]}>MI</Text>
+                  </View>
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      style={[styles.removeBtn, { borderColor: theme.border }]}
+                      onPress={() => setEditingBike(selectedBike)}
+                      accessibilityLabel="Edit bike"
+                    >
+                      <Feather name="edit-2" size={16} color={theme.textSecondary} />
+                    </Pressable>
+                    <Pressable
+                      style={[styles.removeBtn, { borderColor: theme.border }]}
+                      onPress={handleRemoveBike}
+                      accessibilityLabel="Remove bike"
+                    >
+                      <Feather name="trash-2" size={16} color={theme.red} />
+                    </Pressable>
+                  </View>
                 </View>
               </View>
 
-              {/* Placeholder section tabs */}
-              <View style={styles.sectionRow}>
-                {['MAINTENANCE', 'MODS', 'DOCS'].map((s) => (
-                  <View key={s} style={styles.sectionTab}>
-                    <Text style={styles.sectionTabText}>{s}</Text>
-                  </View>
+              {/* Section tabs */}
+              <View style={[styles.sectionRow, { borderBottomColor: theme.border }]}>
+                {(['MAINTENANCE', 'MODS', 'SERVICE'] as const).map((s, i, arr) => (
+                  <Pressable
+                    key={s}
+                    style={[
+                      styles.sectionTab,
+                      { borderRightColor: theme.border },
+                      i === arr.length - 1 && { borderRightWidth: 0 },
+                      activeSection === s && { borderBottomWidth: 2, borderBottomColor: theme.red },
+                    ]}
+                    onPress={() => setActiveSection(s)}
+                  >
+                    <Text style={[styles.sectionTabText, { color: activeSection === s ? theme.red : theme.textSecondary }]}>{s}</Text>
+                  </Pressable>
                 ))}
               </View>
 
-              <View style={styles.sectionPlaceholder}>
-                <Text style={styles.sectionPlaceholderText}>
-                  Maintenance logs coming soon
-                </Text>
-              </View>
+              {activeSection === 'MAINTENANCE' && selectedBike && (
+                <MaintenanceSection bikeId={selectedBike.id} />
+              )}
+              {activeSection === 'MODS' && selectedBike && (
+                <ModificationsSection bikeId={selectedBike.id} />
+              )}
+              {activeSection === 'SERVICE' && selectedBike && (
+                <>
+                  <ServiceBulletinsSection bike={selectedBike} />
+                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
+                  <ServiceIntervalsSection bike={selectedBike} />
+                </>
+              )}
             </View>
           )}
         </ScrollView>
@@ -155,10 +223,13 @@ export default function GarageScreen() {
         <AddBikeModal onClose={() => setShowAddBike(false)} />
       )}
 
-      {/* Emergency Contacts Sheet */}
-      {showContacts && (
-        <EmergencyContactsSheet onClose={() => setShowContacts(false)} />
+      {/* Edit Bike Bottom Sheet */}
+      {editingBike && (
+        <AddBikeModal bike={editingBike} onClose={() => setEditingBike(null)} />
       )}
+
+      {/* Hamburger menu */}
+      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -166,7 +237,6 @@ export default function GarageScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.TTM_DARK,
   },
 
   // Header
@@ -174,38 +244,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.TTM_BORDER,
   },
   heading: {
-    color: Colors.TEXT_PRIMARY,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 4,
+    letterSpacing: 3,
+    textTransform: 'uppercase',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  contactsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  contactsBtnActive: { borderColor: '#4CAF5066' },
-  contactsBtnText: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  contactsBtnTextActive: { color: '#4CAF50' },
   addBtn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -224,25 +274,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
   emptyTitle: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 2,
     marginBottom: 8,
   },
   emptySubtitle: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 14,
     textAlign: 'center',
     marginBottom: 32,
   },
   emptyBtn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingHorizontal: 24,
     paddingVertical: 14,
@@ -270,31 +313,19 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
-    backgroundColor: Colors.TTM_CARD,
-  },
-  chipActive: {
-    borderColor: Colors.TTM_RED,
-    backgroundColor: 'rgba(211,47,47,0.12)',
   },
   chipText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
   },
-  chipTextActive: {
-    color: Colors.TTM_RED,
-  },
 
   // Bike card
   bikeCard: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -304,68 +335,83 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.TTM_BORDER,
   },
   bikeYear: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     letterSpacing: 2,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  bikeNameContainer: {
+    flex: 1,
+    marginRight: 12,
   },
   bikeName: {
-    color: Colors.TEXT_PRIMARY,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: 1,
   },
+  bikeNickname: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  bikeRealName: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 1,
+  },
+  bikeCardActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
   odoBadge: {
     alignItems: 'center',
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
+  removeBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 8,
+  },
   odoValue: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 20,
     fontWeight: '700',
   },
   odoLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     letterSpacing: 2,
     marginTop: 2,
+  },
+
+  serviceDivider: {
+    height: 1,
+    marginHorizontal: 16,
   },
 
   // Section tabs
   sectionRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.TTM_BORDER,
   },
   sectionTab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
     borderRightWidth: 1,
-    borderRightColor: Colors.TTM_BORDER,
   },
   sectionTabText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 2,
   },
-  sectionPlaceholder: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  sectionPlaceholderText: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 13,
-    letterSpacing: 1,
-  },
+
 });

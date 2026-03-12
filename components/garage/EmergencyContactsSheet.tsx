@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuthStore, useSafetyStore, type EmergencyContact } from '../../lib/store';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 const SHEET_HEIGHT = 520;
 const MAX_CONTACTS = 3;
@@ -27,6 +27,7 @@ interface Props {
 }
 
 export default function EmergencyContactsSheet({ onClose }: Props) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -41,7 +42,6 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
   const [error, setError]   = useState<string | null>(null);
   const [saved, setSaved]   = useState(false);
 
-  // Slide in
   useEffect(() => {
     Animated.parallel([
       Animated.spring(slideAnim, {
@@ -52,11 +52,9 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
       }),
     ]).start();
 
-    // Load latest from DB
-    if (user) loadContacts(user.id);
+    loadContacts(user?.id ?? 'local');
   }, []);
 
-  // Sync store → local state when loaded
   useEffect(() => {
     if (emergencyContacts.length > 0) {
       setContacts([...emergencyContacts]);
@@ -87,10 +85,8 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
   }
 
   async function handleSave() {
-    if (!user) return;
     Keyboard.dismiss();
 
-    // Validate
     const filled = contacts.filter((c) => c.name.trim() && c.phone.trim());
     if (filled.length === 0) {
       setError('Add at least one contact with a name and phone number.');
@@ -106,7 +102,7 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
 
     setError(null);
     setSaving(true);
-    const err = await saveContacts(user.id, filled);
+    const err = await saveContacts(user?.id ?? 'local', filled);
     setSaving(false);
     if (err) { setError(err); return; }
     setSaved(true);
@@ -124,11 +120,15 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
       <Animated.View
         style={[
           styles.sheet,
-          { paddingBottom: insets.bottom + 16 },
+          {
+            backgroundColor: theme.bgPanel,
+            borderColor: theme.border,
+            paddingBottom: insets.bottom + 16,
+          },
           { transform: [{ translateY: slideAnim }] },
         ]}
       >
-        <View style={styles.handleBar} />
+        <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
@@ -139,41 +139,41 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
             {/* Header */}
             <View style={styles.header}>
               <View>
-                <Text style={styles.heading}>EMERGENCY CONTACTS</Text>
-                <Text style={styles.subHeading}>Notified if a crash is detected</Text>
+                <Text style={[styles.heading, { color: theme.textPrimary }]}>EMERGENCY CONTACTS</Text>
+                <Text style={[styles.subHeading, { color: theme.textSecondary }]}>Notified if a crash is detected</Text>
               </View>
               <Pressable onPress={handleClose} style={styles.closeBtn}>
-                <Feather name="x" size={18} color={Colors.TEXT_SECONDARY} />
+                <Feather name="x" size={18} color={theme.textSecondary} />
               </Pressable>
             </View>
 
             {contacts.map((c, i) => (
-              <View key={i} style={styles.contactCard}>
+              <View key={i} style={[styles.contactCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.contactCardHeader}>
-                  <Text style={styles.contactNum}>CONTACT {i + 1}</Text>
+                  <Text style={[styles.contactNum, { color: theme.textSecondary }]}>CONTACT {i + 1}</Text>
                   {contacts.length > 1 && (
                     <Pressable onPress={() => removeContact(i)} hitSlop={8}>
-                      <Feather name="trash-2" size={14} color={Colors.TEXT_SECONDARY} />
+                      <Feather name="trash-2" size={14} color={theme.textSecondary} />
                     </Pressable>
                   )}
                 </View>
-                <Text style={styles.fieldLabel}>NAME</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>NAME</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.bgPanel, borderColor: theme.border, color: theme.textPrimary }]}
                   value={c.name}
                   onChangeText={(t) => updateContact(i, 'name', t)}
                   placeholder="e.g. Jane Doe"
-                  placeholderTextColor={Colors.TEXT_SECONDARY}
+                  placeholderTextColor={theme.textSecondary}
                   autoCorrect={false}
                   autoCapitalize="words"
                 />
-                <Text style={styles.fieldLabel}>PHONE NUMBER</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>PHONE NUMBER</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: theme.bgPanel, borderColor: theme.border, color: theme.textPrimary }]}
                   value={c.phone}
                   onChangeText={(t) => updateContact(i, 'phone', t)}
                   placeholder="e.g. +1 512 555 0100"
-                  placeholderTextColor={Colors.TEXT_SECONDARY}
+                  placeholderTextColor={theme.textSecondary}
                   keyboardType="phone-pad"
                   autoCorrect={false}
                 />
@@ -181,18 +181,22 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
             ))}
 
             {contacts.length < MAX_CONTACTS && (
-              <Pressable style={styles.addContactBtn} onPress={addContact}>
-                <Feather name="plus" size={14} color={Colors.TEXT_SECONDARY} />
-                <Text style={styles.addContactText}>ADD ANOTHER CONTACT</Text>
+              <Pressable
+                style={[styles.addContactBtn, { borderColor: theme.border }]}
+                onPress={addContact}
+              >
+                <Feather name="plus" size={14} color={theme.textSecondary} />
+                <Text style={[styles.addContactText, { color: theme.textSecondary }]}>ADD ANOTHER CONTACT</Text>
               </Pressable>
             )}
 
-            {!!error && <Text style={styles.errorText}>{error}</Text>}
+            {!!error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
             {saved && <Text style={styles.savedText}>Contacts saved!</Text>}
 
             <Pressable
               style={({ pressed }) => [
                 styles.saveBtn,
+                { backgroundColor: theme.red },
                 pressed && styles.saveBtnPressed,
                 saving && styles.saveBtnDisabled,
               ]}
@@ -221,17 +225,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.TTM_PANEL,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     maxHeight: '90%',
   },
   handleBar: {
     width: 40,
     height: 4,
-    backgroundColor: Colors.TTM_BORDER,
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
@@ -249,22 +250,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   heading: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 3,
   },
   subHeading: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 12,
     marginTop: 4,
   },
   closeBtn: { padding: 4 },
 
   contactCard: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     padding: 14,
     marginBottom: 10,
@@ -276,13 +273,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   contactNum: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 2,
   },
   fieldLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 2,
@@ -290,13 +285,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   input: {
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 15,
   },
 
@@ -306,24 +298,21 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     borderStyle: 'dashed',
     justifyContent: 'center',
     marginBottom: 12,
   },
   addContactText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2,
   },
 
-  errorText: { color: Colors.TTM_RED, fontSize: 13, marginBottom: 12, textAlign: 'center' },
-  savedText:  { color: '#4CAF50',     fontSize: 13, marginBottom: 12, textAlign: 'center' },
+  errorText: { fontSize: 13, marginBottom: 12, textAlign: 'center' },
+  savedText:  { color: '#4CAF50', fontSize: 13, marginBottom: 12, textAlign: 'center' },
 
   saveBtn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingVertical: 16,
     alignItems: 'center',

@@ -16,7 +16,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useGarageStore, useSafetyStore } from '../lib/store';
-import { Colors } from '../lib/theme';
+import { useTheme } from '../lib/useTheme';
 
 export const ONBOARDING_KEY = '@ttm/onboarding_v1';
 
@@ -27,6 +27,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // ---------------------------------------------------------------------------
 
 function Screen1() {
+  const { theme } = useTheme();
   const features = [
     { icon: 'shield',     text: 'Crash detection & emergency alerts' },
     { icon: 'navigation', text: 'Live location sharing with contacts' },
@@ -37,20 +38,20 @@ function Screen1() {
   return (
     <View style={s.screen}>
       <View style={s.logoBlock}>
-        <View style={s.logoCircle}>
-          <Feather name="navigation" size={40} color={Colors.TTM_RED} />
+        <View style={[s.logoCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Feather name="navigation" size={40} color={theme.red} />
         </View>
-        <Text style={s.logoTitle}>TIME to MOTO</Text>
-        <Text style={s.logoSub}>YOUR ADVENTURE HEADQUARTERS</Text>
+        <Text style={[s.logoTitle, { color: theme.textPrimary }]}>TIME to MOTO</Text>
+        <Text style={[s.logoSub, { color: theme.textSecondary }]}>YOUR ADVENTURE HEADQUARTERS</Text>
       </View>
 
       <View style={s.featureList}>
         {features.map((f) => (
-          <View key={f.icon} style={s.featureRow}>
-            <View style={s.featureIcon}>
-              <Feather name={f.icon as any} size={16} color={Colors.TTM_RED} />
+          <View key={f.icon} style={[s.featureRow, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[s.featureIcon, { backgroundColor: theme.red + '18' }]}>
+              <Feather name={f.icon as any} size={16} color={theme.red} />
             </View>
-            <Text style={s.featureText}>{f.text}</Text>
+            <Text style={[s.featureText, { color: theme.textPrimary }]}>{f.text}</Text>
           </View>
         ))}
       </View>
@@ -63,6 +64,7 @@ function Screen1() {
 // ---------------------------------------------------------------------------
 
 function Screen2() {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
   const { addBike } = useGarageStore();
   const [make, setMake]   = useState('');
@@ -85,11 +87,11 @@ function Screen2() {
 
   return (
     <View style={s.screen}>
-      <View style={s.screenIconWrap}>
-        <Feather name="tool" size={36} color={Colors.TTM_RED} />
+      <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <Feather name="tool" size={36} color={theme.red} />
       </View>
-      <Text style={s.screenTitle}>ADD YOUR BIKE</Text>
-      <Text style={s.screenBody}>
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>ADD YOUR BIKE</Text>
+      <Text style={[s.screenBody, { color: theme.textSecondary }]}>
         Get personalized fuel range, maintenance tracking, and ride stats.
       </Text>
 
@@ -101,23 +103,23 @@ function Screen2() {
       ) : (
         <View style={s.form}>
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="Make (e.g. Triumph)"
-            placeholderTextColor={Colors.TEXT_SECONDARY}
+            placeholderTextColor={theme.textSecondary}
             value={make}
             onChangeText={setMake}
             autoCorrect={false}
           />
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="Model (e.g. Tiger 900)"
-            placeholderTextColor={Colors.TEXT_SECONDARY}
+            placeholderTextColor={theme.textSecondary}
             value={model}
             onChangeText={setModel}
             autoCorrect={false}
           />
           <Pressable
-            style={[s.formBtn, (!make.trim() || !model.trim() || saving) && s.formBtnDisabled]}
+            style={[s.formBtn, { backgroundColor: theme.red }, (!make.trim() || !model.trim() || saving) && s.formBtnDisabled]}
             onPress={handleSave}
             disabled={!make.trim() || !model.trim() || saving}
             accessibilityLabel="Save bike"
@@ -136,6 +138,7 @@ function Screen2() {
 // ---------------------------------------------------------------------------
 
 function Screen3() {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
   const { saveContacts } = useSafetyStore();
   const [name, setName]   = useState('');
@@ -154,11 +157,11 @@ function Screen3() {
 
   return (
     <View style={s.screen}>
-      <View style={s.screenIconWrap}>
-        <Feather name="shield" size={36} color={Colors.TTM_RED} />
+      <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <Feather name="shield" size={36} color={theme.red} />
       </View>
-      <Text style={s.screenTitle}>STAY SAFE OUT THERE</Text>
-      <Text style={s.screenBody}>
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>STAY SAFE OUT THERE</Text>
+      <Text style={[s.screenBody, { color: theme.textSecondary }]}>
         Add a trusted contact who'll be notified instantly if crash detection triggers.
       </Text>
 
@@ -170,23 +173,23 @@ function Screen3() {
       ) : (
         <View style={s.form}>
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="Contact name"
-            placeholderTextColor={Colors.TEXT_SECONDARY}
+            placeholderTextColor={theme.textSecondary}
             value={name}
             onChangeText={setName}
             autoCorrect={false}
           />
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
             placeholder="Phone number"
-            placeholderTextColor={Colors.TEXT_SECONDARY}
+            placeholderTextColor={theme.textSecondary}
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
           />
           <Pressable
-            style={[s.formBtn, (!name.trim() || !phone.trim() || saving) && s.formBtnDisabled]}
+            style={[s.formBtn, { backgroundColor: theme.red }, (!name.trim() || !phone.trim() || saving) && s.formBtnDisabled]}
             onPress={handleSave}
             disabled={!name.trim() || !phone.trim() || saving}
             accessibilityLabel="Save emergency contact"
@@ -208,6 +211,7 @@ const SCREENS = [Screen1, Screen2, Screen3];
 const TITLES  = ['01 / 03', '02 / 03', '03 / 03'];
 
 export default function OnboardingScreen() {
+  const { theme } = useTheme();
   const router   = useRouter();
   const listRef  = useRef<FlatList>(null);
   const [index, setIndex] = useState(0);
@@ -234,17 +238,17 @@ export default function OnboardingScreen() {
   const isLast = index === SCREENS.length - 1;
 
   return (
-    <SafeAreaView style={s.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={[s.root, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
       {/* Skip */}
       <View style={s.topBar}>
-        <Text style={s.stepLabel}>{TITLES[index]}</Text>
+        <Text style={[s.stepLabel, { color: theme.textSecondary }]}>{TITLES[index]}</Text>
         <Pressable
           onPress={finish}
           style={s.skipBtn}
           accessibilityLabel="Skip onboarding"
           accessibilityRole="button"
         >
-          <Text style={s.skipText}>SKIP</Text>
+          <Text style={[s.skipText, { color: theme.textSecondary }]}>SKIP</Text>
         </Pressable>
       </View>
 
@@ -269,14 +273,14 @@ export default function OnboardingScreen() {
       {/* Dots */}
       <View style={s.dots}>
         {SCREENS.map((_, i) => (
-          <View key={i} style={[s.dot, i === index && s.dotActive]} />
+          <View key={i} style={[s.dot, { backgroundColor: theme.border }, i === index && { width: 20, backgroundColor: theme.red }]} />
         ))}
       </View>
 
       {/* CTA */}
       <View style={s.footer}>
         <Pressable
-          style={s.nextBtn}
+          style={[s.nextBtn, { backgroundColor: theme.red }]}
           onPress={next}
           accessibilityLabel={isLast ? 'Start riding' : 'Next'}
           accessibilityRole="button"
@@ -296,7 +300,7 @@ export default function OnboardingScreen() {
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.TTM_DARK },
+  root: { flex: 1 },
 
   topBar: {
     flexDirection: 'row',
@@ -305,9 +309,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  stepLabel: { color: Colors.TEXT_SECONDARY, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  stepLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
   skipBtn: { paddingHorizontal: 4, paddingVertical: 8, minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  skipText: { color: Colors.TEXT_SECONDARY, fontSize: 12, fontWeight: '600', letterSpacing: 1 },
+  skipText: { fontSize: 12, fontWeight: '600', letterSpacing: 1 },
 
   screen: {
     flex: 1,
@@ -322,22 +326,18 @@ const s = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
   },
   logoTitle: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 26,
     fontWeight: '700',
     letterSpacing: 3,
     marginBottom: 6,
   },
   logoSub: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 3,
@@ -348,9 +348,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -359,26 +357,22 @@ const s = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: Colors.TTM_RED + '18',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureText: { color: Colors.TEXT_PRIMARY, fontSize: 14, flex: 1 },
+  featureText: { fontSize: 14, flex: 1 },
 
   // Screens 2 & 3
   screenIconWrap: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
   screenTitle: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 2,
@@ -386,7 +380,6 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
   screenBody: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
@@ -394,18 +387,14 @@ const s = StyleSheet.create({
   },
   form: { width: '100%', gap: 12 },
   input: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 16,
     minHeight: 50,
   },
   formBtn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -435,9 +424,7 @@ const s = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.TTM_BORDER,
   },
-  dotActive: { width: 20, backgroundColor: Colors.TTM_RED },
 
   // Footer
   footer: { paddingHorizontal: 24, paddingBottom: 8 },
@@ -446,7 +433,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 10,
     paddingVertical: 18,
     minHeight: 56,

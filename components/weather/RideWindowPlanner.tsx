@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { geocodePlace, planRideWindow, type GeoPlace, type RideWindowResult, type RiskLevel } from '../../lib/rideWindow';
 import { useRideWindowStore } from '../../lib/store';
 import { codeMeta } from '../../lib/weather';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +54,7 @@ interface CityInputProps {
 }
 
 function CityInput({ label, value, place, onChange, onGeocode, placeholder }: CityInputProps) {
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,31 +80,31 @@ function CityInput({ label, value, place, onChange, onGeocode, placeholder }: Ci
 
   return (
     <View style={s.cityGroup}>
-      <Text style={s.cityLabel}>{label}</Text>
-      <View style={[s.cityInputRow, place && s.cityInputResolved]}>
+      <Text style={[s.cityLabel, { color: theme.textSecondary }]}>{label}</Text>
+      <View style={[s.cityInputRow, { backgroundColor: theme.bgPanel, borderColor: theme.border }, place && { borderColor: RISK_COLOR.CLEAR + '66' }]}>
         {loading
-          ? <ActivityIndicator size="small" color={Colors.TTM_RED} style={{ marginRight: 8 }} />
+          ? <ActivityIndicator size="small" color={theme.red} style={{ marginRight: 8 }} />
           : place
             ? <Feather name="check-circle" size={16} color={RISK_COLOR.CLEAR} style={{ marginRight: 8 }} />
-            : <Feather name="map-pin" size={16} color={Colors.TEXT_SECONDARY} style={{ marginRight: 8 }} />
+            : <Feather name="map-pin" size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
         }
         <TextInput
-          style={s.cityInputText}
+          style={[s.cityInputText, { color: theme.textPrimary }]}
           value={value}
           onChangeText={handleChange}
           placeholder={placeholder}
-          placeholderTextColor={Colors.TEXT_SECONDARY}
+          placeholderTextColor={theme.textSecondary}
           autoCorrect={false}
           autoCapitalize="words"
           returnKeyType="done"
         />
         {value.length > 0 && !loading && (
           <Pressable onPress={() => { onChange(''); onGeocode(null); setError(''); }}>
-            <Feather name="x" size={14} color={Colors.TEXT_SECONDARY} />
+            <Feather name="x" size={14} color={theme.textSecondary} />
           </Pressable>
         )}
       </View>
-      {!!error && <Text style={s.cityError}>{error}</Text>}
+      {!!error && <Text style={[s.cityError, { color: theme.red }]}>{error}</Text>}
     </View>
   );
 }
@@ -119,6 +120,7 @@ function DateChips({
   selected: Date;
   onChange: (d: Date) => void;
 }) {
+  const { theme } = useTheme();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = [today, addDays(today, 1), addDays(today, 2)];
@@ -131,14 +133,18 @@ function DateChips({
         return (
           <Pressable
             key={i}
-            style={[s.chip, isActive && s.chipActive]}
+            style={[
+              s.chip,
+              { backgroundColor: theme.bgPanel, borderColor: theme.border },
+              isActive && { backgroundColor: theme.red + '22', borderColor: theme.red },
+            ]}
             onPress={() => {
               const next = new Date(d);
               next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
               onChange(next);
             }}
           >
-            <Text style={[s.chipText, isActive && s.chipTextActive]}>{label}</Text>
+            <Text style={[s.chipText, { color: theme.textSecondary }, isActive && { color: theme.red }]}>{label}</Text>
           </Pressable>
         );
       })}
@@ -157,6 +163,7 @@ function TimePicker({
   departure: Date;
   onChange: (d: Date) => void;
 }) {
+  const { theme } = useTheme();
   const rawHour = departure.getHours();
   const displayHour = rawHour % 12 === 0 ? 12 : rawHour % 12;
   const ampm = rawHour < 12 ? 'AM' : 'PM';
@@ -175,20 +182,26 @@ function TimePicker({
 
   return (
     <View style={s.timeRow}>
-      <Pressable style={s.timeBtn} onPress={() => setHour(-1)}>
-        <Feather name="chevron-left" size={20} color={Colors.TEXT_SECONDARY} />
+      <Pressable style={[s.timeBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]} onPress={() => setHour(-1)}>
+        <Feather name="chevron-left" size={20} color={theme.textSecondary} />
       </Pressable>
-      <View style={s.timeDisplay}>
-        <Text style={s.timeText}>{displayHour}:00</Text>
+      <View style={[s.timeDisplay, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+        <Text style={[s.timeText, { color: theme.textPrimary }]}>{displayHour}:00</Text>
       </View>
-      <Pressable style={s.timeBtn} onPress={() => setHour(1)}>
-        <Feather name="chevron-right" size={20} color={Colors.TEXT_SECONDARY} />
+      <Pressable style={[s.timeBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]} onPress={() => setHour(1)}>
+        <Feather name="chevron-right" size={20} color={theme.textSecondary} />
       </Pressable>
-      <Pressable style={[s.ampmBtn, ampm === 'AM' && s.ampmActive]} onPress={toggleAMPM}>
-        <Text style={[s.ampmText, ampm === 'AM' && s.ampmTextActive]}>AM</Text>
+      <Pressable
+        style={[s.ampmBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }, ampm === 'AM' && { backgroundColor: theme.red + '22', borderColor: theme.red }]}
+        onPress={toggleAMPM}
+      >
+        <Text style={[s.ampmText, { color: theme.textSecondary }, ampm === 'AM' && { color: theme.red }]}>AM</Text>
       </Pressable>
-      <Pressable style={[s.ampmBtn, ampm === 'PM' && s.ampmActive]} onPress={toggleAMPM}>
-        <Text style={[s.ampmText, ampm === 'PM' && s.ampmTextActive]}>PM</Text>
+      <Pressable
+        style={[s.ampmBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }, ampm === 'PM' && { backgroundColor: theme.red + '22', borderColor: theme.red }]}
+        onPress={toggleAMPM}
+      >
+        <Text style={[s.ampmText, { color: theme.textSecondary }, ampm === 'PM' && { color: theme.red }]}>PM</Text>
       </Pressable>
     </View>
   );
@@ -199,25 +212,26 @@ function TimePicker({
 // ---------------------------------------------------------------------------
 
 function SegmentCard({ seg }: { seg: RideWindowResult['segments'][0] }) {
+  const { theme } = useTheme();
   const meta = codeMeta(seg.weatherCode);
   const riskColor = RISK_COLOR[seg.risk];
 
   return (
-    <View style={[s.segCard, { borderLeftColor: riskColor }]}>
+    <View style={[s.segCard, { backgroundColor: theme.bgCard, borderColor: theme.border, borderLeftColor: riskColor }]}>
       <View style={s.segHeader}>
-        <Text style={s.segName}>{seg.name}</Text>
+        <Text style={[s.segName, { color: theme.textPrimary }]}>{seg.name}</Text>
         <View style={[s.riskBadge, { backgroundColor: riskColor + '22', borderColor: riskColor }]}>
           <Text style={[s.riskText, { color: riskColor }]}>{seg.risk}</Text>
         </View>
       </View>
       <View style={s.segBody}>
         <View style={s.segStat}>
-          <Feather name="clock" size={12} color={Colors.TEXT_SECONDARY} />
-          <Text style={s.segStatText}>{formatETA(seg.eta)}</Text>
+          <Feather name="clock" size={12} color={theme.textSecondary} />
+          <Text style={[s.segStatText, { color: theme.textSecondary }]}>{formatETA(seg.eta)}</Text>
         </View>
         <View style={s.segStat}>
-          <Feather name={meta.icon as any} size={12} color={Colors.TEXT_SECONDARY} />
-          <Text style={s.segStatText}>{Math.round(seg.temperature)}°F</Text>
+          <Feather name={meta.icon as any} size={12} color={theme.textSecondary} />
+          <Text style={[s.segStatText, { color: theme.textSecondary }]}>{Math.round(seg.temperature)}°F</Text>
         </View>
         {seg.precipProbability > 0 && (
           <View style={s.segStat}>
@@ -227,8 +241,8 @@ function SegmentCard({ seg }: { seg: RideWindowResult['segments'][0] }) {
         )}
         {seg.windSpeed > 0 && (
           <View style={s.segStat}>
-            <Feather name="wind" size={12} color={Colors.TEXT_SECONDARY} />
-            <Text style={s.segStatText}>{Math.round(seg.windSpeed)} mph</Text>
+            <Feather name="wind" size={12} color={theme.textSecondary} />
+            <Text style={[s.segStatText, { color: theme.textSecondary }]}>{Math.round(seg.windSpeed)} mph</Text>
           </View>
         )}
       </View>
@@ -241,6 +255,7 @@ function SegmentCard({ seg }: { seg: RideWindowResult['segments'][0] }) {
 // ---------------------------------------------------------------------------
 
 function RecommendationBox({ result }: { result: RideWindowResult }) {
+  const { theme } = useTheme();
   const worstRisk: RiskLevel = result.segments.reduce<RiskLevel>((worst, s) => {
     const order: RiskLevel[] = ['CLEAR', 'WATCH', 'WARNING', 'DANGER'];
     return order.indexOf(s.risk) > order.indexOf(worst) ? s.risk : worst;
@@ -249,22 +264,22 @@ function RecommendationBox({ result }: { result: RideWindowResult }) {
   const borderColor = RISK_COLOR[worstRisk];
 
   return (
-    <View style={[s.recBox, { borderLeftColor: borderColor }]}>
+    <View style={[s.recBox, { backgroundColor: theme.bgCard, borderColor: theme.border, borderLeftColor: borderColor }]}>
       <View style={s.recHeader}>
         <Feather name="flag" size={14} color={borderColor} />
         <Text style={[s.recTitle, { color: borderColor }]}>RIDE WINDOW</Text>
       </View>
-      <Text style={s.recSubtitle}>
+      <Text style={[s.recSubtitle, { color: theme.textPrimary }]}>
         {result.fromLabel} → {result.toLabel}
       </Text>
-      <Text style={s.recMeta}>
+      <Text style={[s.recMeta, { color: theme.textSecondary }]}>
         {Math.round(result.totalMiles)} mi · ~{
           result.estimatedHours < 1
             ? `${Math.round(result.estimatedHours * 60)} min`
             : `${result.estimatedHours.toFixed(1)} hr`
         } · Depart {formatETA(result.departureTime)}, {formatDate(result.departureTime)}
       </Text>
-      <Text style={s.recText}>{result.recommendation}</Text>
+      <Text style={[s.recText, { color: theme.textPrimary }]}>{result.recommendation}</Text>
     </View>
   );
 }
@@ -274,6 +289,7 @@ function RecommendationBox({ result }: { result: RideWindowResult }) {
 // ---------------------------------------------------------------------------
 
 export default function RideWindowPlanner() {
+  const { theme } = useTheme();
   const { result, setResult } = useRideWindowStore();
 
   const [fromText, setFromText] = useState('');
@@ -331,14 +347,14 @@ export default function RideWindowPlanner() {
 
   return (
     <ScrollView
-      style={s.root}
+      style={[s.root, { backgroundColor: theme.bg }]}
       contentContainerStyle={s.content}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {/* Route inputs */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>ROUTE</Text>
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <Text style={[s.cardTitle, { color: theme.textSecondary }]}>ROUTE</Text>
         <CityInput
           label="FROM"
           value={fromText}
@@ -348,7 +364,7 @@ export default function RideWindowPlanner() {
           placeholder="Starting city or zip"
         />
         <View style={s.routeArrow}>
-          <Feather name="arrow-down" size={16} color={Colors.TEXT_SECONDARY} />
+          <Feather name="arrow-down" size={16} color={theme.textSecondary} />
         </View>
         <CityInput
           label="TO"
@@ -361,19 +377,19 @@ export default function RideWindowPlanner() {
       </View>
 
       {/* Departure time */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>DEPARTURE</Text>
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <Text style={[s.cardTitle, { color: theme.textSecondary }]}>DEPARTURE</Text>
         <DateChips selected={departure} onChange={setDeparture} />
         <View style={s.timeLabelRow}>
-          <Text style={s.fieldLabel}>TIME</Text>
+          <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>TIME</Text>
         </View>
         <TimePicker departure={departure} onChange={setDeparture} />
       </View>
 
       {/* Plan button */}
-      {!!planError && <Text style={s.planError}>{planError}</Text>}
+      {!!planError && <Text style={[s.planError, { color: theme.red }]}>{planError}</Text>}
       <Pressable
-        style={({ pressed }) => [s.planBtn, pressed && s.planBtnPressed, planning && s.planBtnDisabled]}
+        style={({ pressed }) => [s.planBtn, { backgroundColor: theme.red }, pressed && s.planBtnPressed, planning && s.planBtnDisabled]}
         onPress={handlePlan}
         disabled={planning}
       >
@@ -393,12 +409,12 @@ export default function RideWindowPlanner() {
         <>
           <RecommendationBox result={result} />
 
-          <Text style={s.segSectionTitle}>ROUTE SEGMENTS</Text>
+          <Text style={[s.segSectionTitle, { color: theme.textSecondary }]}>ROUTE SEGMENTS</Text>
           {result.segments.map((seg, i) => (
             <SegmentCard key={i} seg={seg} />
           ))}
 
-          <Text style={s.plannedNote}>
+          <Text style={[s.plannedNote, { color: theme.textSecondary }]}>
             Planned {new Date(result.plannedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </Text>
         </>
@@ -416,15 +432,12 @@ const s = StyleSheet.create({
   content: { padding: 16, paddingBottom: 48 },
 
   card: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
   },
   cardTitle: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 3,
@@ -434,7 +447,6 @@ const s = StyleSheet.create({
   // City input
   cityGroup: { marginBottom: 4 },
   cityLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 2,
@@ -443,41 +455,32 @@ const s = StyleSheet.create({
   cityInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
-  cityInputResolved: { borderColor: RISK_COLOR.CLEAR + '66' },
   cityInputText: {
     flex: 1,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 15,
   },
-  cityError: { color: Colors.TTM_RED, fontSize: 11, marginTop: 4 },
+  cityError: { fontSize: 11, marginTop: 4 },
   routeArrow: { alignItems: 'center', paddingVertical: 6 },
 
   // Date chips
   chipRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip: {
     flex: 1,
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
   },
-  chipActive: { backgroundColor: Colors.TTM_RED + '22', borderColor: Colors.TTM_RED },
-  chipText: { color: Colors.TEXT_SECONDARY, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  chipTextActive: { color: Colors.TTM_RED },
+  chipText: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 
   // Time picker
   timeLabelRow: { marginBottom: 8 },
   fieldLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 2,
@@ -485,32 +488,24 @@ const s = StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeBtn: {
     padding: 10,
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
   },
   timeDisplay: {
     flex: 1,
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
   },
-  timeText: { color: Colors.TEXT_PRIMARY, fontSize: 18, fontWeight: '700' },
+  timeText: { fontSize: 18, fontWeight: '700' },
   ampmBtn: {
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
   },
-  ampmActive: { backgroundColor: Colors.TTM_RED + '22', borderColor: Colors.TTM_RED },
-  ampmText: { color: Colors.TEXT_SECONDARY, fontSize: 13, fontWeight: '700' },
-  ampmTextActive: { color: Colors.TTM_RED },
+  ampmText: { fontSize: 13, fontWeight: '700' },
 
   // Plan button
   planBtn: {
@@ -518,7 +513,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingVertical: 16,
     marginBottom: 20,
@@ -526,13 +520,11 @@ const s = StyleSheet.create({
   planBtnPressed: { opacity: 0.8 },
   planBtnDisabled: { opacity: 0.5 },
   planBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 2 },
-  planError: { color: Colors.TTM_RED, fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  planError: { fontSize: 13, marginBottom: 10, textAlign: 'center' },
 
   // Recommendation box
   recBox: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderLeftWidth: 4,
     borderRadius: 8,
     padding: 16,
@@ -540,22 +532,19 @@ const s = StyleSheet.create({
   },
   recHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   recTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 2 },
-  recSubtitle: { color: Colors.TEXT_PRIMARY, fontSize: 14, fontWeight: '600', marginBottom: 4 },
-  recMeta: { color: Colors.TEXT_SECONDARY, fontSize: 12, marginBottom: 10 },
-  recText: { color: Colors.TEXT_PRIMARY, fontSize: 14, lineHeight: 20 },
+  recSubtitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
+  recMeta: { fontSize: 12, marginBottom: 10 },
+  recText: { fontSize: 14, lineHeight: 20 },
 
   // Segment cards
   segSectionTitle: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 3,
     marginBottom: 10,
   },
   segCard: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderLeftWidth: 4,
     borderRadius: 8,
     padding: 14,
@@ -567,7 +556,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  segName: { color: Colors.TEXT_PRIMARY, fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
+  segName: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 8 },
   riskBadge: {
     borderWidth: 1,
     borderRadius: 4,
@@ -577,8 +566,8 @@ const s = StyleSheet.create({
   riskText: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
   segBody: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   segStat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  segStatText: { color: Colors.TEXT_SECONDARY, fontSize: 13 },
+  segStatText: { fontSize: 13 },
 
   // Planned note
-  plannedNote: { color: Colors.TEXT_SECONDARY, fontSize: 11, textAlign: 'center', marginTop: 8 },
+  plannedNote: { fontSize: 11, textAlign: 'center', marginTop: 8 },
 });

@@ -11,13 +11,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
-import { useAuthStore, useSafetyStore } from '../lib/store';
+import { useAuthStore, useSafetyStore, useThemeStore } from '../lib/store';
 import type { TrackPoint } from '../lib/gpx';
 import { CrashDetector } from '../lib/safety';
 import { endShare } from '../lib/liveShare';
 import { stopBackgroundLocation } from '../lib/backgroundTasks';
-import { Colors } from '../lib/theme';
 import CrashAlertModal from '../components/safety/CrashAlertModal';
+import { useTheme } from '../lib/useTheme';
 
 // Configure how notifications are presented when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -53,10 +53,9 @@ function AuthGuard() {
     if (loading || onboardingDone === null) return;
     const inAuthGroup   = segments[0] === 'auth';
     const inOnboarding  = segments[0] === 'onboarding';
-    const inTabs        = segments[0] === '(tabs)';
 
-    if (!session && !inAuthGroup) {
-      router.replace('/auth');
+    if (!session && inAuthGroup) {
+      router.replace('/(tabs)/ride'); // DEV: skip login — redirect away from auth screen only
     } else if (session && !onboardingDone && !inOnboarding) {
       router.replace('/onboarding');
     } else if (session && onboardingDone && (inAuthGroup || inOnboarding)) {
@@ -221,18 +220,34 @@ function SafetyService() {
 // Root layout
 // ---------------------------------------------------------------------------
 
-export default function RootLayout() {
+function RootLayoutInner() {
+  const { mode, theme } = useTheme();
+  const { loadSavedMode } = useThemeStore();
+
+  useEffect(() => {
+    loadSavedMode();
+  }, []);
+
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" backgroundColor={Colors.TTM_DARK} />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.bg }}>
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} backgroundColor={theme.bg} />
       <AuthGuard />
       <SafetyService />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth" />
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="account" />
+        <Stack.Screen name="emergency-contacts" />
+        <Stack.Screen name="settings" />
+        <Stack.Screen name="weather-favorites" />
+        <Stack.Screen name="help-contact" />
       </Stack>
       <CrashAlertModal />
     </GestureHandlerRootView>
   );
+}
+
+export default function RootLayout() {
+  return <RootLayoutInner />;
 }

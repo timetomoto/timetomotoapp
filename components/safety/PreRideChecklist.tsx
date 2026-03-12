@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
-import { useSafetyStore } from '../../lib/store';
-import SafetyDot from './SafetyDot';
-import { Colors } from '../../lib/theme';
+import { useSafetyStore, useGarageStore, bikeLabel } from '../../lib/store';
+import { useTheme } from '../../lib/useTheme';
+import EmergencyContactsSheet from '../garage/EmergencyContactsSheet';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -19,7 +19,8 @@ import { Colors } from '../../lib/theme';
 
 export interface RideConfig {
   shareEnabled: boolean;
-  checkInMinutes: number | null;  // null = no check-in timer
+  checkInMinutes: number | null;
+  bikeId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,26 +53,27 @@ function CheckRow({
   status: RowStatus;
   children?: React.ReactNode;
 }) {
-  const statusColor = status === 'ok' ? '#4CAF50' : status === 'warn' ? '#FF9800' : Colors.TEXT_SECONDARY;
+  const { theme } = useTheme();
+  const statusColor = status === 'ok' ? '#4CAF50' : status === 'warn' ? '#FF9800' : theme.textSecondary;
   const statusIcon  = status === 'ok' ? 'check-circle' : status === 'warn' ? 'alert-circle' : status === 'loading' ? null : 'circle';
 
   return (
     <View style={s.row}>
       <View style={s.rowLeft}>
         <View style={[s.rowIconWrap, { backgroundColor: statusColor + '18' }]}>
-          <Feather name={icon as any} size={16} color={statusColor} />
+          <Feather name={icon as any} size={14} color={statusColor} />
         </View>
         <View style={s.rowText}>
-          <Text style={s.rowTitle}>{title}</Text>
-          <Text style={s.rowDetail}>{detail}</Text>
+          <Text style={[s.rowTitle, { color: theme.textPrimary }]}>{title}</Text>
+          <Text style={[s.rowDetail, { color: theme.textSecondary }]}>{detail}</Text>
         </View>
       </View>
       <View style={s.rowRight}>
         {children ?? (
           status === 'loading'
-            ? <ActivityIndicator size="small" color={Colors.TEXT_SECONDARY} />
+            ? <ActivityIndicator size="small" color={theme.textSecondary} />
             : statusIcon
-              ? <Feather name={statusIcon as any} size={18} color={statusColor} />
+              ? <Feather name={statusIcon as any} size={16} color={statusColor} />
               : null
         )}
       </View>
@@ -84,12 +86,13 @@ function CheckRow({
 // ---------------------------------------------------------------------------
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const { theme } = useTheme();
   return (
     <Pressable
-      style={[s.toggle, value && s.toggleOn]}
+      style={[s.toggle, { backgroundColor: theme.border }, value && { backgroundColor: theme.red }]}
       onPress={() => onChange(!value)}
     >
-      <View style={[s.toggleThumb, value && s.toggleThumbOn]} />
+      <View style={[s.toggleThumb, { backgroundColor: theme.textSecondary }, value && { alignSelf: 'flex-end', backgroundColor: '#fff' }]} />
     </Pressable>
   );
 }
@@ -98,10 +101,23 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 // PreRideChecklist
 // ---------------------------------------------------------------------------
 
-export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfig) => void }) {
-  const { isMonitoring, emergencyContacts } = useSafetyStore();
+const PRE_RIDE_COL1 = [
+  'Check tire pressure',
+  'Check brakes and controls',
+  'Check chain condition',
+];
 
-  // GPS status
+const PRE_RIDE_COL2 = [
+  'Check lights and signals',
+  'Check gear and helmet',
+  'Check fuel level',
+];
+
+export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfig) => void }) {
+  const { theme } = useTheme();
+  const { isMonitoring, setMonitoring, emergencyContacts } = useSafetyStore();
+  const { bikes, selectedBikeId, selectBike } = useGarageStore();
+
   const [gpsStatus, setGpsStatus] = useState<'loading' | 'ok' | 'warn'>('loading');
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => {
@@ -109,15 +125,17 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
     });
   }, []);
 
-  // Optional features
-  const [shareEnabled, setShareEnabled]   = useState(false);
-  const [checkInOn,    setCheckInOn]      = useState(false);
-  const [checkInMins,  setCheckInMins]    = useState<number>(60);
+  const [selectedBike, setSelectedBike]     = useState<string | null>(selectedBikeId);
+  const [shareEnabled, setShareEnabled]     = useState(false);
+  const [checkInOn,    setCheckInOn]        = useState(false);
+  const [checkInMins,  setCheckInMins]      = useState<number>(60);
+  const [showContacts, setShowContacts]     = useState(false);
 
   function handleStart() {
     onStart({
       shareEnabled,
       checkInMinutes: checkInOn ? checkInMins : null,
+      bikeId: selectedBike ?? undefined,
     });
   }
 
@@ -125,15 +143,75 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 
   return (
     <ScrollView
-      style={s.root}
+      style={[s.root, { backgroundColor: theme.bg }]}
       contentContainerStyle={s.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={s.heading}>PRE-RIDE CHECK</Text>
+      <Text style={[s.heading, { color: theme.textSecondary }]}>PRE-RIDE CHECK</Text>
+
+      {/* ── Bike selector ── */}
+      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>SELECT BIKE</Text>
+      {bikes.length === 0 ? (
+        <View style={[s.emptyCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Text style={[s.emptyText, { color: theme.textSecondary }]}>
+            No bikes in garage — add one in the Garage tab.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={s.bikeChipRow}
+          contentContainerStyle={s.bikeChipContent}
+          nestedScrollEnabled
+        >
+          {bikes.map((bike) => (
+            <Pressable
+              key={bike.id}
+              style={[
+                s.bikeChip,
+                { borderColor: theme.border, backgroundColor: theme.bgCard },
+                bike.id === selectedBike && { borderColor: theme.red, backgroundColor: 'rgba(211,47,47,0.12)' },
+              ]}
+              onPress={() => setSelectedBike(bike.id)}
+            >
+              <Text style={[
+                s.bikeChipText,
+                { color: theme.textSecondary },
+                bike.id === selectedBike && { color: theme.red },
+              ]}>
+                {bikeLabel(bike)}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* ── Static pre-ride reminders ── */}
+      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>REMINDERS</Text>
+      <View style={[s.remindersCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={s.remindersColumns}>
+          <View style={s.remindersCol}>
+            {PRE_RIDE_COL1.map((reminder, i) => (
+              <View key={i} style={s.reminderRow}>
+                <Feather name="check" size={9} color={theme.textSecondary} />
+                <Text style={[s.reminderText, { color: theme.textSecondary }]}>{reminder}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={s.remindersCol}>
+            {PRE_RIDE_COL2.map((reminder, i) => (
+              <View key={i} style={s.reminderRow}>
+                <Feather name="check" size={9} color={theme.textSecondary} />
+                <Text style={[s.reminderText, { color: theme.textSecondary }]}>{reminder}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
 
       {/* ── Required checks ── */}
-      <View style={s.card}>
-        {/* GPS */}
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <CheckRow
           icon="map-pin"
           title="GPS LOCK"
@@ -141,35 +219,45 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
           status={gpsStatus === 'loading' ? 'loading' : gpsStatus}
         />
 
-        <View style={s.divider} />
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
 
-        {/* Crash detection */}
         <CheckRow
           icon="shield"
           title="CRASH DETECTION"
           detail={isMonitoring ? 'Armed — accelerometer monitoring at 10 Hz' : 'Off — tap to enable'}
           status={isMonitoring ? 'ok' : 'off'}
         >
-          <SafetyDot />
+          <Toggle value={isMonitoring} onChange={setMonitoring} />
         </CheckRow>
 
-        <View style={s.divider} />
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
 
-        {/* Emergency contacts */}
         <CheckRow
           icon="users"
           title="EMERGENCY CONTACTS"
           detail={
             contactsOk
-              ? `${emergencyContacts.length} contact${emergencyContacts.length > 1 ? 's' : ''} saved`
-              : 'No contacts — add in Garage → Safety'
+              ? `${emergencyContacts.length} contact${emergencyContacts.length > 1 ? 's' : ''} saved — tap to edit`
+              : 'No contacts added — tap to add'
           }
           status={contactsOk ? 'ok' : 'warn'}
-        />
+        >
+          <Pressable
+            style={[s.contactsBtn, { backgroundColor: contactsOk ? theme.bgPanel : theme.red, borderColor: contactsOk ? theme.border : 'transparent' }]}
+            onPress={() => setShowContacts(true)}
+          >
+            <Feather name={contactsOk ? 'edit-2' : 'plus'} size={13} color={contactsOk ? theme.textSecondary : '#fff'} />
+            <Text style={[s.contactsBtnText, { color: contactsOk ? theme.textSecondary : '#fff' }]}>
+              {contactsOk ? 'EDIT' : 'ADD'}
+            </Text>
+          </Pressable>
+        </CheckRow>
       </View>
 
+      {showContacts && <EmergencyContactsSheet onClose={() => setShowContacts(false)} />}
+
       {/* ── Optional: Live share ── */}
-      <View style={s.card}>
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <CheckRow
           icon="share-2"
           title="LIVE SHARE"
@@ -185,7 +273,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
       </View>
 
       {/* ── Optional: Check-in timer ── */}
-      <View style={s.card}>
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <CheckRow
           icon="clock"
           title="CHECK-IN TIMER"
@@ -204,10 +292,18 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
             {CHECK_IN_PRESETS.map((p) => (
               <Pressable
                 key={p.value}
-                style={[s.durationChip, checkInMins === p.value && s.durationChipActive]}
+                style={[
+                  s.durationChip,
+                  { backgroundColor: theme.bgPanel, borderColor: theme.border },
+                  checkInMins === p.value && { backgroundColor: theme.red + '22', borderColor: theme.red },
+                ]}
                 onPress={() => setCheckInMins(p.value)}
               >
-                <Text style={[s.durationChipText, checkInMins === p.value && s.durationChipTextActive]}>
+                <Text style={[
+                  s.durationChipText,
+                  { color: theme.textSecondary },
+                  checkInMins === p.value && { color: theme.red },
+                ]}>
                   {p.label}
                 </Text>
               </Pressable>
@@ -218,10 +314,10 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 
       {/* ── Start button ── */}
       <Pressable
-        style={({ pressed }) => [s.startBtn, pressed && s.startBtnPressed]}
+        style={({ pressed }) => [s.startBtn, { backgroundColor: theme.red }, pressed && s.startBtnPressed]}
         onPress={handleStart}
       >
-        <Feather name="play-circle" size={20} color="#fff" />
+        <Feather name="play-circle" size={18} color="#fff" />
         <Text style={s.startBtnText}>START RIDE</Text>
       </Pressable>
     </ScrollView>
@@ -233,93 +329,149 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.TTM_DARK },
-  content: { padding: 20, paddingBottom: 80 },
+  root: { flex: 1 },
+  content: { padding: 14, paddingBottom: 60 },
 
   heading: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 3,
-    marginBottom: 14,
+    marginBottom: 8,
+  },
+
+  sectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 5,
+    marginTop: 2,
+  },
+
+  // Bike selector
+  bikeChipRow: { marginBottom: 8 },
+  bikeChipContent: { gap: 6, paddingHorizontal: 2 },
+  bikeChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  bikeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  emptyCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  emptyText: { fontSize: 11, lineHeight: 16 },
+
+  // Static reminders
+  remindersCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  remindersColumns: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  remindersCol: {
+    flex: 1,
+    gap: 4,
+  },
+  reminderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  reminderText: {
+    fontSize: 10,
+    lineHeight: 14,
+    flex: 1,
   },
 
   card: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
-    borderRadius: 10,
-    marginBottom: 12,
+    borderRadius: 8,
+    marginBottom: 8,
     overflow: 'hidden',
   },
-  divider: { height: 1, backgroundColor: Colors.TTM_BORDER, marginHorizontal: 16 },
+  divider: { height: 1, marginHorizontal: 12 },
 
-  // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 14,
-    minHeight: 64,
+    minHeight: 53,
   },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
-  rowIconWrap: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  rowText: { flex: 1, gap: 3 },
-  rowTitle: { color: Colors.TEXT_PRIMARY, fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
-  rowDetail: { color: Colors.TEXT_SECONDARY, fontSize: 11, lineHeight: 16 },
-  rowRight: { marginLeft: 12 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 9 },
+  rowIconWrap: { width: 33, height: 33, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, gap: 2 },
+  rowTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  rowDetail: { fontSize: 10, lineHeight: 14 },
+  rowRight: { marginLeft: 10 },
 
-  // Toggle
   toggle: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: Colors.TTM_BORDER,
+    width: 40,
+    height: 29,
+    borderRadius: 14,
     justifyContent: 'center',
     paddingHorizontal: 3,
   },
-  toggleOn:    { backgroundColor: Colors.TTM_RED },
   toggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.TEXT_SECONDARY,
+    width: 23,
+    height: 23,
+    borderRadius: 11,
     alignSelf: 'flex-start',
   },
-  toggleThumbOn: { alignSelf: 'flex-end', backgroundColor: '#fff' },
 
-  // Duration chips
   durationRow: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
   },
   durationChip: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 11,
     alignItems: 'center',
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
   },
-  durationChipActive:     { backgroundColor: Colors.TTM_RED + '22', borderColor: Colors.TTM_RED },
-  durationChipText:       { color: Colors.TEXT_SECONDARY, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  durationChipTextActive: { color: Colors.TTM_RED },
+  durationChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
 
-  // Start button
   startBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: Colors.TTM_RED,
-    borderRadius: 10,
+    gap: 10,
+    borderRadius: 8,
     paddingVertical: 18,
-    marginTop: 4,
+    marginTop: 2,
   },
   startBtnPressed: { opacity: 0.8 },
-  startBtnText: { color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 3 },
+  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 2 },
+
+  contactsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  contactsBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -11,60 +11,132 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Mapbox, {
   Camera,
   CircleLayer,
-  FillLayer,
   LineLayer,
   LocationPuck,
   MapView,
+  RasterLayer,
+  RasterSource,
   ShapeSource,
   StyleURL,
 } from '@rnmapbox/maps';
+// LineLayer kept for live track and overlay route layers
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore } from '../../lib/store';
+import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, bikeLabel } from '../../lib/store';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
 import { routeGeoJson, routeBounds, calcDistance } from '../../lib/gpx';
 import { createRoute } from '../../lib/routes';
 import {
-  circleGeoJson,
   fuelStationsGeoJson,
   fetchFuelStations,
+  foodPlacesGeoJson,
+  fetchFoodPlaces,
   type FuelStation,
+  type FoodPlace,
 } from '../../lib/mapOverlays';
 import type { Route } from '../../lib/routes';
 import type { TrackPoint } from '../../lib/gpx';
-import SafetyDot from '../../components/safety/SafetyDot';
 import PreRideChecklist, { type RideConfig } from '../../components/safety/PreRideChecklist';
 import RoutesScreen from '../../components/ride/RoutesScreen';
 import SaveRideSheet from '../../components/ride/SaveRideSheet';
-import MapOverlayControls from '../../components/ride/MapOverlayControls';
-import { Colors } from '../../lib/theme';
+import PlaceDetailPanel, { type PlaceDetail } from '../../components/ride/PlaceDetailPanel';
+import HamburgerButton from '../../components/navigation/HamburgerButton';
+import HamburgerMenu from '../../components/navigation/HamburgerMenu';
+import TimetomotoLogo from '../../components/common/TimetomotoLogo';
+import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT } from '../../lib/headerLayout';
+import { darkTheme } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
+import { useNavigationStore } from '../../lib/navigationStore';
+import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMeters } from '../../lib/directions';
+import MapControlDrawer from '../../components/ride/MapControlDrawer';
+import SearchSheet from '../../components/ride/SearchSheet';
+import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
+import NavigationBanner from '../../components/ride/NavigationBanner';
+import NavigationStatsBar from '../../components/ride/NavigationStatsBar';
+import CompletionScreen from '../../components/ride/CompletionScreen';
 
 // ---------------------------------------------------------------------------
 // Mapbox init — runs once
 // ---------------------------------------------------------------------------
 Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
+Mapbox.setTelemetryEnabled(false);
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 type SubTab   = 'MAP' | 'ROUTES' | 'RECORD';
-type MapStyle = 'dark' | 'satellite' | 'outdoors';
+type MapStyle = 'standard' | 'terrain' | 'satellite' | 'hybrid';
 
 const MAP_STYLES: Record<MapStyle, string> = {
-  dark:      'mapbox://styles/mapbox/dark-v11',
-  satellite: StyleURL.SatelliteStreet,
-  outdoors:  StyleURL.Outdoors,
-};
-
-const STYLE_LABELS: Record<MapStyle, string> = {
-  dark:      'DARK',
-  satellite: 'SAT',
-  outdoors:  'TOPO',
+  standard:  'mapbox://styles/mapbox/dark-v11',
+  terrain:   StyleURL.Outdoors,
+  satellite: StyleURL.Satellite,
+  hybrid:    StyleURL.SatelliteStreet,
 };
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
+
+const TOMORROW_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
+
+// ---------------------------------------------------------------------------
+// Weather legend overlay
+// ---------------------------------------------------------------------------
+
+const WeatherLegend = memo(function WeatherLegend() {
+  const { theme } = useTheme();
+  return (
+    <View style={[wl.panel, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
+      <Text style={[wl.title, { color: '#fff' }]}>PRECIPITATION</Text>
+      <View style={wl.row}>
+        <View style={[wl.swatch, { backgroundColor: '#1a1aff' }]} />
+        <Text style={[wl.label, { color: '#fff' }]}>Heavy</Text>
+        <View style={[wl.swatch, { backgroundColor: '#00aaff', marginLeft: 8 }]} />
+        <Text style={[wl.label, { color: '#fff' }]}>Moderate</Text>
+      </View>
+      <View style={wl.row}>
+        <View style={[wl.swatch, { backgroundColor: '#aaffaa' }]} />
+        <Text style={[wl.label, { color: '#fff' }]}>Light</Text>
+        <View style={[wl.swatch, { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginLeft: 8 }]} />
+        <Text style={[wl.label, { color: '#fff' }]}>None</Text>
+      </View>
+    </View>
+  );
+});
+
+const wl = StyleSheet.create({
+  panel: {
+    position: 'absolute',
+    bottom: 168,
+    left: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    gap: 4,
+    minWidth: 160,
+  },
+  title: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  swatch: {
+    width: 14,
+    height: 10,
+    borderRadius: 2,
+  },
+  label: {
+    fontSize: 10,
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Sub-screens
@@ -72,9 +144,12 @@ const AUSTIN = [-97.7431, 30.2672] as [number, number];
 
 function RecordScreen({
   onStopRequested,
+  elapsedSeconds,
 }: {
   onStopRequested: () => void;
+  elapsedSeconds: number;
 }) {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
   const {
     isRecording, setRecording, isMonitoring, lastKnownLocation,
@@ -82,19 +157,6 @@ function RecordScreen({
     checkInActive, checkInDeadline, checkInNotifId, clearCheckIn,
     setCheckIn, emergencyContacts,
   } = useSafetyStore();
-
-  // Elapsed recording timer
-  const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    if (isRecording) {
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
-    } else {
-      clearInterval(timerRef.current!);
-      setElapsed(0);
-    }
-    return () => clearInterval(timerRef.current!);
-  }, [isRecording]);
 
   // Check-in countdown
   const [checkInSecsLeft, setCheckInSecsLeft] = useState<number | null>(null);
@@ -110,9 +172,11 @@ function RecordScreen({
     return () => clearInterval(tickRef.current!);
   }, [checkInActive, checkInDeadline]);
 
-  function formatTime(s: number) {
-    const m = Math.floor(s / 60);
-    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  function formatHMS(s: number) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   }
 
   function formatCountdown(secs: number) {
@@ -189,55 +253,50 @@ function RecordScreen({
     return <PreRideChecklist onStart={handleStart} />;
   }
 
-  // ── ACTIVE RIDE view ──
+  // ── ACTIVE RIDE view — transparent overlay on top of the map ──
   return (
-    <View style={[{ flex: 1 }, styles.subScreenCentered, { padding: 20 }]}>
-      {/* Elapsed time */}
-      <Text style={styles.recordElapsed}>{formatTime(elapsed)}</Text>
-
-      {/* Stop button */}
-      <Pressable style={styles.recordCircleActive} onPress={handleStop}>
-        <Feather name="square" size={36} color="#fff" />
+    <View style={{ flex: 1 }} pointerEvents="box-none">
+      {/* END button — bottom-right, same position as navigation END */}
+      <Pressable
+        style={[styles.endNavBtn, { backgroundColor: theme.red }]}
+        onPress={handleStop}
+      >
+        <Feather name="x" size={16} color="#fff" />
+        <Text style={styles.endNavBtnText}>END</Text>
       </Pressable>
-      <Text style={styles.recordHint}>Recording · tap to stop</Text>
 
-      {/* Crash detection status */}
-      <View style={styles.monitoringBadge}>
-        <SafetyDot />
-        <Text style={styles.monitoringText}>
-          {isMonitoring ? 'Crash detection on' : 'Crash detection off'}
-        </Text>
+      {/* Status badges — share / check-in only (crash badge is already on the map header) */}
+      <View style={styles.recordActiveCenter} pointerEvents="box-none">
+        {/* Live share status */}
+        {shareActive && (
+          <View style={[styles.statusRow, { backgroundColor: 'rgba(0,0,0,0.65)', borderColor: '#4CAF5044' }]}>
+            <View style={styles.statusDot} />
+            <Text style={[styles.statusText, { color: '#ccc' }]}>LIVE — location link copied to clipboard</Text>
+            <Pressable onPress={async () => {
+              if (shareToken) await Clipboard.setStringAsync(shareUrl(shareToken));
+            }}>
+              <Feather name="copy" size={14} color="#ccc" />
+            </Pressable>
+          </View>
+        )}
+
+        {/* Check-in countdown */}
+        {checkInActive && checkInSecsLeft !== null && (
+          <View style={[styles.statusRow, { backgroundColor: 'rgba(0,0,0,0.65)', borderColor: checkInSecsLeft < 300 ? theme.red + '66' : 'rgba(255,255,255,0.15)' }]}>
+            <Feather
+              name="clock"
+              size={14}
+              color={checkInSecsLeft < 300 ? theme.red : '#ccc'}
+            />
+            <Text style={[styles.statusText, { color: '#ccc' }, checkInSecsLeft < 300 && { color: theme.red }]}>
+              Check in: {formatCountdown(checkInSecsLeft)} remaining
+            </Text>
+            <Pressable style={styles.checkInBtn} onPress={handleCheckIn}>
+              <Text style={styles.checkInBtnText}>CHECK IN</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
-
-      {/* Live share status */}
-      {shareActive && (
-        <View style={[styles.statusRow, { borderColor: '#4CAF5044' }]}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>LIVE — location link copied to clipboard</Text>
-          <Pressable onPress={async () => {
-            if (shareToken) await Clipboard.setStringAsync(shareUrl(shareToken));
-          }}>
-            <Feather name="copy" size={14} color={Colors.TEXT_SECONDARY} />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Check-in countdown */}
-      {checkInActive && checkInSecsLeft !== null && (
-        <View style={[styles.statusRow, { borderColor: checkInSecsLeft < 300 ? Colors.TTM_RED + '66' : Colors.TTM_BORDER }]}>
-          <Feather
-            name="clock"
-            size={14}
-            color={checkInSecsLeft < 300 ? Colors.TTM_RED : Colors.TEXT_SECONDARY}
-          />
-          <Text style={[styles.statusText, checkInSecsLeft < 300 && { color: Colors.TTM_RED }]}>
-            Check in: {formatCountdown(checkInSecsLeft)} remaining
-          </Text>
-          <Pressable style={styles.checkInBtn} onPress={handleCheckIn}>
-            <Text style={styles.checkInBtnText}>CHECK IN</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
@@ -246,57 +305,36 @@ function RecordScreen({
 // Stats overlay (shown on MAP tab while recording)
 // ---------------------------------------------------------------------------
 
-function StatsOverlay({ isRecording }: { isRecording: boolean }) {
-  const [elapsed, setElapsed] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: boolean; elapsedSeconds: number; speedMph: number }) {
+  const { theme } = useTheme();
   const { recordedPoints } = useSafetyStore();
 
-  useEffect(() => {
-    if (isRecording) {
-      timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
-    } else {
-      clearInterval(timerRef.current!);
-      setElapsed(0);
-    }
-    return () => clearInterval(timerRef.current!);
-  }, [isRecording]);
-
-  function formatTime(s: number) {
-    const m = Math.floor(s / 60);
-    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  function formatHMS(s: number) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
   }
 
   const miles = isRecording ? calcDistance(recordedPoints) : 0;
 
   return (
-    <View style={styles.statsBar}>
+    <View style={[styles.statsBar, { backgroundColor: 'rgba(20,20,20,0.88)', borderColor: theme.border }]}>
       <View style={styles.statItem}>
-        <Text style={styles.statValue}>0</Text>
-        <Text style={styles.statLabel}>MPH</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{Math.round(speedMph)}</Text>
+        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MPH</Text>
       </View>
-      <View style={styles.statDivider} />
+      <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
       <View style={styles.statItem}>
-        <Text style={styles.statValue}>{miles < 10 ? miles.toFixed(1) : Math.round(miles)}</Text>
-        <Text style={styles.statLabel}>MILES</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{miles < 10 ? miles.toFixed(1) : Math.round(miles)}</Text>
+        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MILES</Text>
       </View>
-      <View style={styles.statDivider} />
+      <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
       <View style={styles.statItem}>
-        <Text style={styles.statValue}>{formatTime(elapsed)}</Text>
-        <Text style={styles.statLabel}>TIME</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{formatHMS(elapsedSeconds)}</Text>
+        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>TIME</Text>
       </View>
     </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Layer toggle
-// ---------------------------------------------------------------------------
-
-function LayerToggle({ current, onCycle }: { current: MapStyle; onCycle: () => void }) {
-  return (
-    <Pressable style={styles.layerBtn} onPress={onCycle}>
-      <Text style={styles.layerBtnText}>{STYLE_LABELS[current]}</Text>
-    </Pressable>
   );
 }
 
@@ -304,63 +342,79 @@ function LayerToggle({ current, onCycle }: { current: MapStyle; onCycle: () => v
 // Sub-nav
 // ---------------------------------------------------------------------------
 
-function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
+const SubNav = memo(function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
+  const { theme } = useTheme();
   const tabs: SubTab[] = ['MAP', 'ROUTES', 'RECORD'];
   return (
-    <View style={styles.subNav}>
+    <View style={[styles.subNav, { backgroundColor: 'rgba(20,20,20,0.95)', borderTopColor: theme.border }]}>
       {tabs.map((tab) => (
         <Pressable key={tab} style={styles.subNavItem} onPress={() => onChange(tab)}>
-          <Text style={[styles.subNavText, active === tab && styles.subNavTextActive]}>
+          <Text style={[styles.subNavText, { color: theme.tabBarInactive }, active === tab && { color: theme.red }]}>
             {tab}
           </Text>
-          {active === tab && <View style={styles.subNavUnderline} />}
+          {active === tab && <View style={[styles.subNavUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
       ))}
     </View>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Main RideScreen
 // ---------------------------------------------------------------------------
 
 export default function RideScreen() {
+  const { theme } = useTheme();
   const [subTab, setSubTab]     = useState<SubTab>('MAP');
-  const [mapStyle, setMapStyle] = useState<MapStyle>('dark');
+  const [mapStyle, setMapStyle] = useState<MapStyle>('standard');
   const { user }                = useAuthStore();
   const { addRoute }            = useRoutesStore();
-  const { bikes, selectedBikeId } = useGarageStore();
+  const { bikes, selectedBikeId, fetchBikes } = useGarageStore();
+
+  useEffect(() => {
+    fetchBikes(user?.id ?? 'local');
+  }, [user?.id]);
   const {
     isRecording, setRecording,
-    recordedPoints, clearRecordedPoints,
+    recordedPoints, clearRecordedPoints, addRecordedPoint,
     lastKnownLocation,
   } = useSafetyStore();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { isMonitoring, setMonitoring } = useSafetyStore();
 
   const selectedBike = useMemo(
     () => bikes.find((b) => b.id === selectedBikeId) ?? null,
     [bikes, selectedBikeId],
   );
 
+  // ── Navigation store ──
+  const {
+    mode: navMode, destination, activeRoute, alternateRoutes,
+    currentStepIndex, remainingDistanceMiles, eta,
+    routePreference, speedMph, headingDeg,
+    setMode: setNavMode, setDestination, setActiveRoute, setAlternateRoutes,
+    setCurrentStepIndex, setRemainingDistance, setEta,
+    setRoutePreference, setSpeed, setHeading, setIsOffRoute,
+    resetNavigation,
+  } = useNavigationStore();
+
+  // ── Drawer / sheet state ──
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchSheetOpen, setSearchSheetOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [navRouteGeojson, setNavRouteGeojson] = useState<any>(null);
+
   // ── Overlay toggles ──
-  const [fuelRangeOn,    setFuelRangeOn]    = useState(false);
-  const [offRoadOn,      setOffRoadOn]      = useState(false);
-  const [publicLandsOn,  setPublicLandsOn]  = useState(false);
   const [fuelStationsOn, setFuelStationsOn] = useState(false);
   const [fuelStations,   setFuelStations]   = useState<FuelStation[]>([]);
   const [fuelStationsLoading, setFuelStationsLoading] = useState(false);
-
-  // Fuel range miles (reactive to bike specs)
-  const fuelRangeMiles = useMemo(() => {
-    if (!selectedBike?.tank_gallons || !selectedBike?.avg_mpg) return null;
-    return Math.round(selectedBike.tank_gallons * selectedBike.avg_mpg * 0.8);
-  }, [selectedBike]);
-
-  // Fuel range circle GeoJSON (reactive to location + range)
-  const fuelCircleGeoJson = useMemo(() => {
-    if (!fuelRangeOn || fuelRangeMiles === null) return null;
-    const c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
-    return circleGeoJson(c.lng, c.lat, fuelRangeMiles);
-  }, [fuelRangeOn, fuelRangeMiles, lastKnownLocation]);
+  const [foodOn,         setFoodOn]         = useState(false);
+  const [foodPlaces,     setFoodPlaces]     = useState<FoodPlace[]>([]);
+  const [foodLoading,    setFoodLoading]    = useState(false);
+  const [weatherOn,      setWeatherOn]      = useState(false);
+  const [selectedPlace,  setSelectedPlace]  = useState<PlaceDetail | null>(null);
 
   // Fuel stations GeoJSON
   const fuelStationsGeoJsonData = useMemo(
@@ -368,16 +422,11 @@ export default function RideScreen() {
     [fuelStations],
   );
 
-  function handleToggleFuelRange() {
-    if (!fuelRangeOn && (!selectedBike?.tank_gallons || !selectedBike?.avg_mpg)) {
-      Alert.alert(
-        'No bike specs',
-        'Add tank size and average MPG in Garage to use the fuel range overlay.',
-      );
-      return;
-    }
-    setFuelRangeOn((v) => !v);
-  }
+  // Food places GeoJSON
+  const foodPlacesGeoJsonData = useMemo(
+    () => (foodPlaces.length > 0 ? foodPlacesGeoJson(foodPlaces) : null),
+    [foodPlaces],
+  );
 
   async function handleToggleFuelStations() {
     if (fuelStationsOn) {
@@ -399,31 +448,244 @@ export default function RideScreen() {
     }
   }
 
+  async function handleToggleFood() {
+    if (foodOn) {
+      setFoodOn(false);
+      setFoodPlaces([]);
+      return;
+    }
+    setFoodLoading(true);
+    setFoodOn(true);
+    try {
+      const c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+      const places = await fetchFoodPlaces(c.lat, c.lng);
+      setFoodPlaces(places);
+    } catch {
+      Alert.alert('Failed', 'Could not fetch food places. Check your connection.');
+      setFoodOn(false);
+    } finally {
+      setFoodLoading(false);
+    }
+  }
+
   // Map overlays: imported/navigating route + live track
   const [overlayPoints, setOverlayPoints] = useState<TrackPoint[] | null>(null);
   const [showSaveSheet, setShowSaveSheet] = useState(false);
   const [rideElapsed, setRideElapsed]     = useState(0);
 
+  // Toast state
+  const [toastMsg, setToastMsg] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastMsg(''), 2500);
+  }
+
   const cameraRef    = useRef<Mapbox.Camera>(null);
-  const styleKeys    = Object.keys(MAP_STYLES) as MapStyle[];
   const elapsedRef   = useRef(0);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isRecordingRef = useRef(isRecording);
+  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
-  // Track elapsed separately for save sheet (RecordScreen has its own timer)
+  // Single source-of-truth elapsed timer — drives both RecordScreen overlay and StatsOverlay
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   useEffect(() => {
     if (isRecording) {
       elapsedRef.current = 0;
-      elapsedTimer.current = setInterval(() => { elapsedRef.current += 1; }, 1000);
+      setElapsedSeconds(0);
+      elapsedTimer.current = setInterval(() => {
+        elapsedRef.current += 1;
+        setElapsedSeconds(elapsedRef.current);
+      }, 1000);
     } else {
       clearInterval(elapsedTimer.current!);
+      setElapsedSeconds(0);
+      elapsedRef.current = 0;
     }
     return () => clearInterval(elapsedTimer.current!);
   }, [isRecording]);
 
-  function cycleStyle() {
-    setMapStyle((s) => {
-      const idx = styleKeys.indexOf(s);
-      return styleKeys[(idx + 1) % styleKeys.length];
+  // ── GPS speed/heading tracking + 1s recorded-track updates ──
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    Location.requestForegroundPermissionsAsync().then(({ status }) => {
+      if (status !== 'granted') return;
+      Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
+        (loc) => {
+          const speedMs = loc.coords.speed ?? 0;
+          setSpeed(Math.max(0, speedMs * 2.237)); // m/s to mph
+          if (loc.coords.heading != null && loc.coords.heading >= 0) {
+            setHeading(loc.coords.heading);
+          }
+          // Record GPS point every second while recording
+          if (isRecordingRef.current) {
+            addRecordedPoint({
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+              elevation: loc.coords.altitude ?? 0,
+              time: new Date().toISOString(),
+            });
+          }
+        },
+      ).then((s) => { sub = s; });
+    });
+    return () => { sub?.remove(); };
+  }, []);
+
+  // ── Navigation engine ──
+  useEffect(() => {
+    if (navMode !== 'navigating' && navMode !== 'off_route') return;
+    const interval = setInterval(async () => {
+      const pos = lastKnownLocation;
+      if (!pos || !activeRoute) return;
+
+      // Check if we've reached the destination
+      if (destination) {
+        const distToDest = haversineMeters(pos.lat, pos.lng, destination.lat, destination.lng);
+        if (distToDest < 30) {
+          setNavMode('completed');
+          clearInterval(interval);
+          return;
+        }
+      }
+
+      // Advance step
+      const nextStep = findNextStepIndex(pos.lat, pos.lng, activeRoute.steps, currentStepIndex);
+      if (nextStep !== currentStepIndex) {
+        setCurrentStepIndex(nextStep);
+      }
+
+      // Off-route check
+      if (navMode === 'navigating') {
+        const offDist = distanceToRouteMeters(pos.lat, pos.lng, activeRoute.geometry.coordinates);
+        if (offDist > 50) {
+          setNavMode('off_route');
+          setIsOffRoute(true);
+          // Auto-recalculate after 3 seconds
+          setTimeout(async () => {
+            if (!destination) return;
+            setNavMode('recalculating');
+            try {
+              const newRoutes = await fetchDirections(
+                pos.lng, pos.lat, destination.lng, destination.lat, routePreference,
+              );
+              if (newRoutes.length > 0) {
+                setActiveRoute(newRoutes[0]);
+                setNavRouteGeojson(newRoutes[0].geometry);
+                setCurrentStepIndex(0);
+                setIsOffRoute(false);
+                setNavMode('navigating');
+              }
+            } catch {
+              setNavMode('navigating'); // Resume even if recalc fails
+            }
+          }, 3000);
+        }
+      }
+
+      // Update remaining distance
+      if (destination) {
+        const remaining = haversineMeters(pos.lat, pos.lng, destination.lat, destination.lng) / 1609.344;
+        setRemainingDistance(remaining);
+        if (activeRoute) {
+          const etaMs = Date.now() + (remaining / Math.max(speedMph, 10)) * 3600 * 1000;
+          setEta(new Date(etaMs));
+        }
+      }
+
+      // Update camera for heading-up navigation
+      const zoom = speedMph > 50 ? 13 : speedMph > 20 ? 15 : 17;
+      cameraRef.current?.setCamera({
+        centerCoordinate: [pos.lng, pos.lat],
+        zoomLevel: zoom,
+        heading: headingDeg,
+        animationDuration: 800,
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [navMode, activeRoute, destination, currentStepIndex, routePreference, lastKnownLocation, speedMph, headingDeg]);
+
+  // ── Camera: center on user when switching to RECORD tab during recording ──
+  useEffect(() => {
+    if (subTab === 'RECORD' && isRecording && lastKnownLocation) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [lastKnownLocation.lng, lastKnownLocation.lat],
+        zoomLevel: 16,
+        heading: headingDeg,
+        animationDuration: 600,
+      });
+    }
+  }, [subTab]);
+
+  // ── fetchAndPreviewRoute ──
+  async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }) {
+    setDestination(dest);
+    setNavMode('preview');
+    setRouteLoading(true);
+    setRouteError(null);
+    try {
+      const origin = lastKnownLocation
+        ? { lat: lastKnownLocation.lat, lng: lastKnownLocation.lng }
+        : { lat: AUSTIN[1], lng: AUSTIN[0] };
+      const routes = await fetchDirections(
+        origin.lng, origin.lat, dest.lng, dest.lat, routePreference,
+      );
+      if (routes.length > 0) {
+        setActiveRoute(routes[0]);
+        setAlternateRoutes(routes.slice(1));
+        setNavRouteGeojson(routes[0].geometry);
+
+        // Fit camera to route bounds
+        const coords = routes[0].geometry.coordinates;
+        if (coords.length >= 2) {
+          const lats = coords.map((c) => c[1]);
+          const lngs = coords.map((c) => c[0]);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLng = Math.min(...lngs);
+          const maxLng = Math.max(...lngs);
+          cameraRef.current?.fitBounds(
+            [maxLng, maxLat],
+            [minLng, minLat],
+            [80, 80, 220, 80],
+            800,
+          );
+        }
+      }
+    } catch (e: any) {
+      setRouteError(e?.message ?? 'Could not fetch route');
+      setActiveRoute(null);
+      setAlternateRoutes([]);
+    } finally {
+      setRouteLoading(false);
+    }
+  }
+
+  // ── handleStartNavigation ──
+  function handleStartNavigation(route: typeof activeRoute) {
+    if (!route) return;
+    setNavMode('navigating');
+    setActiveRoute(route);
+    setNavRouteGeojson(route.geometry);
+    setCurrentStepIndex(0);
+    setRemainingDistance(route.distanceMiles);
+
+    const etaMs = Date.now() + route.durationSeconds * 1000;
+    setEta(new Date(etaMs));
+
+    const pos = lastKnownLocation;
+    const startCoord = pos
+      ? [pos.lng, pos.lat]
+      : (route.geometry.coordinates[0] ?? AUSTIN);
+
+    cameraRef.current?.setCamera({
+      centerCoordinate: startCoord as [number, number],
+      zoomLevel: 16,
+      heading: headingDeg,
+      animationDuration: 800,
     });
   }
 
@@ -431,8 +693,12 @@ export default function RideScreen() {
   function handleNavigate(route: Route) {
     setOverlayPoints(route.points);
     setSubTab('MAP');
-    const [ne, sw] = routeBounds(route.points);
-    cameraRef.current?.fitBounds(ne, sw, [60, 60, 100, 60], 800);
+    const dest = {
+      name: route.name,
+      lat: route.points[route.points.length - 1].lat,
+      lng: route.points[route.points.length - 1].lng,
+    };
+    fetchAndPreviewRoute(dest);
   }
 
   // GPX import: preview route on map + switch to MAP
@@ -455,7 +721,12 @@ export default function RideScreen() {
       const miles   = calcDistance(recordedPoints);
       const gainFt  = 0; // elevation from device GPS — skipped without barometer
       const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current);
-      if (saved) addRoute(saved);
+      if (saved) {
+        addRoute(saved);
+        showToast('Route saved to library!');
+        // Switch to ROUTES sub-tab so user sees their new route
+        setSubTab('ROUTES');
+      }
     }
     clearRecordedPoints();
     setRecording(false);
@@ -469,6 +740,39 @@ export default function RideScreen() {
     setShowSaveSheet(false);
   }
 
+  // Locate me: animate camera to user's current location
+  async function handleLocateMe() {
+    // Try last known location first (instant)
+    if (lastKnownLocation) {
+      cameraRef.current?.setCamera({
+        centerCoordinate: [lastKnownLocation.lng, lastKnownLocation.lat],
+        zoomLevel: 14,
+        animationDuration: 600,
+      });
+      return;
+    }
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      cameraRef.current?.setCamera({
+        centerCoordinate: [loc.coords.longitude, loc.coords.latitude],
+        zoomLevel: 14,
+        animationDuration: 800,
+      });
+    } catch {
+      // Silently fail — GPS unavailable in simulator
+    }
+  }
+
+  function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 3958.8;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   // Live track GeoJSON
   const liveTrackGeoJson =
     isRecording && recordedPoints.length >= 2
@@ -480,15 +784,32 @@ export default function RideScreen() {
     ? routeGeoJson(overlayPoints)
     : null;
 
+  // Map style — respect theme for standard, always use correct style for others
+  const activeMapStyle = (() => {
+    if (mapStyle === 'satellite') return StyleURL.Satellite;
+    if (mapStyle === 'hybrid') return StyleURL.SatelliteStreet;
+    if (mapStyle === 'terrain') return StyleURL.Outdoors;
+    // standard — respect theme
+    return theme.bg === darkTheme.bg
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/light-v11';
+  })();
+
+  // Weather tile URL template
+  const weatherTileUrl = `https://api.tomorrow.io/v4/map/tile/{z}/{x}/{y}/precipitationIntensity/now.png?apikey=${TOMORROW_KEY}`;
+
+  const isNavigatingActive = navMode === 'navigating' || navMode === 'off_route' || navMode === 'recalculating';
+
   return (
-    <View style={styles.root}>
-      {/* ── Full-screen map (always mounted) ── */}
-      <View style={[styles.mapContainer, subTab !== 'MAP' && styles.hidden]}>
+    <View style={[styles.root, { backgroundColor: theme.bg }]}>
+      {/* ── Full-screen map (always mounted; also visible on RECORD tab while recording) ── */}
+      <View style={[styles.mapContainer, (subTab !== 'MAP' && !(subTab === 'RECORD' && isRecording)) && styles.hidden]}>
         <MapView
           style={StyleSheet.absoluteFillObject}
-          styleURL={MAP_STYLES[mapStyle]}
+          styleURL={activeMapStyle}
           compassEnabled
-          compassPosition={{ bottom: 120, right: 16 }}
+          compassPosition={{ top: Platform.OS === 'ios' ? 108 : 68, right: 12 }}
+          compassViewStyle={{ opacity: 0.7 }}
           attributionEnabled
           attributionPosition={{ bottom: 8, right: 8 }}
           logoEnabled={false}
@@ -497,60 +818,68 @@ export default function RideScreen() {
             ref={cameraRef}
             defaultSettings={{ centerCoordinate: AUSTIN, zoomLevel: 9 }}
           />
+
+          {/* User location puck */}
           <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
 
-          {/* ── ADV: Off-road trails ── */}
-          {offRoadOn && (
-            <LineLayer
-              id="offroad-trails"
-              sourceID="composite"
-              sourceLayerID="road"
-              filter={['match', ['get', 'class'], ['track', 'path'], true, false]}
-              style={{ lineColor: '#4ECDC4', lineWidth: 2, lineOpacity: 0.85 }}
-            />
-          )}
-
-          {/* ── ADV: Public / protected lands ── */}
-          {publicLandsOn && (
-            <>
-              <FillLayer
-                id="public-lands-fill"
-                sourceID="composite"
-                sourceLayerID="landuse"
-                filter={['match', ['get', 'class'], ['national_park', 'park', 'wood'], true, false]}
-                style={{ fillColor: '#4CAF50', fillOpacity: 0.18 }}
+          {/* ── Weather tile overlay ── */}
+          {weatherOn && !!TOMORROW_KEY && (
+            <RasterSource
+              id="weather-tiles"
+              tileUrlTemplates={[weatherTileUrl]}
+              tileSize={256}
+            >
+              <RasterLayer
+                id="weather-layer"
+                style={{ rasterOpacity: 0.6 }}
               />
-              <LineLayer
-                id="public-lands-border"
-                sourceID="composite"
-                sourceLayerID="landuse"
-                filter={['match', ['get', 'class'], ['national_park', 'park', 'wood'], true, false]}
-                style={{ lineColor: '#4CAF50', lineWidth: 1, lineOpacity: 0.6 }}
-              />
-            </>
-          )}
-
-          {/* ── Fuel range circle ── */}
-          {fuelCircleGeoJson && (
-            <ShapeSource id="fuel-range-src" shape={fuelCircleGeoJson}>
-              <FillLayer
-                id="fuel-range-fill"
-                style={{ fillColor: '#FFD600', fillOpacity: 0.1 }}
-              />
-              <LineLayer
-                id="fuel-range-border"
-                style={{ lineColor: '#FFD600', lineWidth: 2, lineDasharray: [3, 2.5] }}
-              />
-            </ShapeSource>
+            </RasterSource>
           )}
 
           {/* ── Fuel stations ── */}
           {fuelStationsGeoJsonData && fuelStationsOn && (
-            <ShapeSource id="fuel-stations-src" shape={fuelStationsGeoJsonData}>
+            <ShapeSource
+              id="fuel-stations-src"
+              shape={fuelStationsGeoJsonData}
+              onPress={(e) => {
+                const props = e.features?.[0]?.properties;
+                if (!props) return;
+                const dist = lastKnownLocation
+                  ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
+                  : undefined;
+                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', distanceMiles: dist });
+              }}
+            >
               <CircleLayer
                 id="fuel-stations-dots"
                 style={{
                   circleColor: '#FFD600',
+                  circleRadius: 6,
+                  circleStrokeColor: '#000',
+                  circleStrokeWidth: 1.5,
+                }}
+              />
+            </ShapeSource>
+          )}
+
+          {/* ── Food places ── */}
+          {foodPlacesGeoJsonData && foodOn && (
+            <ShapeSource
+              id="food-places-src"
+              shape={foodPlacesGeoJsonData}
+              onPress={(e) => {
+                const props = e.features?.[0]?.properties;
+                if (!props) return;
+                const dist = lastKnownLocation
+                  ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
+                  : undefined;
+                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'food', subtype: props.type, distanceMiles: dist });
+              }}
+            >
+              <CircleLayer
+                id="food-places-dots"
+                style={{
+                  circleColor: '#D32F2F',
                   circleRadius: 6,
                   circleStrokeColor: '#000',
                   circleStrokeWidth: 1.5,
@@ -565,11 +894,21 @@ export default function RideScreen() {
               <LineLayer
                 id="overlay-route-line"
                 style={{
-                  lineColor: Colors.TTM_RED,
+                  lineColor: theme.red,
                   lineWidth: 3,
                   lineDasharray: [2, 1.5],
                   lineOpacity: 0.9,
                 }}
+              />
+            </ShapeSource>
+          )}
+
+          {/* ── Navigation route layer (rendered above overlay) ── */}
+          {navMode !== 'idle' && navRouteGeojson && (
+            <ShapeSource id="nav-route-src" shape={navRouteGeojson}>
+              <LineLayer
+                id="nav-route-line"
+                style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
               />
             </ShapeSource>
           )}
@@ -579,58 +918,208 @@ export default function RideScreen() {
             <ShapeSource id="live-track" shape={liveTrackGeoJson}>
               <LineLayer
                 id="live-track-line"
-                style={{ lineColor: '#4CAF50', lineWidth: 3, lineOpacity: 0.9 }}
+                style={{ lineColor: '#D32F2F', lineWidth: 3, lineOpacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
               />
             </ShapeSource>
           )}
         </MapView>
 
-        <LayerToggle current={mapStyle} onCycle={cycleStyle} />
+        {/* ── Navigation Banner (top, during navigation) ── */}
+        {isNavigatingActive && (
+          <NavigationBanner
+            step={activeRoute?.steps[currentStepIndex] ?? null}
+            nextStep={activeRoute?.steps[currentStepIndex + 1] ?? null}
+            isOffRoute={navMode === 'off_route'}
+            isRecalculating={navMode === 'recalculating'}
+          />
+        )}
 
-        {/* Overlay toggle controls */}
-        <MapOverlayControls
-          fuelRangeOn={fuelRangeOn}
-          offRoadOn={offRoadOn}
-          publicLandsOn={publicLandsOn}
-          fuelStationsOn={fuelStationsOn}
-          fuelStationsLoading={fuelStationsLoading}
-          onToggleFuelRange={handleToggleFuelRange}
-          onToggleOffRoad={() => setOffRoadOn((v) => !v)}
-          onTogglePublicLands={() => setPublicLandsOn((v) => !v)}
-          onToggleFuelStations={handleToggleFuelStations}
-        />
-
-        {/* Safety dot — top-left corner of map */}
-        <View style={styles.safetyDotOverlay}>
-          <SafetyDot />
+        {/* ── Top header bar ── */}
+        <View style={styles.mapHeader}>
+          <HamburgerButton onPress={() => setMenuOpen(true)} />
+          <>
+            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
+              </View>
+            </View>
+            <View style={{ flex: 1 }} />
+          </>
+          <Pressable
+            style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+            onPress={() => setSearchSheetOpen(true)}
+          >
+            <Feather name="search" size={18} color={theme.textPrimary} />
+          </Pressable>
         </View>
 
-        {/* Fuel range label */}
-        {fuelRangeOn && fuelRangeMiles !== null && (
-          <View style={styles.fuelRangeLabel}>
-            <Feather name="crosshair" size={13} color="#FFD600" />
-            <Text style={styles.fuelRangeLabelText}>
-              {fuelRangeMiles} mi range
-              {selectedBike?.model ? ` · ${selectedBike.model}` : ''}
+        {/* ── Crash detection toggle ── */}
+        <Pressable
+          style={[
+            styles.crashToggle,
+            { backgroundColor: isMonitoring ? 'rgba(76,175,80,0.15)' : theme.mapOverlayBg, borderColor: isMonitoring ? '#4CAF50' : theme.border },
+          ]}
+          onPress={() => setMonitoring(!isMonitoring)}
+        >
+          <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textMuted} />
+          <View>
+            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textMuted }]}>
+              {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
             </Text>
+            {selectedBike && (
+              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textMuted }]}>
+                {bikeLabel(selectedBike)}
+              </Text>
+            )}
+          </View>
+        </Pressable>
+
+        {/* ── Map control icon (replaces MapOverlayControls) ── */}
+        <Pressable
+          style={[styles.mapControlIcon, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+          onPress={() => setDrawerOpen(true)}
+        >
+          <Feather name="layers" size={20} color={theme.textPrimary} />
+        </Pressable>
+
+        {/* Weather legend — bottom-left when weather is on */}
+        {weatherOn && <WeatherLegend />}
+
+        {/* ── Stats bar: navigation stats or recording stats ── */}
+        {isNavigatingActive ? (
+          <NavigationStatsBar
+            speedMph={speedMph}
+            eta={eta}
+            remainingMiles={remainingDistanceMiles}
+          />
+        ) : (
+          <StatsOverlay isRecording={isRecording} elapsedSeconds={elapsedSeconds} speedMph={speedMph} />
+        )}
+
+        {/* ── End Navigation button ── */}
+        {isNavigatingActive && (
+          <Pressable
+            style={[styles.endNavBtn, { backgroundColor: theme.red }]}
+            onPress={() => {
+              resetNavigation();
+              setNavRouteGeojson(null);
+              if (isRecording) handleStopRequested();
+            }}
+          >
+            <Feather name="x" size={16} color="#fff" />
+            <Text style={styles.endNavBtnText}>END</Text>
+          </Pressable>
+        )}
+
+
+        {/* Place detail panel (fuel / food) */}
+        <PlaceDetailPanel
+          place={selectedPlace}
+          onClose={() => setSelectedPlace(null)}
+          onNavigateInApp={(dest) => fetchAndPreviewRoute(dest)}
+        />
+
+        {/* Toast notification */}
+        {!!toastMsg && (
+          <View style={[styles.toast, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <Feather name="check-circle" size={14} color="#4CAF50" />
+            <Text style={[styles.toastText, { color: theme.textPrimary }]}>{toastMsg}</Text>
           </View>
         )}
 
-        <StatsOverlay isRecording={isRecording} />
+        {/* ── Route Preview Screen (overlay) ── */}
+        {navMode === 'preview' && destination && (
+          <RoutePreviewScreen
+            destination={destination}
+            routes={
+              alternateRoutes.length > 0
+                ? [activeRoute!, ...alternateRoutes]
+                : activeRoute
+                ? [activeRoute]
+                : []
+            }
+            loading={routeLoading}
+            error={routeError}
+            routePreference={routePreference}
+            onChangePreference={(p) => {
+              setRoutePreference(p);
+              if (destination) {
+                fetchAndPreviewRoute(destination);
+              }
+            }}
+            onStartNavigation={handleStartNavigation}
+            onSaveRoute={async (route) => {
+              if (user) {
+                const saved = await createRoute(
+                  user.id,
+                  destination.name,
+                  route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
+                  route.distanceMiles,
+                  0,
+                  null,
+                );
+                if (saved) { addRoute(saved); showToast('Route saved!'); }
+              }
+            }}
+            onCancel={() => { resetNavigation(); setNavRouteGeojson(null); }}
+          />
+        )}
+
+        {/* ── Completion Screen ── */}
+        {navMode === 'completed' && (
+          <CompletionScreen
+            distanceMiles={activeRoute?.distanceMiles ?? 0}
+            durationSeconds={activeRoute?.durationSeconds ?? 0}
+            onSaveRide={() => {
+              if (user && activeRoute) {
+                const pts = activeRoute.geometry.coordinates.map(([lng, lat]) => ({ lat, lng }));
+                createRoute(
+                  user.id,
+                  destination?.name ?? 'Navigation Route',
+                  pts,
+                  activeRoute.distanceMiles,
+                  0,
+                  activeRoute.durationSeconds,
+                ).then((saved) => {
+                  if (saved) { addRoute(saved); showToast('Ride saved!'); }
+                });
+              }
+              resetNavigation();
+              setNavRouteGeojson(null);
+            }}
+            onDismiss={() => { resetNavigation(); setNavRouteGeojson(null); }}
+          />
+        )}
       </View>
 
       {/* ── Sub-screens ── */}
       {subTab === 'ROUTES' && (
-        <SafeAreaView edges={['top']} style={styles.subScreen}>
+        <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
           <RoutesScreen
             onImportRoute={handleImportRoute}
             onNavigate={handleNavigate}
           />
         </SafeAreaView>
       )}
-      {subTab === 'RECORD' && (
-        <SafeAreaView edges={['top']} style={styles.subScreen}>
-          <RecordScreen onStopRequested={handleStopRequested} />
+      {subTab === 'RECORD' && !isRecording && (
+        <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
+          {/* Header with hamburger */}
+          <View style={[styles.recordHeader, { borderBottomColor: theme.border }]}>
+            <HamburgerButton onPress={() => setMenuOpen(true)} />
+            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
+              </View>
+            </View>
+            <View style={{ width: 40 }} />
+          </View>
+          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} />
+        </SafeAreaView>
+      )}
+      {subTab === 'RECORD' && isRecording && (
+        /* Transparent overlay — map is visible underneath */
+        <SafeAreaView edges={['top', 'bottom']} style={styles.recordMapOverlay} pointerEvents="box-none">
+          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} />
         </SafeAreaView>
       )}
 
@@ -647,6 +1136,36 @@ export default function RideScreen() {
         onSave={handleSaveRide}
         onDiscard={handleDiscardRide}
       />
+
+      {/* ── Hamburger menu ── */}
+      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      {/* ── Map Control Drawer ── */}
+      <MapControlDrawer
+        visible={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        mapStyle={mapStyle}
+        onChangeMapStyle={setMapStyle}
+        weatherOn={weatherOn}
+        fuelOn={fuelStationsOn}
+        fuelLoading={fuelStationsLoading}
+        foodOn={foodOn}
+        foodLoading={foodLoading}
+        onToggleWeather={() => setWeatherOn((v) => !v)}
+        onToggleFuel={handleToggleFuelStations}
+        onToggleFood={handleToggleFood}
+        onLocateMe={handleLocateMe}
+      />
+
+      {/* ── Search Sheet ── */}
+      <SearchSheet
+        visible={searchSheetOpen}
+        onClose={() => setSearchSheetOpen(false)}
+        onSelectDestination={(dest) => {
+          setSearchSheetOpen(false);
+          fetchAndPreviewRoute(dest);
+        }}
+      />
     </View>
   );
 }
@@ -656,177 +1175,201 @@ export default function RideScreen() {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.TTM_DARK },
+  root: { flex: 1 },
 
   mapContainer: { ...StyleSheet.absoluteFillObject },
   hidden:        { opacity: 0, pointerEvents: 'none' },
 
-  // Safety dot overlay — top-left of map
-  safetyDotOverlay: {
+  // Top header bar over map
+  recordHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: (HEADER_HEIGHT - 40) / 2,
+    borderBottomWidth: 1,
+  },
+  mapHeader: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 16,
-    left: 16,
-    backgroundColor: 'rgba(20,20,20,0.75)',
+    top: Platform.OS === 'ios' ? 52 : 12,
+    left: 12,
+    right: 12,
+    height: HEADER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
-    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Crash detection toggle
+  crashToggle: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 102 : 62,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-
-  // Layer toggle
-  layerBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 16,
-    right: 16,
-    backgroundColor: Colors.TTM_CARD,
-    borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  crashToggleText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
-  layerBtnText: {
-    color: Colors.TEXT_PRIMARY,
-    fontSize: 11,
+  crashToggleBike: {
+    fontSize: 8,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+
+  // Map control icon (layers button)
+  mapControlIcon: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 102 : 62,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // End navigation button
+  endNavBtn: {
+    position: 'absolute',
+    bottom: 130,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  endNavBtnText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.5,
   },
 
-  // Fuel range label
-  fuelRangeLabel: {
-    position: 'absolute',
-    bottom: 160,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    backgroundColor: 'rgba(20,20,20,0.85)',
-    borderWidth: 1,
-    borderColor: '#FFD60055',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  fuelRangeLabelText: {
-    color: '#FFD600',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-
-  // Stats bar
+  // Stats bar (shifted down 10px per layout spec, Map sub-tab only)
   statsBar: {
     position: 'absolute',
-    bottom: 106,
+    bottom: 61,
     left: 16,
     right: 16,
     flexDirection: 'row',
-    backgroundColor: 'rgba(20,20,20,0.88)',
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     paddingVertical: 10,
   },
   statItem:  { flex: 1, alignItems: 'center' },
-  statValue: { color: Colors.TEXT_PRIMARY, fontSize: 22, fontWeight: '700', letterSpacing: 1 },
-  statLabel: { color: Colors.TEXT_SECONDARY, fontSize: 10, letterSpacing: 1.5, marginTop: 2 },
-  statDivider: { width: 1, backgroundColor: Colors.TTM_BORDER, marginVertical: 4 },
+  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 1 },
+  statLabel: { fontSize: 10, letterSpacing: 1.5, marginTop: 2 },
+  statDivider: { width: 1, marginVertical: 4 },
 
-  // Sub-nav
-  subNavWrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  // Sub-nav (shifted down 5px per layout spec)
+  subNavWrapper: { position: 'absolute', bottom: -30, left: 0, right: 0 },
   subNav: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(20,20,20,0.95)',
     borderTopWidth: 1,
-    borderTopColor: Colors.TTM_BORDER,
     height: 48,
   },
-  subNavItem:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  subNavText:       { color: Colors.TAB_INACTIVE, fontSize: 11, fontWeight: '700', letterSpacing: 2 },
-  subNavTextActive: { color: Colors.TTM_RED },
+  subNavItem:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  subNavText:      { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
   subNavUnderline: {
     position: 'absolute',
     bottom: 0,
     left: '20%',
     right: '20%',
     height: 2,
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 1,
   },
 
   // Sub-screens
-  subScreen:         { flex: 1, backgroundColor: Colors.TTM_DARK },
-  subScreenContent:  { padding: 20, paddingBottom: 80 },
-  subScreenCentered: { alignItems: 'center', justifyContent: 'center' },
-  subHeading: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 11,
+  subScreen: { flex: 1 },
+
+  // Record screen — transparent map overlay (when recording)
+  recordMapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
+  recordTimerCard: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  recordTimerText: {
+    fontSize: 32,
     fontWeight: '700',
-    letterSpacing: 3,
-    marginBottom: 16,
+    letterSpacing: 2,
+    color: '#fff',
+  },
+  recordActiveCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
   },
 
   // Record screen
   recordElapsed: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 48,
     fontWeight: '700',
     letterSpacing: 2,
     marginBottom: 8,
   },
-  recordCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.TTM_RED,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 32,
-    shadowColor: Colors.TTM_RED,
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
-  },
   recordCircleActive: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 32,
-    shadowColor: '#333',
     shadowOpacity: 0.5,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
-  recordBtnText:  { color: '#fff', fontSize: 18, fontWeight: '700', letterSpacing: 3 },
-  recordHint:     { color: Colors.TEXT_SECONDARY, fontSize: 13, letterSpacing: 1 },
+  recordHint: { fontSize: 13, letterSpacing: 1 },
   monitoringBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginTop: 24,
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  monitoringText: { color: Colors.TEXT_SECONDARY, fontSize: 12 },
+  monitoringDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  monitoringText: { fontSize: 12 },
 
   // Status rows (share / check-in)
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
@@ -842,7 +1385,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     flex: 1,
-    color: Colors.TEXT_SECONDARY,
     fontSize: 12,
   },
   checkInBtn: {
@@ -856,5 +1398,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.5,
+  },
+
+  // Toast
+  toast: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : 60,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  toastText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

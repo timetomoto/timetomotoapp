@@ -1,0 +1,354 @@
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../lib/useTheme';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface Destination {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+interface GeocodingFeature {
+  id: string;
+  place_name: string;
+  center: [number, number];
+  text: string;
+}
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onSelectDestination: (dest: Destination) => void;
+}
+
+const RECENTS_KEY = 'ttm_nav_recents';
+const MAX_RECENTS = 5;
+const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function loadRecents(): Promise<Destination[]> {
+  try {
+    const raw = await AsyncStorage.getItem(RECENTS_KEY);
+    return raw ? (JSON.parse(raw) as Destination[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveRecent(dest: Destination): Promise<void> {
+  try {
+    const existing = await loadRecents();
+    const filtered = existing.filter(
+      (r) => !(r.lat === dest.lat && r.lng === dest.lng),
+    );
+    const updated = [dest, ...filtered].slice(0, MAX_RECENTS);
+    await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(updated));
+  } catch {
+    // non-fatal
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function SearchSheet({ visible, onClose, onSelectDestination }: Props) {
+  const { theme } = useTheme();
+  const translateY = useRef(new Animated.Value(800)).current;
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeocodingFeature[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [recents, setRecents] = useState<Destination[]>([]);
+  const [panelMounted, setPanelMounted] = useState(visible);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setPanelMounted(true);
+      loadRecents().then(setRecents);
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 22,
+        stiffness: 200,
+        mass: 0.8,
+      }).start(() => {
+        inputRef.current?.focus();
+      });
+    } else {
+      Animated.timing(translateY, {
+        toValue: 800,
+        duration: 250,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished) setPanelMounted(false);
+      });
+      setQuery('');
+      setResults([]);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    debounceTimer.current = setTimeout(async () => {
+      try {
+        const encoded = encodeURIComponent(query.trim());
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=place,address,poi&limit=6`;
+        const res = await fetch(url);
+        const json = await res.json();
+        setResults(json.features ?? []);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [query]);
+
+  function handleSelect(dest: Destination) {
+    saveRecent(dest);
+    onSelectDestination(dest);
+    onClose();
+  }
+
+  function shortAddress(feature: GeocodingFeature): string {
+    const parts = feature.place_name.split(',');
+    if (parts.length > 2) {
+      return parts.slice(1, 3).join(',').trim();
+    }
+    return parts.slice(1).join(',').trim();
+  }
+
+  if (!panelMounted) return null;
+
+  return (
+    <Animated.View
+      style={[
+        styles.sheet,
+        {
+          backgroundColor: theme.bgPanel,
+          transform: [{ translateY }],
+        },
+      ]}
+    >
+      {/* Header row */}
+      <View style={[styles.headerRow, { borderBottomColor: theme.border }]}>
+        <Feather name="search" size={18} color={theme.textMuted} style={styles.searchIcon} />
+        <TextInput
+          ref={inputRef}
+          style={[styles.input, { color: theme.textPrimary }]}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search destination..."
+          placeholderTextColor={theme.textMuted}
+          autoFocus={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        {loading && <ActivityIndicator size="small" color={theme.textMuted} style={styles.spinner} />}
+        <Pressable onPress={() => { Keyboard.dismiss(); onClose(); }} style={styles.cancelBtn}>
+          <Text style={[styles.cancelText, { color: theme.red }]}>Cancel</Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        style={styles.list}
+        keyboardShouldPersistTaps="always"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Search results */}
+        {results.length > 0 &&
+          results.map((feature) => {
+            const [lng, lat] = feature.center;
+            return (
+              <Pressable
+                key={feature.id}
+                style={[styles.resultRow, { borderBottomColor: theme.border }]}
+                onPress={() =>
+                  handleSelect({ name: feature.text, lat, lng })
+                }
+              >
+                <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
+                  <Feather name="map-pin" size={14} color={theme.red} />
+                </View>
+                <View style={styles.resultText}>
+                  <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {feature.text}
+                  </Text>
+                  <Text style={[styles.resultAddress, { color: theme.textMuted }]} numberOfLines={1}>
+                    {shortAddress(feature)}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={14} color={theme.textMuted} />
+              </Pressable>
+            );
+          })}
+
+        {/* Recent destinations — show when query is empty */}
+        {!query.trim() && recents.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
+              RECENT DESTINATIONS
+            </Text>
+            {recents.map((dest, idx) => (
+              <Pressable
+                key={`${dest.lat}-${dest.lng}-${idx}`}
+                style={[styles.resultRow, { borderBottomColor: theme.border }]}
+                onPress={() => handleSelect(dest)}
+              >
+                <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
+                  <Feather name="clock" size={14} color={theme.textSecondary} />
+                </View>
+                <View style={styles.resultText}>
+                  <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {dest.name}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={14} color={theme.textMuted} />
+              </Pressable>
+            ))}
+          </>
+        )}
+
+        {/* Empty state */}
+        {!query.trim() && recents.length === 0 && (
+          <View style={styles.emptyState}>
+            <Feather name="search" size={32} color={theme.textMuted} />
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              Search for a destination
+            </Text>
+          </View>
+        )}
+
+        {/* No results */}
+        {query.trim().length > 0 && !loading && results.length === 0 && (
+          <View style={styles.emptyState}>
+            <Feather name="map-pin" size={32} color={theme.textMuted} />
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>No results found</Text>
+          </View>
+        )}
+      </ScrollView>
+    </Animated.View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const styles = StyleSheet.create({
+  sheet: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 9997,
+    elevation: 18,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  searchIcon: {
+    marginRight: 2,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    height: 40,
+  },
+  spinner: {
+    marginRight: 4,
+  },
+  cancelBtn: {
+    paddingLeft: 8,
+    paddingVertical: 4,
+  },
+  cancelText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  list: {
+    flex: 1,
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  resultIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resultText: {
+    flex: 1,
+  },
+  resultName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  resultAddress: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 80,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+  },
+});

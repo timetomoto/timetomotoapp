@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 interface Props {
   onRetry: () => void;
@@ -8,13 +8,14 @@ interface Props {
 }
 
 export default function NetworkError({ onRetry, message }: Props) {
+  const { theme } = useTheme();
   return (
     <View style={s.root}>
-      <Feather name="wifi-off" size={40} color={Colors.TTM_BORDER} />
-      <Text style={s.title}>CAN'T REACH THE MOTHERSHIP</Text>
-      <Text style={s.body}>{message ?? 'Check your connection and try again.'}</Text>
+      <Feather name="wifi-off" size={40} color={theme.border} />
+      <Text style={[s.title, { color: theme.textPrimary }]}>CAN'T REACH THE MOTHERSHIP</Text>
+      <Text style={[s.body, { color: theme.textSecondary }]}>{message ?? 'Check your connection and try again.'}</Text>
       <Pressable
-        style={s.btn}
+        style={[s.btn, { backgroundColor: theme.red }]}
         onPress={onRetry}
         accessibilityLabel="Retry loading"
         accessibilityRole="button"
@@ -35,7 +36,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 40,
   },
   title: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 2,
@@ -43,7 +43,6 @@ const s = StyleSheet.create({
     marginTop: 8,
   },
   body: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
@@ -52,7 +51,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 13,

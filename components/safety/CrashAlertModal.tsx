@@ -10,7 +10,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useSafetyStore } from '../../lib/store';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 const COUNTDOWN_SEC = 30;
 
@@ -51,24 +51,22 @@ async function sendCrashAlerts(
 // ---------------------------------------------------------------------------
 
 export default function CrashAlertModal() {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
   const { crashDetected, emergencyContacts, lastKnownLocation, setCrashDetected } = useSafetyStore();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim   = useRef(new Animated.Value(1)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hapticRef   = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset countdown each time modal opens
   useEffect(() => {
     if (!crashDetected) return;
 
     setCountdown(COUNTDOWN_SEC);
 
-    // Heavy haptic on appearance
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-    // Pulsing ring animation
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.12, duration: 600, useNativeDriver: true }),
@@ -77,19 +75,16 @@ export default function CrashAlertModal() {
     );
     pulse.start();
 
-    // Periodic haptic buzz every 5 s
     hapticRef.current = setInterval(() => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }, 5000);
 
-    // Countdown tick
     intervalRef.current = setInterval(() => {
       setCountdown((n) => {
         if (n <= 1) {
           clearInterval(intervalRef.current!);
           clearInterval(hapticRef.current!);
           pulse.stop();
-          // Fire alerts
           const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
           const name = user?.email ?? 'A rider';
           sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
@@ -121,12 +116,12 @@ export default function CrashAlertModal() {
     <Modal transparent animationType="fade" statusBarTranslucent>
       <View style={s.overlay}>
         {/* Pulsing ring behind the timer */}
-        <Animated.View style={[s.ring, { transform: [{ scale: pulseAnim }] }]} />
+        <Animated.View style={[s.ring, { borderColor: theme.red + '44', transform: [{ scale: pulseAnim }] }]} />
 
-        <View style={s.panel}>
+        <View style={[s.panel, { backgroundColor: theme.bgPanel, borderColor: theme.red }]}>
           {/* Header */}
-          <Text style={s.warningLabel}>⚠ CRASH DETECTED</Text>
-          <Text style={s.subLabel}>
+          <Text style={[s.warningLabel, { color: theme.red }]}>⚠ CRASH DETECTED</Text>
+          <Text style={[s.subLabel, { color: theme.textSecondary }]}>
             {emergencyContacts.length > 0
               ? `Alerting your emergency contacts in`
               : 'No emergency contacts saved.\nCancel if you are OK.'}
@@ -134,15 +129,15 @@ export default function CrashAlertModal() {
 
           {/* Countdown */}
           <View style={s.countdownWrapper}>
-            <Text style={s.countdownNumber}>{countdown}</Text>
-            <Text style={s.countdownUnit}>seconds</Text>
+            <Text style={[s.countdownNumber, { color: theme.textPrimary }]}>{countdown}</Text>
+            <Text style={[s.countdownUnit, { color: theme.textSecondary }]}>seconds</Text>
           </View>
 
           {/* Contacts preview */}
           {emergencyContacts.length > 0 && (
-            <View style={s.contactList}>
+            <View style={[s.contactList, { backgroundColor: theme.bgCard }]}>
               {emergencyContacts.map((c, i) => (
-                <Text key={i} style={s.contactItem}>
+                <Text key={i} style={[s.contactItem, { color: theme.textSecondary }]}>
                   {c.name} · {c.phone}
                 </Text>
               ))}
@@ -157,7 +152,7 @@ export default function CrashAlertModal() {
             <Text style={s.okBtnText}>I'M OK</Text>
           </Pressable>
 
-          <Text style={s.hint}>Press to cancel the alert</Text>
+          <Text style={[s.hint, { color: theme.textSecondary }]}>Press to cancel the alert</Text>
         </View>
       </View>
     </Modal>
@@ -182,27 +177,22 @@ const s = StyleSheet.create({
     height: 320,
     borderRadius: 160,
     borderWidth: 2,
-    borderColor: Colors.TTM_RED + '44',
   },
   panel: {
     width: '100%',
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_RED,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     gap: 12,
   },
   warningLabel: {
-    color: Colors.TTM_RED,
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: 3,
     textAlign: 'center',
   },
   subLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -212,13 +202,11 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   countdownNumber: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 96,
     fontWeight: '700',
     lineHeight: 100,
   },
   countdownUnit: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 14,
     letterSpacing: 3,
     textTransform: 'uppercase',
@@ -226,12 +214,10 @@ const s = StyleSheet.create({
   contactList: {
     gap: 4,
     alignSelf: 'stretch',
-    backgroundColor: Colors.TTM_CARD,
     borderRadius: 8,
     padding: 12,
   },
   contactItem: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -252,7 +238,6 @@ const s = StyleSheet.create({
     letterSpacing: 4,
   },
   hint: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 11,
     letterSpacing: 1,
   },

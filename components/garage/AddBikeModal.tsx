@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -17,17 +16,20 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore, useGarageStore } from '../../lib/store';
-import { Colors } from '../../lib/theme';
+import { useAuthStore, useGarageStore, type Bike } from '../../lib/store';
+import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MAKES = [
-  'Triumph', 'BMW', 'KTM', 'Yamaha', 'Honda',
-  'Suzuki', 'Husqvarna', 'Aprilia', 'Royal Enfield', 'Ducati',
+  'Aprilia', 'Benelli', 'Beta', 'BMW', 'Can-Am', 'CFMoto',
+  'Ducati', 'Gas Gas', 'Harley-Davidson', 'Honda', 'Husqvarna',
+  'Indian', 'Kawasaki', 'KTM', 'Moto Guzzi', 'Royal Enfield',
+  'Sherco', 'Suzuki', 'Triumph', 'Yamaha', 'Zero Motorcycles',
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -43,16 +45,23 @@ const SHEET_HEIGHT = 700;
 // ---------------------------------------------------------------------------
 
 function FieldLabel({ label }: { label: string }) {
-  return <Text style={styles.label}>{label}</Text>;
+  const { theme } = useTheme();
+  return <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>;
 }
 
 function StyledInput(props: React.ComponentProps<typeof TextInput>) {
+  const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
-      placeholderTextColor={Colors.TEXT_SECONDARY}
+      placeholderTextColor={theme.textSecondary}
       {...props}
-      style={[styles.input, focused && styles.inputFocused, props.style]}
+      style={[
+        styles.input,
+        { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary },
+        focused && { borderColor: theme.red },
+        props.style,
+      ]}
       onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
       onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
     />
@@ -60,31 +69,42 @@ function StyledInput(props: React.ComponentProps<typeof TextInput>) {
 }
 
 function YearPicker({ value, onChange }: { value: string; onChange: (y: string) => void }) {
+  const { theme } = useTheme();
   return (
-    <View style={styles.yearPickerWrapper}>
-      <FlatList
-        data={YEARS}
-        keyExtractor={(y) => y}
+    <View style={[styles.yearPickerWrapper, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+      <ScrollView
         showsVerticalScrollIndicator={false}
         snapToInterval={44}
         decelerationRate="fast"
         style={styles.yearList}
-        renderItem={({ item }) => (
+        nestedScrollEnabled
+      >
+        {YEARS.map((item) => (
           <Pressable
-            style={[styles.yearItem, item === value && styles.yearItemActive]}
+            key={item}
+            style={[
+              styles.yearItem,
+              { borderBottomColor: theme.border },
+              item === value && { backgroundColor: 'rgba(211,47,47,0.12)' },
+            ]}
             onPress={() => onChange(item)}
           >
-            <Text style={[styles.yearItemText, item === value && styles.yearItemTextActive]}>
+            <Text style={[
+              styles.yearItemText,
+              { color: theme.textSecondary },
+              item === value && { color: theme.red, fontWeight: '700' },
+            ]}>
               {item}
             </Text>
           </Pressable>
-        )}
-      />
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
 function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: string) => void }) {
+  const { theme } = useTheme();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const filtered = value.length > 0
     ? MAKES.filter((m) => m.toLowerCase().startsWith(value.toLowerCase()))
@@ -101,14 +121,14 @@ function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: st
         autoCorrect={false}
       />
       {showSuggestions && filtered.length > 0 && (
-        <View style={styles.suggestions}>
+        <View style={[styles.suggestions, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           {filtered.map((make) => (
             <Pressable
               key={make}
-              style={styles.suggestionItem}
+              style={[styles.suggestionItem, { borderBottomColor: theme.border }]}
               onPress={() => { onChange(make); setShowSuggestions(false); }}
             >
-              <Text style={styles.suggestionText}>{make}</Text>
+              <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{make}</Text>
             </Pressable>
           ))}
         </View>
@@ -123,26 +143,36 @@ function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: st
 
 interface Props {
   onClose: () => void;
+  bike?: import('../../lib/store').Bike; // edit mode when provided
 }
 
-export default function AddBikeModal({ onClose }: Props) {
+export default function AddBikeModal({ onClose, bike: editBike }: Props) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const { user } = useAuthStore();
-  const { addBike } = useGarageStore();
+  const { addBike, updateBike } = useGarageStore();
 
-  const [year, setYear]         = useState(String(CURRENT_YEAR));
-  const [make, setMake]         = useState('');
-  const [model, setModel]       = useState('');
-  const [odometer, setOdometer] = useState('');
-  const [tankGal, setTankGal]   = useState('');
-  const [avgMpg, setAvgMpg]     = useState('');
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const isEdit = !!editBike;
 
-  // Slide in on mount
+  const [year, setYear]               = useState(editBike?.year ? String(editBike.year) : String(CURRENT_YEAR));
+  const [make, setMake]               = useState(editBike?.make ?? '');
+  const [model, setModel]             = useState(editBike?.model ?? '');
+  const [nickname, setNickname]       = useState(editBike?.nickname ?? '');
+  const [odometer, setOdometer]       = useState(editBike?.odometer ? String(editBike.odometer) : '');
+  const [fuelCapacity, setFuelCap]    = useState(editBike?.fuelCapacity ? String(editBike.fuelCapacity) : '');
+  const [capacityUnit, setCapUnit]    = useState<'gallons' | 'liters'>(editBike?.fuelCapacityUnit ?? 'gallons');
+  const [saving, setSaving]           = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('ttm_units_capacity').then((v) => {
+      if (v === 'liters' || v === 'gallons') setCapUnit(v);
+    });
+  }, []);
+
   useEffect(() => {
     Animated.parallel([
       Animated.spring(slideAnim, {
@@ -175,7 +205,6 @@ export default function AddBikeModal({ onClose }: Props) {
   }
 
   async function handleSave() {
-    if (!user) return;
     if (!make.trim()) { setError('Make is required.'); return; }
     if (!model.trim()) { setError('Model is required.'); return; }
 
@@ -184,28 +213,68 @@ export default function AddBikeModal({ onClose }: Props) {
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const { data, error: dbError } = await supabase
-      .from('bikes')
-      .insert({
-        user_id: user.id,
-        year: parseInt(year, 10),
-        make: make.trim(),
-        model: model.trim(),
-        odometer:     odometer ? parseInt(odometer, 10)    : null,
-        tank_gallons: tankGal  ? parseFloat(tankGal)       : null,
-        avg_mpg:      avgMpg   ? parseFloat(avgMpg)        : null,
-      })
-      .select()
-      .single();
+    const fields = {
+      year: parseInt(year, 10),
+      make: make.trim(),
+      model: model.trim(),
+      nickname: nickname.trim() || null,
+      odometer: odometer ? parseInt(odometer, 10) : null,
+      fuelCapacity: fuelCapacity ? parseFloat(fuelCapacity) : null,
+      fuelCapacityUnit: capacityUnit,
+    };
 
-    setSaving(false);
+    if (isEdit && editBike) {
+      // Edit existing bike
+      if (editBike.user_id === 'local') {
+        const stored = await AsyncStorage.getItem('ttm_bikes_local');
+        const bikes = stored ? JSON.parse(stored) : [];
+        const updated = bikes.map((b: Bike) => b.id === editBike.id ? { ...b, ...fields } : b);
+        await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify(updated));
+        setSaving(false);
+        updateBike({ ...editBike, ...fields });
+      } else {
+        const { error: dbError } = await supabase
+          .from('bikes')
+          .update({ year: fields.year, make: fields.make, model: fields.model, odometer: fields.odometer })
+          .eq('id', editBike.id);
+        setSaving(false);
+        if (dbError) { setError(dbError.message); return; }
+        updateBike({ ...editBike, ...fields });
+      }
+    } else if (user) {
+      // Add new bike — Supabase
+      const { data, error: dbError } = await supabase
+        .from('bikes')
+        .insert({
+          user_id: user.id,
+          year: fields.year,
+          make: fields.make,
+          model: fields.model,
+          odometer: fields.odometer,
+        })
+        .select()
+        .single();
 
-    if (dbError) {
-      setError(dbError.message);
-      return;
+      setSaving(false);
+      if (dbError) { setError(dbError.message); return; }
+      addBike(data);
+    } else {
+      // Add new bike — local fallback
+      const newBike: Bike = {
+        id: `local_${Date.now()}`,
+        user_id: 'local',
+        ...fields,
+        tank_gallons: null,
+        avg_mpg: null,
+        created_at: new Date().toISOString(),
+      };
+      const stored = await AsyncStorage.getItem('ttm_bikes_local');
+      const existing = stored ? JSON.parse(stored) : [];
+      await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify([newBike, ...existing]));
+      setSaving(false);
+      addBike(newBike);
     }
 
-    addBike(data);
     handleClose();
   }
 
@@ -222,12 +291,16 @@ export default function AddBikeModal({ onClose }: Props) {
       <Animated.View
         style={[
           styles.sheet,
-          { paddingBottom: insets.bottom + 16 },
+          {
+            backgroundColor: theme.bgPanel,
+            borderColor: theme.border,
+            paddingBottom: insets.bottom + 16,
+          },
           { transform: [{ translateY: slideAnim }] },
         ]}
       >
         {/* Handle */}
-        <View style={styles.handleBar} />
+        <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -239,9 +312,9 @@ export default function AddBikeModal({ onClose }: Props) {
           >
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.heading}>ADD BIKE</Text>
+              <Text style={[styles.heading, { color: theme.textPrimary }]}>{isEdit ? 'EDIT BIKE' : 'ADD BIKE'}</Text>
               <Pressable onPress={handleClose} style={styles.cancelBtn}>
-                <Text style={styles.cancelText}>CANCEL</Text>
+                <Text style={[styles.cancelText, { color: theme.textSecondary }]}>CANCEL</Text>
               </Pressable>
             </View>
 
@@ -259,7 +332,16 @@ export default function AddBikeModal({ onClose }: Props) {
               autoCorrect={false}
             />
 
-            <FieldLabel label="CURRENT ODOMETER (MI)" />
+            <FieldLabel label="NICKNAME — OPTIONAL" />
+            <StyledInput
+              value={nickname}
+              onChangeText={setNickname}
+              placeholder="e.g. The Beast, Blue Thunder"
+              autoCorrect={false}
+              autoCapitalize="words"
+            />
+
+            <FieldLabel label="CURRENT ODOMETER (MI) — OPTIONAL" />
             <StyledInput
               value={odometer}
               onChangeText={setOdometer}
@@ -267,39 +349,20 @@ export default function AddBikeModal({ onClose }: Props) {
               keyboardType="decimal-pad"
             />
 
-            {/* ── Specs (for fuel range) ── */}
-            <View style={styles.specsHeader}>
-              <Text style={styles.specsHeading}>SPECS</Text>
-              <Text style={styles.specsSubtitle}>Used for fuel range overlay</Text>
-            </View>
+            <FieldLabel label={`FUEL CAPACITY (${capacityUnit.toUpperCase()}) — OPTIONAL`} />
+            <StyledInput
+              value={fuelCapacity}
+              onChangeText={setFuelCap}
+              placeholder={capacityUnit === 'gallons' ? 'e.g. 4.5' : 'e.g. 17'}
+              keyboardType="decimal-pad"
+            />
 
-            <View style={styles.specsRow}>
-              <View style={{ flex: 1 }}>
-                <FieldLabel label="TANK SIZE (GAL)" />
-                <StyledInput
-                  value={tankGal}
-                  onChangeText={setTankGal}
-                  placeholder="e.g. 4.5"
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View style={{ width: 12 }} />
-              <View style={{ flex: 1 }}>
-                <FieldLabel label="AVG MPG" />
-                <StyledInput
-                  value={avgMpg}
-                  onChangeText={setAvgMpg}
-                  placeholder="e.g. 48"
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            </View>
-
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
 
             <Pressable
               style={({ pressed }) => [
                 styles.saveBtn,
+                { backgroundColor: theme.red },
                 pressed && styles.saveBtnPressed,
                 saving && styles.saveBtnDisabled,
               ]}
@@ -308,7 +371,7 @@ export default function AddBikeModal({ onClose }: Props) {
             >
               {saving
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.saveBtnText}>SAVE BIKE</Text>
+                : <Text style={styles.saveBtnText}>{isEdit ? 'SAVE CHANGES' : 'SAVE BIKE'}</Text>
               }
             </Pressable>
           </ScrollView>
@@ -332,17 +395,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.TTM_PANEL,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     maxHeight: '90%',
   },
   handleBar: {
     width: 40,
     height: 4,
-    backgroundColor: Colors.TTM_BORDER,
     borderRadius: 2,
     alignSelf: 'center',
     marginTop: 12,
@@ -360,20 +420,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   heading: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 3,
   },
   cancelBtn: { paddingHorizontal: 4 },
   cancelText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 2,
   },
   label: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 2,
@@ -381,22 +438,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 16,
   },
-  inputFocused: {
-    borderColor: Colors.TTM_RED,
-  },
   yearPickerWrapper: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     overflow: 'hidden',
     height: 176,
@@ -407,22 +456,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.TTM_BORDER,
   },
-  yearItemActive: { backgroundColor: 'rgba(211,47,47,0.12)' },
   yearItemText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 17,
     fontWeight: '500',
   },
-  yearItemTextActive: {
-    color: Colors.TTM_RED,
-    fontWeight: '700',
-  },
   suggestions: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 6,
     marginTop: 4,
     overflow: 'hidden',
@@ -431,44 +471,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.TTM_BORDER,
   },
   suggestionText: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 15,
   },
-  specsHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 10,
-    marginTop: 24,
-    marginBottom: 0,
-    borderTopWidth: 1,
-    borderTopColor: Colors.TTM_BORDER,
-    paddingTop: 20,
-  },
-  specsHeading: {
-    color: Colors.TEXT_SECONDARY,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  specsSubtitle: {
-    color: Colors.TTM_BORDER,
-    fontSize: 10,
-    letterSpacing: 0.5,
-  },
-  specsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
   errorText: {
-    color: Colors.TTM_RED,
     fontSize: 13,
     marginTop: 12,
   },
   saveBtn: {
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 6,
     paddingVertical: 16,
     alignItems: 'center',

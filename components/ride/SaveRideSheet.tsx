@@ -11,11 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 import type { TrackPoint } from '../../lib/gpx';
 import { calcDistance, calcElevationGain } from '../../lib/gpx';
-import type { Route } from '../../lib/routes';
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -51,12 +49,13 @@ function defaultName() {
 // ---------------------------------------------------------------------------
 
 export default function SaveRideSheet({ visible, points, durationSeconds, onSave, onDiscard }: Props) {
+  const { theme } = useTheme();
   const [name, setName]     = useState(defaultName);
   const [saving, setSaving] = useState(false);
 
-  const distanceMiles  = calcDistance(points);
+  const distanceMiles   = calcDistance(points);
   const elevationGainFt = calcElevationGain(points);
-  const avgSpeedMph    = durationSeconds > 0 ? (distanceMiles / durationSeconds) * 3600 : 0;
+  const avgSpeedMph     = durationSeconds > 0 ? (distanceMiles / durationSeconds) * 3600 : 0;
 
   async function handleSave() {
     setSaving(true);
@@ -73,52 +72,52 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
         style={s.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={s.sheet}>
-          <View style={s.handle} />
+        <View style={[s.sheet, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <View style={[s.handle, { backgroundColor: theme.border }]} />
 
-          <Text style={s.title}>SAVE THIS RIDE?</Text>
+          <Text style={[s.title, { color: theme.textPrimary }]}>SAVE THIS RIDE?</Text>
 
           {/* Stats */}
-          <View style={s.statsRow}>
+          <View style={[s.statsRow, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
             <View style={s.statItem}>
-              <Text style={s.statValue}>
+              <Text style={[s.statValue, { color: theme.textPrimary }]}>
                 {distanceMiles < 10 ? distanceMiles.toFixed(1) : Math.round(distanceMiles)}
               </Text>
-              <Text style={s.statLabel}>MILES</Text>
+              <Text style={[s.statLabel, { color: theme.textSecondary }]}>MILES</Text>
             </View>
-            <View style={s.statDivider} />
+            <View style={[s.statDivider, { backgroundColor: theme.border }]} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{fmtDuration(durationSeconds)}</Text>
-              <Text style={s.statLabel}>MOVING TIME</Text>
+              <Text style={[s.statValue, { color: theme.textPrimary }]}>{fmtDuration(durationSeconds)}</Text>
+              <Text style={[s.statLabel, { color: theme.textSecondary }]}>MOVING TIME</Text>
             </View>
-            <View style={s.statDivider} />
+            <View style={[s.statDivider, { backgroundColor: theme.border }]} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{Math.round(avgSpeedMph)}</Text>
-              <Text style={s.statLabel}>AVG MPH</Text>
+              <Text style={[s.statValue, { color: theme.textPrimary }]}>{Math.round(avgSpeedMph)}</Text>
+              <Text style={[s.statLabel, { color: theme.textSecondary }]}>AVG MPH</Text>
             </View>
-            <View style={s.statDivider} />
+            <View style={[s.statDivider, { backgroundColor: theme.border }]} />
             <View style={s.statItem}>
-              <Text style={s.statValue}>{Math.round(elevationGainFt).toLocaleString()}</Text>
-              <Text style={s.statLabel}>FT GAIN</Text>
+              <Text style={[s.statValue, { color: theme.textPrimary }]}>{Math.round(elevationGainFt).toLocaleString()}</Text>
+              <Text style={[s.statLabel, { color: theme.textSecondary }]}>FT GAIN</Text>
             </View>
           </View>
 
           {/* Name input */}
-          <Text style={s.inputLabel}>RIDE NAME</Text>
+          <Text style={[s.inputLabel, { color: theme.textSecondary }]}>RIDE NAME</Text>
           <TextInput
-            style={s.input}
+            style={[s.input, { backgroundColor: theme.bgPanel, borderColor: theme.border, color: theme.textPrimary }]}
             value={name}
             onChangeText={setName}
             placeholder="Enter a name…"
-            placeholderTextColor={Colors.TEXT_SECONDARY}
-            selectionColor={Colors.TTM_RED}
+            placeholderTextColor={theme.textSecondary}
+            selectionColor={theme.red}
             returnKeyType="done"
             maxLength={80}
           />
 
           {/* Actions */}
           <Pressable
-            style={[s.saveBtn, saving && { opacity: 0.7 }]}
+            style={[s.saveBtn, { backgroundColor: theme.red }, saving && { opacity: 0.7 }]}
             onPress={handleSave}
             disabled={saving}
           >
@@ -132,7 +131,7 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
           </Pressable>
 
           <Pressable style={s.discardBtn} onPress={onDiscard} disabled={saving}>
-            <Text style={s.discardBtnText}>DISCARD RIDE</Text>
+            <Text style={[s.discardBtnText, { color: theme.textSecondary }]}>DISCARD RIDE</Text>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -151,11 +150,9 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
-    backgroundColor: Colors.TTM_CARD,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     padding: 24,
     paddingBottom: 40,
     gap: 16,
@@ -164,58 +161,46 @@ const s = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.TTM_BORDER,
     alignSelf: 'center',
     marginBottom: 4,
   },
   title: {
-    color: Colors.TEXT_PRIMARY,
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 2,
     textAlign: 'center',
   },
 
-  // Stats
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 10,
     paddingVertical: 14,
   },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
-  statValue: { color: Colors.TEXT_PRIMARY, fontSize: 18, fontWeight: '700' },
-  statLabel: { color: Colors.TEXT_SECONDARY, fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
-  statDivider: { width: 1, backgroundColor: Colors.TTM_BORDER, marginVertical: 4 },
+  statValue: { fontSize: 18, fontWeight: '700' },
+  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  statDivider: { width: 1, marginVertical: 4 },
 
-  // Input
   inputLabel: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 2,
     marginBottom: -8,
   },
   input: {
-    backgroundColor: Colors.TTM_PANEL,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
-    color: Colors.TEXT_PRIMARY,
     fontSize: 15,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
 
-  // Buttons
   saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: Colors.TTM_RED,
     borderRadius: 10,
     paddingVertical: 16,
   },
@@ -230,7 +215,6 @@ const s = StyleSheet.create({
     paddingVertical: 10,
   },
   discardBtnText: {
-    color: Colors.TEXT_SECONDARY,
     fontSize: 13,
     letterSpacing: 1,
   },

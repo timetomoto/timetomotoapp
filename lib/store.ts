@@ -4,6 +4,8 @@ import { supabase } from './supabase';
 import type { RideWindowResult } from './rideWindow';
 import type { TrackPoint } from './gpx';
 import type { Route } from './routes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { darkTheme, lightTheme, Theme } from './theme';
 
 // ---------------------------------------------------------------------------
 // Safety / crash-detection store
@@ -12,6 +14,8 @@ import type { Route } from './routes';
 export interface EmergencyContact {
   name: string;
   phone: string;
+  relationship?: string;
+  email?: string;
 }
 
 interface SafetyState {
@@ -84,6 +88,14 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   clearRecordedPoints: () => set({ recordedPoints: [] }),
 
   loadContacts: async (userId) => {
+    // Always try local cache first so the UI shows something immediately
+    const cacheKey = `${LOCAL_CONTACTS_KEY}_${userId}`;
+    const stored = await AsyncStorage.getItem(cacheKey);
+    if (stored) set({ emergencyContacts: JSON.parse(stored) as EmergencyContact[] });
+
+    if (userId === 'local') return;
+
+    // Attempt Supabase sync — if it returns data, overwrite local cache
     const { data } = await supabase
       .from('profiles')
       .select('contacts')
@@ -91,11 +103,18 @@ export const useSafetyStore = create<SafetyState>((set) => ({
       .single();
     if (data?.contacts) {
       set({ emergencyContacts: data.contacts as EmergencyContact[] });
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data.contacts));
     }
   },
 
   saveContacts: async (userId, contacts) => {
     set({ emergencyContacts: contacts });
+    // Always persist locally so contacts survive restarts even if Supabase is unavailable
+    const cacheKey = `${LOCAL_CONTACTS_KEY}_${userId}`;
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(contacts));
+
+    if (userId === 'local') return null;
+
     const { error } = await supabase
       .from('profiles')
       .upsert({ id: userId, contacts });
@@ -142,6 +161,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Bike display helper
+// ---------------------------------------------------------------------------
+
+export function bikeLabel(bike: { nickname?: string | null; year?: number | null; make?: string | null; model?: string | null } | null): string {
+  if (!bike) return '';
+  if (bike.nickname?.trim()) return bike.nickname.trim();
+  return [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+}
+
+// ---------------------------------------------------------------------------
 // Garage store
 // ---------------------------------------------------------------------------
 
@@ -151,11 +180,17 @@ export interface Bike {
   year: number | null;
   make: string | null;
   model: string | null;
+  nickname?: string | null;
   odometer: number | null;
   tank_gallons: number | null;
   avg_mpg: number | null;
+  fuelCapacity?: number | null;
+  fuelCapacityUnit?: 'gallons' | 'liters' | null;
   created_at: string;
 }
+
+const LOCAL_BIKES_KEY    = 'ttm_bikes_local';
+const LOCAL_CONTACTS_KEY = 'ttm_contacts_local';
 
 interface GarageState {
   bikes: Bike[];
@@ -163,19 +198,27 @@ interface GarageState {
   loading: boolean;
   fetchBikes: (userId: string) => Promise<void>;
   addBike: (bike: Bike) => void;
+  updateBike: (bike: Bike) => void;
+  removeBike: (id: string, local?: boolean) => Promise<void>;
   selectBike: (id: string) => void;
 }
 
-export const useGarageStore = create<GarageState>((set) => ({
+export const useGarageStore = create<GarageState>((set, get) => ({
   bikes: [],
   selectedBikeId: null,
   loading: false,
 
   fetchBikes: async (userId) => {
     set({ loading: true });
+    if (userId === 'local') {
+      const stored = await AsyncStorage.getItem(LOCAL_BIKES_KEY);
+      const bikes: Bike[] = stored ? JSON.parse(stored) : [];
+      set({ bikes, selectedBikeId: bikes[0]?.id ?? null, loading: false });
+      return;
+    }
     const { data, error } = await supabase
       .from('bikes')
-      .select('*')
+      .select('id, user_id, year, make, model, nickname, odometer, tank_gallons, avg_mpg, fuelCapacity, fuelCapacityUnit, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {
@@ -186,6 +229,27 @@ export const useGarageStore = create<GarageState>((set) => ({
 
   addBike: (bike) =>
     set((s) => ({ bikes: [bike, ...s.bikes], selectedBikeId: bike.id })),
+
+  updateBike: (bike) =>
+    set((s) => ({ bikes: s.bikes.map((b) => b.id === bike.id ? bike : b) })),
+
+  removeBike: async (id, local = false) => {
+    if (local) {
+      const stored = await AsyncStorage.getItem(LOCAL_BIKES_KEY);
+      if (stored) {
+        const bikes = (JSON.parse(stored) as Bike[]).filter((b) => b.id !== id);
+        await AsyncStorage.setItem(LOCAL_BIKES_KEY, JSON.stringify(bikes));
+      }
+    } else {
+      await supabase.from('bikes').delete().eq('id', id);
+    }
+    set((s) => {
+      const bikes = s.bikes.filter((b) => b.id !== id);
+      const selectedBikeId =
+        s.selectedBikeId === id ? (bikes[0]?.id ?? null) : s.selectedBikeId;
+      return { bikes, selectedBikeId };
+    });
+  },
 
   selectBike: (id) => set({ selectedBikeId: id }),
 }));
@@ -215,6 +279,8 @@ interface RoutesState {
   setLoading: (v: boolean) => void;
   addRoute: (r: Route) => void;
   removeRoute: (id: string) => void;
+  updateRouteName: (id: string, name: string) => void;
+  updateRouteCategory: (id: string, category: string | null) => void;
 }
 
 export const useRoutesStore = create<RoutesState>((set) => ({
@@ -224,14 +290,45 @@ export const useRoutesStore = create<RoutesState>((set) => ({
   setLoading: (loading) => set({ loading }),
   addRoute:   (r)       => set((s) => ({ routes: [r, ...s.routes] })),
   removeRoute: (id)     => set((s) => ({ routes: s.routes.filter((r) => r.id !== id) })),
+  updateRouteName: (id, name) =>
+    set((s) => ({ routes: s.routes.map((r) => r.id === id ? { ...r, name } : r) })),
+  updateRouteCategory: (id, category) =>
+    set((s) => ({ routes: s.routes.map((r) => r.id === id ? { ...r, category } : r) })),
 }));
 
 // ---------------------------------------------------------------------------
-// App store (non-auth global state)
+// Theme store
 // ---------------------------------------------------------------------------
 
-interface AppState {
-  // extend as features are added
-}
+type ThemeMode = 'dark' | 'light' | 'system';
 
-export const useAppStore = create<AppState>(() => ({}));
+type ThemeStore = {
+  mode: ThemeMode;
+  theme: Theme;
+  setMode: (mode: ThemeMode, systemScheme?: 'dark' | 'light' | null) => void;
+  resolveTheme: (systemScheme: 'dark' | 'light' | null) => void;
+  loadSavedMode: () => Promise<void>;
+};
+
+export const useThemeStore = create<ThemeStore>()((set, get) => ({
+  mode: 'system',
+  theme: darkTheme,
+  setMode: async (mode, systemScheme = null) => {
+    await AsyncStorage.setItem('ttm_theme_mode', mode);
+    const resolved = mode === 'system'
+      ? (systemScheme === 'light' ? lightTheme : darkTheme)
+      : mode === 'light' ? lightTheme : darkTheme;
+    set({ mode, theme: resolved });
+  },
+  resolveTheme: (systemScheme) => {
+    const { mode } = get();
+    const resolved = mode === 'system'
+      ? (systemScheme === 'light' ? lightTheme : darkTheme)
+      : mode === 'light' ? lightTheme : darkTheme;
+    set({ theme: resolved });
+  },
+  loadSavedMode: async () => {
+    const saved = await AsyncStorage.getItem('ttm_theme_mode') as ThemeMode | null;
+    if (saved) set({ mode: saved });
+  },
+}));

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
 // Single skeleton bar — pulsing opacity 0.3 → 0.7 → 0.3
@@ -14,6 +14,7 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ width = '100%', height, borderRadius = 6, style }: SkeletonProps) {
+  const { theme } = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export function Skeleton({ width = '100%', height, borderRadius = 6, style }: Sk
 
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: Colors.TTM_CARD, opacity }, style]}
+      style={[{ width, height, borderRadius, backgroundColor: theme.bgCard, opacity }, style]}
     />
   );
 }
@@ -39,8 +40,9 @@ export function Skeleton({ width = '100%', height, borderRadius = 6, style }: Sk
 // ---------------------------------------------------------------------------
 
 export function FeedCardSkeleton() {
+  const { theme } = useTheme();
   return (
-    <View style={s.feedCard}>
+    <View style={[s.feedCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
       <Skeleton height={180} borderRadius={8} />
       <View style={s.feedMeta}>
         <Skeleton width="30%" height={10} />
@@ -57,8 +59,9 @@ export function FeedCardSkeleton() {
 // ---------------------------------------------------------------------------
 
 export function EventCardSkeleton() {
+  const { theme } = useTheme();
   return (
-    <View style={s.eventCard}>
+    <View style={[s.eventCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
       <View style={s.eventCardLeft}>
         <Skeleton width={44} height={44} borderRadius={8} />
       </View>
@@ -76,8 +79,9 @@ export function EventCardSkeleton() {
 // ---------------------------------------------------------------------------
 
 export function BikeCardSkeleton() {
+  const { theme } = useTheme();
   return (
-    <View style={s.bikeCard}>
+    <View style={[s.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
       <View style={s.bikeCardHeader}>
         <View style={{ gap: 8 }}>
           <Skeleton width={60} height={12} />
@@ -90,42 +94,12 @@ export function BikeCardSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
-// Weather conditions skeleton
-// ---------------------------------------------------------------------------
-
-export function WeatherCardSkeleton() {
-  return (
-    <View style={s.weatherCard}>
-      <View style={s.weatherTop}>
-        <View style={{ gap: 8 }}>
-          <Skeleton width={80} height={60} />
-          <Skeleton width={120} height={12} />
-          <Skeleton width={80} height={10} />
-        </View>
-        <Skeleton width={72} height={72} borderRadius={36} />
-      </View>
-      <View style={s.weatherGrid}>
-        {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={s.weatherCell}>
-            <Skeleton width={18} height={18} borderRadius={9} />
-            <Skeleton width="70%" height={9} style={{ marginTop: 6 }} />
-            <Skeleton width="50%" height={12} style={{ marginTop: 4 }} />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
   feedCard: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 14,
@@ -134,9 +108,7 @@ const s = StyleSheet.create({
 
   eventCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 10,
     padding: 14,
     marginBottom: 10,
@@ -146,9 +118,7 @@ const s = StyleSheet.create({
   eventCardRight: { flex: 1, gap: 4 },
 
   bikeCard: {
-    backgroundColor: Colors.TTM_CARD,
     borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -158,27 +128,4 @@ const s = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 20,
   },
-
-  weatherCard: {
-    backgroundColor: Colors.TTM_CARD,
-    borderWidth: 1,
-    borderColor: Colors.TTM_BORDER,
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 16,
-  },
-  weatherTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  weatherGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    borderTopWidth: 1,
-    borderTopColor: Colors.TTM_BORDER,
-    paddingTop: 16,
-  },
-  weatherCell: { width: '50%', paddingVertical: 10, paddingRight: 16 },
 });

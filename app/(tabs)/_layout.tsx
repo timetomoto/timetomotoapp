@@ -1,19 +1,21 @@
 import { Tabs } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../../lib/theme';
+import { useTheme } from '../../lib/useTheme';
 
 export default function TabLayout() {
+  const { theme } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor:   Colors.TAB_ACTIVE,
-        tabBarInactiveTintColor: Colors.TAB_INACTIVE,
+        tabBarActiveTintColor:   theme.tabBarActive,
+        tabBarInactiveTintColor: theme.tabBarInactive,
         tabBarStyle: {
-          backgroundColor: Colors.TTM_PANEL,
-          borderTopColor:  Colors.TTM_BORDER,
+          backgroundColor: theme.tabBarBg,
+          borderTopColor:  theme.tabBarBorder,
           borderTopWidth:  1,
-          height:          60,
+          height:          65,
           paddingBottom:   8,
           paddingTop:      6,
         },
@@ -32,8 +34,8 @@ export default function TabLayout() {
         name="ride"
         options={{
           title: 'RIDE',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="navigation" size={size} color={color} accessibilityLabel="Ride tab" />
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="motorbike" size={22} color={color} accessibilityLabel="Ride tab" />
           ),
         }}
       />
@@ -47,29 +49,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="feed"
-        options={{
-          title: 'FEED',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="rss" size={size} color={color} accessibilityLabel="Feed tab" />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="events"
-        options={{
-          title: 'EVENTS',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="flag" size={size} color={color} accessibilityLabel="Events tab" />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="garage"
         options={{
           title: 'GARAGE',
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} accessibilityLabel="Garage tab" />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'DISCOVER',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="compass" size={size} color={color} accessibilityLabel="Discover tab" />
           ),
         }}
       />
