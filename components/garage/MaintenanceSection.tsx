@@ -21,6 +21,7 @@ import {
   MAINTENANCE_TYPES,
   type MaintenanceRecord,
 } from '../../lib/garage';
+import DatePickerField, { formatDisplayDate } from './DatePickerField';
 
 // ---------------------------------------------------------------------------
 // Sort options
@@ -151,15 +152,8 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
               </View>
             )}
 
-            <Text style={[fm.label, { color: theme.textSecondary }]}>DATE (YYYY-MM-DD)</Text>
-            <TextInput
-              style={[fm.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-              value={date}
-              onChangeText={setDate}
-              placeholder="2026-03-11"
-              placeholderTextColor={theme.textMuted}
-              keyboardType="numbers-and-punctuation"
-            />
+            <Text style={[fm.label, { color: theme.textSecondary }]}>DATE</Text>
+            <DatePickerField value={date} onChange={setDate} />
 
             <Text style={[fm.label, { color: theme.textSecondary }]}>MILEAGE (OPTIONAL)</Text>
             <TextInput
@@ -210,7 +204,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
 // MaintenanceSection
 // ---------------------------------------------------------------------------
 
-export default function MaintenanceSection({ bikeId }: { bikeId: string }) {
+export default function MaintenanceSection({ bikeId, userId }: { bikeId: string; userId?: string }) {
   const { theme } = useTheme();
   const [records, setRecords]     = useState<MaintenanceRecord[]>([]);
   const [sortKey, setSortKey]     = useState<SortKey>('date_desc');
@@ -221,17 +215,17 @@ export default function MaintenanceSection({ bikeId }: { bikeId: string }) {
   const [editing, setEditing]     = useState<MaintenanceRecord | null>(null);
 
   useEffect(() => {
-    loadMaintenance(bikeId).then(setRecords);
+    loadMaintenance(bikeId, userId).then(setRecords);
   }, [bikeId]);
 
   const sorted = sortRecords(records, sortKey);
 
   async function handleSave(record: MaintenanceRecord) {
     if (editing) {
-      await updateMaintenanceRecord(bikeId, record);
+      await updateMaintenanceRecord(bikeId, record, userId);
       setRecords((prev) => prev.map((r) => r.id === record.id ? record : r));
     } else {
-      await addMaintenanceRecord(bikeId, record);
+      await addMaintenanceRecord(bikeId, record, userId);
       setRecords((prev) => [record, ...prev]);
     }
     setEditing(null);
@@ -248,7 +242,7 @@ export default function MaintenanceSection({ bikeId }: { bikeId: string }) {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          await deleteMaintenanceRecord(bikeId, r.id);
+          await deleteMaintenanceRecord(bikeId, r.id, userId);
           setRecords((prev) => prev.filter((x) => x.id !== r.id));
         },
       },
@@ -263,7 +257,7 @@ export default function MaintenanceSection({ bikeId }: { bikeId: string }) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           const ids = Array.from(selected);
-          await bulkDeleteMaintenance(bikeId, ids);
+          await bulkDeleteMaintenance(bikeId, ids, userId);
           setRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
           setSelected(new Set());
           setSelectMode(false);
@@ -352,7 +346,7 @@ export default function MaintenanceSection({ bikeId }: { bikeId: string }) {
             <View style={st.cardContent}>
               <Text style={[st.cardTitle, { color: theme.textPrimary }]}>{record.title}</Text>
               <Text style={[st.cardMeta, { color: theme.textSecondary }]}>
-                {record.maintenanceType} · {record.date}
+                {record.maintenanceType} · {formatDisplayDate(record.date)}
                 {record.mileage ? ` · ${record.mileage.toLocaleString()} mi` : ''}
                 {record.cost ? ` · $${record.cost.toFixed(2)}` : ''}
               </Text>

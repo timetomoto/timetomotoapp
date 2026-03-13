@@ -11,6 +11,7 @@ export interface PlaceDetail {
   lng: number;
   kind: 'fuel' | 'food';
   subtype?: string;
+  fuelTypes?: string;
   distanceMiles?: number;
 }
 
@@ -61,7 +62,7 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
   }
 
   const icon = place?.kind === 'fuel' ? 'droplet' : 'coffee';
-  const accentColor = place?.kind === 'fuel' ? '#FFD600' : '#D32F2F';
+  const accentColor = place?.kind === 'fuel' ? '#FFD600' : theme.red;
 
   return (
     <Animated.View
@@ -105,6 +106,16 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
         <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
           <Feather name="map-pin" size={14} color={theme.textMuted} />
           <Text style={[styles.infoText, { color: theme.textSecondary }]}>{place.address}</Text>
+        </View>
+      )}
+
+      {/* Fuel types */}
+      {place?.kind === 'fuel' && (
+        <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
+          <Feather name="droplet" size={14} color={theme.textMuted} />
+          <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+            {place.fuelTypes ? place.fuelTypes : 'Fuel types not listed'}
+          </Text>
         </View>
       )}
 

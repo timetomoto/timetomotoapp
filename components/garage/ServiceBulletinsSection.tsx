@@ -45,10 +45,10 @@ function RecallCard({ recall }: { recall: NHTSARecall }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <View style={[s.bulletinCard, { backgroundColor: theme.bgCard, borderColor: '#D32F2F44', borderLeftColor: '#D32F2F' }]}>
+    <View style={[s.bulletinCard, { backgroundColor: theme.bgCard, borderColor: theme.red + '44', borderLeftColor: theme.red }]}>
       <View style={s.bulletinBadgeRow}>
-        <View style={[s.badge, { backgroundColor: '#D32F2F22', borderColor: '#D32F2F55' }]}>
-          <Text style={[s.badgeText, { color: '#D32F2F' }]}>RECALL</Text>
+        <View style={[s.badge, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
+          <Text style={[s.badgeText, { color: theme.red }]}>RECALL</Text>
         </View>
         <Text style={[s.bulletinId, { color: theme.textMuted }]}>#{recall.NHTSACampaignNumber}</Text>
       </View>
@@ -130,13 +130,13 @@ function ComplaintCard({ complaint }: { complaint: NHTSAComplaint }) {
       {hasFlags && (
         <View style={s.flagRow}>
           {complaint.crash && (
-            <View style={[s.flag, { backgroundColor: '#D32F2F22', borderColor: '#D32F2F55' }]}>
-              <Text style={[s.flagText, { color: '#D32F2F' }]}>🚨 Crash</Text>
+            <View style={[s.flag, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
+              <Text style={[s.flagText, { color: theme.red }]}>🚨 Crash</Text>
             </View>
           )}
           {complaint.fire && (
-            <View style={[s.flag, { backgroundColor: '#D32F2F22', borderColor: '#D32F2F55' }]}>
-              <Text style={[s.flagText, { color: '#D32F2F' }]}>🔥 Fire</Text>
+            <View style={[s.flag, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
+              <Text style={[s.flagText, { color: theme.red }]}>🔥 Fire</Text>
             </View>
           )}
           {(complaint.numberOfInjuries ?? 0) > 0 && (
@@ -145,8 +145,8 @@ function ComplaintCard({ complaint }: { complaint: NHTSAComplaint }) {
             </View>
           )}
           {(complaint.numberOfDeaths ?? 0) > 0 && (
-            <View style={[s.flag, { backgroundColor: '#D32F2F22', borderColor: '#D32F2F55' }]}>
-              <Text style={[s.flagText, { color: '#D32F2F' }]}>☠️ {complaint.numberOfDeaths} death{complaint.numberOfDeaths === 1 ? '' : 's'}</Text>
+            <View style={[s.flag, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
+              <Text style={[s.flagText, { color: theme.red }]}>☠️ {complaint.numberOfDeaths} death{complaint.numberOfDeaths === 1 ? '' : 's'}</Text>
             </View>
           )}
         </View>
@@ -165,6 +165,7 @@ function ComplaintCard({ complaint }: { complaint: NHTSAComplaint }) {
 
 export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
   const { theme } = useTheme();
+  const [collapsed, setCollapsed] = useState(true);
   const { results, loading, fetchBulletins, clearCache } = useServiceBulletinsStore();
 
   const year  = String(bike.year ?? '');
@@ -177,6 +178,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
 
   const hasResults = result != null && (result.recalls.length > 0 || result.complaints.length > 0);
   const isEmpty    = result != null && result.recalls.length === 0 && result.complaints.length === 0;
+  const totalCount = result ? result.recalls.length + result.complaints.length : 0;
 
   async function handleCheck() {
     await fetchBulletins(year, make, model);
@@ -199,10 +201,26 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
 
   return (
     <View style={s.root}>
-      {/* ── Section header ── */}
+      {/* ── Collapsible section header ── */}
+      <Pressable
+        style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
+        onPress={() => setCollapsed((p) => !p)}
+      >
+        <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>SERVICE BULLETINS</Text>
+        <View style={s.collapseRight}>
+          {collapsed && totalCount > 0 && (
+            <View style={[s.countBadge, { backgroundColor: theme.red }]}>
+              <Text style={s.countText}>{totalCount}</Text>
+            </View>
+          )}
+          <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      {!collapsed && (<View>
+      {/* ── Action button row ── */}
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
-          <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>SERVICE BULLETINS</Text>
           {result && (
             <Text style={[s.checkedAt, { color: theme.textMuted }]}>
               Last checked {new Date(result.fetchedAt).toLocaleDateString()}
@@ -299,6 +317,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
           Data from NHTSA (nhtsa.gov) — official U.S. government vehicle safety database
         </Text>
       )}
+      </View>)}
     </View>
   );
 }
@@ -308,12 +327,31 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
-  root: { padding: 16, paddingBottom: 4 },
+  root: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
+
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  collapseRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  countText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 12,
     marginBottom: 12,
   },
   headerLeft: { flex: 1, gap: 2 },

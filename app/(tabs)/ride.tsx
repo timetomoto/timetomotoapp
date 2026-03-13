@@ -145,9 +145,11 @@ const wl = StyleSheet.create({
 function RecordScreen({
   onStopRequested,
   elapsedSeconds,
+  onBikeSelected,
 }: {
   onStopRequested: () => void;
   elapsedSeconds: number;
+  onBikeSelected?: (bikeId: string | null) => void;
 }) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
@@ -187,6 +189,7 @@ function RecordScreen({
 
   // ── START ride ──
   async function handleStart(cfg: RideConfig) {
+    onBikeSelected?.(cfg.bikeId ?? null);
     setRecording(true);
 
     // Live share
@@ -319,7 +322,7 @@ function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: 
   const miles = isRecording ? calcDistance(recordedPoints) : 0;
 
   return (
-    <View style={[styles.statsBar, { backgroundColor: 'rgba(20,20,20,0.88)', borderColor: theme.border }]}>
+    <View style={[styles.statsBar, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
       <View style={styles.statItem}>
         <Text style={[styles.statValue, { color: theme.textPrimary }]}>{Math.round(speedMph)}</Text>
         <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MPH</Text>
@@ -346,7 +349,7 @@ const SubNav = memo(function SubNav({ active, onChange }: { active: SubTab; onCh
   const { theme } = useTheme();
   const tabs: SubTab[] = ['MAP', 'ROUTES', 'RECORD'];
   return (
-    <View style={[styles.subNav, { backgroundColor: 'rgba(20,20,20,0.95)', borderTopColor: theme.border }]}>
+    <View style={[styles.subNav, { backgroundColor: theme.subNavBg, borderTopColor: theme.subNavBorder }]}>
       {tabs.map((tab) => (
         <Pressable key={tab} style={styles.subNavItem} onPress={() => onChange(tab)}>
           <Text style={[styles.subNavText, { color: theme.tabBarInactive }, active === tab && { color: theme.red }]}>
@@ -376,7 +379,7 @@ export default function RideScreen() {
   }, [user?.id]);
   const {
     isRecording, setRecording,
-    recordedPoints, clearRecordedPoints, addRecordedPoint,
+    recordedPoints, clearRecordedPoints,
     lastKnownLocation,
   } = useSafetyStore();
 
@@ -404,6 +407,8 @@ export default function RideScreen() {
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [isSavedRoutePreview, setIsSavedRoutePreview] = useState(false);
+  const savedRouteStartRef = useRef<{ lat: number; lng: number } | null>(null);
   const [navRouteGeojson, setNavRouteGeojson] = useState<any>(null);
 
   // ── Overlay toggles ──
@@ -437,10 +442,18 @@ export default function RideScreen() {
     setFuelStationsLoading(true);
     setFuelStationsOn(true);
     try {
-      const c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+      // Use visible map center, fall back to user location or default
+      let c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+      try {
+        const bounds = await (mapRef.current as any)?.getVisibleBounds();
+        if (bounds && bounds[0] && bounds[1]) {
+          c = { lat: (bounds[0][1] + bounds[1][1]) / 2, lng: (bounds[0][0] + bounds[1][0]) / 2 };
+        }
+      } catch {}
       const stations = await fetchFuelStations(c.lat, c.lng);
       setFuelStations(stations);
-    } catch {
+    } catch (err) {
+      console.error('Fuel fetch error:', err);
       Alert.alert('Failed', 'Could not fetch fuel stations. Check your connection.');
       setFuelStationsOn(false);
     } finally {
@@ -457,7 +470,14 @@ export default function RideScreen() {
     setFoodLoading(true);
     setFoodOn(true);
     try {
-      const c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+      // Use visible map center, fall back to user location or default
+      let c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+      try {
+        const bounds = await (mapRef.current as any)?.getVisibleBounds();
+        if (bounds && bounds[0] && bounds[1]) {
+          c = { lat: (bounds[0][1] + bounds[1][1]) / 2, lng: (bounds[0][0] + bounds[1][0]) / 2 };
+        }
+      } catch {}
       const places = await fetchFoodPlaces(c.lat, c.lng);
       setFoodPlaces(places);
     } catch {
@@ -483,11 +503,11 @@ export default function RideScreen() {
     toastTimer.current = setTimeout(() => setToastMsg(''), 2500);
   }
 
+  const mapRef       = useRef<Mapbox.MapView>(null);
   const cameraRef    = useRef<Mapbox.Camera>(null);
+  const recordingBikeIdRef = useRef<string | null>(null);
   const elapsedRef   = useRef(0);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isRecordingRef = useRef(isRecording);
-  useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
 
   // Single source-of-truth elapsed timer — drives both RecordScreen overlay and StatsOverlay
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -519,15 +539,6 @@ export default function RideScreen() {
           setSpeed(Math.max(0, speedMs * 2.237)); // m/s to mph
           if (loc.coords.heading != null && loc.coords.heading >= 0) {
             setHeading(loc.coords.heading);
-          }
-          // Record GPS point every second while recording
-          if (isRecordingRef.current) {
-            addRecordedPoint({
-              lat: loc.coords.latitude,
-              lng: loc.coords.longitude,
-              elevation: loc.coords.altitude ?? 0,
-              time: new Date().toISOString(),
-            });
           }
         },
       ).then((s) => { sub = s; });
@@ -621,9 +632,10 @@ export default function RideScreen() {
   }, [subTab]);
 
   // ── fetchAndPreviewRoute ──
-  async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }) {
+  async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }, prefOverride?: import('../../lib/navigationStore').RoutePreference) {
     setDestination(dest);
     setNavMode('preview');
+    setIsSavedRoutePreview(false);
     setRouteLoading(true);
     setRouteError(null);
     try {
@@ -631,7 +643,7 @@ export default function RideScreen() {
         ? { lat: lastKnownLocation.lat, lng: lastKnownLocation.lng }
         : { lat: AUSTIN[1], lng: AUSTIN[0] };
       const routes = await fetchDirections(
-        origin.lng, origin.lat, dest.lng, dest.lat, routePreference,
+        origin.lng, origin.lat, dest.lng, dest.lat, prefOverride ?? routePreference,
       );
       if (routes.length > 0) {
         setActiveRoute(routes[0]);
@@ -667,6 +679,7 @@ export default function RideScreen() {
   // ── handleStartNavigation ──
   function handleStartNavigation(route: typeof activeRoute) {
     if (!route) return;
+    setOverlayPoints(null); // Clear any previously viewed route
     setNavMode('navigating');
     setActiveRoute(route);
     setNavRouteGeojson(route.geometry);
@@ -689,16 +702,69 @@ export default function RideScreen() {
     });
   }
 
-  // Navigate to a saved route: show on map + fit camera
+  // Navigate to a saved route: use GPX geometry directly, no Directions API
   function handleNavigate(route: Route) {
-    setOverlayPoints(route.points);
+    const pts = route.points ?? [];
     setSubTab('MAP');
-    const dest = {
-      name: route.name,
-      lat: route.points[route.points.length - 1].lat,
-      lng: route.points[route.points.length - 1].lng,
-    };
-    fetchAndPreviewRoute(dest);
+
+    if (pts.length >= 2) {
+      // Has GPS points — use saved geometry directly
+      setOverlayPoints(pts);
+
+      const geometry: { type: 'LineString'; coordinates: [number, number][] } = {
+        type: 'LineString',
+        coordinates: pts.map((p) => [p.lng, p.lat]),
+      };
+
+      const distMi = route.distance_miles ?? 0;
+      const durSec = route.duration_seconds ?? (distMi > 0 ? Math.round((distMi / 30) * 3600) : 0);
+      const navRoute: import('../../lib/navigationStore').NavRoute = {
+        geometry,
+        steps: [],
+        distanceMiles: distMi,
+        durationSeconds: durSec,
+      };
+
+      const dest = {
+        name: route.name,
+        lat: pts[pts.length - 1].lat,
+        lng: pts[pts.length - 1].lng,
+      };
+
+      setDestination(dest);
+      setActiveRoute(navRoute);
+      setAlternateRoutes([]);
+      setNavRouteGeojson(geometry);
+      savedRouteStartRef.current = { lat: pts[0].lat, lng: pts[0].lng };
+      setIsSavedRoutePreview(true);
+      setNavMode('preview');
+
+      // Fit camera to route bounds
+      const coords = geometry.coordinates;
+      const lats = coords.map((c) => c[1]);
+      const lngs = coords.map((c) => c[0]);
+      cameraRef.current?.fitBounds(
+        [Math.max(...lngs), Math.max(...lats)],
+        [Math.min(...lngs), Math.min(...lats)],
+        [80, 80, 220, 80],
+        800,
+      );
+    } else {
+      // No GPS points — fall back to Directions API using route name as destination
+      // Try to use distance_miles to guess an end point, but really we just need
+      // a destination. Use the route name and let fetchAndPreviewRoute handle it.
+      showToast(`Loading directions for ${route.name}…`);
+      const dest = { name: route.name, lat: 0, lng: 0 };
+      // If the route somehow has a single point, use it
+      if (pts.length === 1) {
+        dest.lat = pts[0].lat;
+        dest.lng = pts[0].lng;
+        fetchAndPreviewRoute(dest);
+      } else {
+        // No coords at all — can't navigate without a destination
+        showToast('This route has no GPS data to navigate.');
+      }
+    }
   }
 
   // GPX import: preview route on map + switch to MAP
@@ -717,14 +783,13 @@ export default function RideScreen() {
 
   // Save recorded ride
   async function handleSaveRide(name: string) {
-    if (user && recordedPoints.length >= 2) {
-      const miles   = calcDistance(recordedPoints);
-      const gainFt  = 0; // elevation from device GPS — skipped without barometer
-      const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current);
+    if (user) {
+      const miles   = recordedPoints.length >= 2 ? calcDistance(recordedPoints) : 0;
+      const gainFt  = 0;
+      const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, undefined, 'recorded', recordingBikeIdRef.current);
       if (saved) {
         addRoute(saved);
-        showToast('Route saved to library!');
-        // Switch to ROUTES sub-tab so user sees their new route
+        showToast('Ride saved!');
         setSubTab('ROUTES');
       }
     }
@@ -753,15 +818,28 @@ export default function RideScreen() {
     }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      if (status !== 'granted') {
+        cameraRef.current?.setCamera({ centerCoordinate: AUSTIN, zoomLevel: 9, animationDuration: 600 });
+        return;
+      }
+      // Use getLastKnownPositionAsync first (instant), fall back to getCurrentPositionAsync
+      const last = await Location.getLastKnownPositionAsync();
+      if (last) {
+        cameraRef.current?.setCamera({
+          centerCoordinate: [last.coords.longitude, last.coords.latitude],
+          zoomLevel: 14,
+          animationDuration: 600,
+        });
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
       cameraRef.current?.setCamera({
         centerCoordinate: [loc.coords.longitude, loc.coords.latitude],
         zoomLevel: 14,
-        animationDuration: 800,
+        animationDuration: 600,
       });
     } catch {
-      // Silently fail — GPS unavailable in simulator
+      cameraRef.current?.setCamera({ centerCoordinate: AUSTIN, zoomLevel: 9, animationDuration: 600 });
     }
   }
 
@@ -805,6 +883,7 @@ export default function RideScreen() {
       {/* ── Full-screen map (always mounted; also visible on RECORD tab while recording) ── */}
       <View style={[styles.mapContainer, (subTab !== 'MAP' && !(subTab === 'RECORD' && isRecording)) && styles.hidden]}>
         <MapView
+          ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
           compassEnabled
@@ -848,7 +927,7 @@ export default function RideScreen() {
                 const dist = lastKnownLocation
                   ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
                   : undefined;
-                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', distanceMiles: dist });
+                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', fuelTypes: props.fuelTypes || '', distanceMiles: dist });
               }}
             >
               <CircleLayer
@@ -880,7 +959,7 @@ export default function RideScreen() {
               <CircleLayer
                 id="food-places-dots"
                 style={{
-                  circleColor: '#D32F2F',
+                  circleColor: '#E53935',
                   circleRadius: 6,
                   circleStrokeColor: '#000',
                   circleStrokeWidth: 1.5,
@@ -919,11 +998,24 @@ export default function RideScreen() {
             <ShapeSource id="live-track" shape={liveTrackGeoJson}>
               <LineLayer
                 id="live-track-line"
-                style={{ lineColor: '#D32F2F', lineWidth: 3, lineOpacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
+                style={{ lineColor: '#E53935', lineWidth: 3, lineOpacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
               />
             </ShapeSource>
           )}
         </MapView>
+
+        {/* ── Recenter / locate me button (below compass) ── */}
+        {!drawerOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
+          <Pressable
+            style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+            hitSlop={8}
+            onPress={() => {
+              handleLocateMe();
+            }}
+          >
+            <Feather name="crosshair" size={23} color={theme.textSecondary} />
+          </Pressable>
+        </View>}
 
         {/* ── Floating turn card (left side, during navigation) ── */}
         {isNavigatingActive && (
@@ -1004,6 +1096,7 @@ export default function RideScreen() {
               resetNavigation();
               setNavRouteGeojson(null);
               if (isRecording) handleStopRequested();
+              handleLocateMe();
             }}
           >
             <Feather name="x" size={16} color="#fff" />
@@ -1044,24 +1137,17 @@ export default function RideScreen() {
             onChangePreference={(p) => {
               setRoutePreference(p);
               if (destination) {
-                fetchAndPreviewRoute(destination);
+                fetchAndPreviewRoute(destination, p);
               }
             }}
-            onStartNavigation={handleStartNavigation}
-            onSaveRoute={async (route) => {
-              if (user) {
-                const saved = await createRoute(
-                  user.id,
-                  destination.name,
-                  route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
-                  route.distanceMiles,
-                  0,
-                  null,
-                );
-                if (saved) { addRoute(saved); showToast('Route saved!'); }
-              }
+            onStartNavigation={(route, bikeId) => {
+              recordingBikeIdRef.current = bikeId ?? null;
+              handleStartNavigation(route);
             }}
-            onCancel={() => { resetNavigation(); setNavRouteGeojson(null); }}
+            onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; resetNavigation(); setNavRouteGeojson(null); }}
+            isSavedRoute={isSavedRoutePreview}
+            savedRouteStart={savedRouteStartRef.current}
+            onGeometryChange={(geo) => setNavRouteGeojson(geo)}
           />
         )}
 
@@ -1086,8 +1172,9 @@ export default function RideScreen() {
               }
               resetNavigation();
               setNavRouteGeojson(null);
+              handleLocateMe();
             }}
-            onDismiss={() => { resetNavigation(); setNavRouteGeojson(null); }}
+            onDismiss={() => { resetNavigation(); setNavRouteGeojson(null); handleLocateMe(); }}
           />
         )}
       </View>
@@ -1113,13 +1200,13 @@ export default function RideScreen() {
             </View>
             <View style={{ width: 40 }} />
           </View>
-          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} />
+          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
         </SafeAreaView>
       )}
       {subTab === 'RECORD' && isRecording && (
         /* Transparent overlay — map is visible underneath */
         <SafeAreaView edges={['top', 'bottom']} style={styles.recordMapOverlay} pointerEvents="box-none">
-          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} />
+          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
         </SafeAreaView>
       )}
 
@@ -1154,7 +1241,7 @@ export default function RideScreen() {
         onToggleWeather={() => setWeatherOn((v) => !v)}
         onToggleFuel={handleToggleFuelStations}
         onToggleFood={handleToggleFood}
-        onLocateMe={handleLocateMe}
+
       />
 
       {/* ── Search Sheet ── */}
@@ -1179,6 +1266,28 @@ const styles = StyleSheet.create({
 
   mapContainer: { ...StyleSheet.absoluteFillObject },
   hidden:        { opacity: 0, pointerEvents: 'none' },
+
+  // Recenter button wrapper + button (aligned below compass)
+  locateBtnWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 60,
+    zIndex: 9999,
+    elevation: 20,
+  },
+  locateBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 209 : 169,
+    right: 14,
+    width: 37,
+    height: 37,
+    borderRadius: 18.5,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // Top header bar over map
   recordHeader: {

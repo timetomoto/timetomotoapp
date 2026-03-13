@@ -21,6 +21,7 @@ import {
   MODIFICATION_CATEGORIES,
   type Modification,
 } from '../../lib/garage';
+import DatePickerField, { formatDisplayDate } from './DatePickerField';
 
 type SortKey = 'date_desc' | 'date_asc' | 'title_asc' | 'title_desc';
 
@@ -146,13 +147,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
             )}
 
             <Text style={[fm.label, { color: theme.textSecondary }]}>DATE INSTALLED (OPTIONAL)</Text>
-            <TextInput
-              style={[fm.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-              value={dateInstalled} onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={theme.textMuted}
-              keyboardType="numbers-and-punctuation"
-            />
+            <DatePickerField value={dateInstalled} onChange={setDate} />
 
             <Text style={[fm.label, { color: theme.textSecondary }]}>COST (OPTIONAL)</Text>
             <TextInput
@@ -185,7 +180,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
   );
 }
 
-export default function ModificationsSection({ bikeId }: { bikeId: string }) {
+export default function ModificationsSection({ bikeId, userId }: { bikeId: string; userId?: string }) {
   const { theme } = useTheme();
   const [records, setRecords]     = useState<Modification[]>([]);
   const [sortKey, setSortKey]     = useState<SortKey>('date_desc');
@@ -195,16 +190,16 @@ export default function ModificationsSection({ bikeId }: { bikeId: string }) {
   const [showForm, setShowForm]   = useState(false);
   const [editing, setEditing]     = useState<Modification | null>(null);
 
-  useEffect(() => { loadModifications(bikeId).then(setRecords); }, [bikeId]);
+  useEffect(() => { loadModifications(bikeId, userId).then(setRecords); }, [bikeId]);
 
   const sorted = sortRecords(records, sortKey);
 
   async function handleSave(record: Modification) {
     if (editing) {
-      await updateModification(bikeId, record);
+      await updateModification(bikeId, record, userId);
       setRecords((prev) => prev.map((r) => r.id === record.id ? record : r));
     } else {
-      await addModification(bikeId, record);
+      await addModification(bikeId, record, userId);
       setRecords((prev) => [record, ...prev]);
     }
     setEditing(null);
@@ -216,7 +211,7 @@ export default function ModificationsSection({ bikeId }: { bikeId: string }) {
     Alert.alert('Delete Mod?', `Delete "${r.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        await deleteModification(bikeId, r.id);
+        await deleteModification(bikeId, r.id, userId);
         setRecords((prev) => prev.filter((x) => x.id !== r.id));
       }},
     ]);
@@ -228,7 +223,7 @@ export default function ModificationsSection({ bikeId }: { bikeId: string }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         const ids = Array.from(selected);
-        await bulkDeleteModifications(bikeId, ids);
+        await bulkDeleteModifications(bikeId, ids, userId);
         setRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
         setSelected(new Set()); setSelectMode(false);
       }},
@@ -302,7 +297,7 @@ export default function ModificationsSection({ bikeId }: { bikeId: string }) {
               <Text style={[st.cardMeta, { color: theme.textSecondary }]}>
                 {record.category}
                 {record.brand ? ` · ${record.brand}` : ''}
-                {record.dateInstalled ? ` · ${record.dateInstalled}` : ''}
+                {record.dateInstalled ? ` · ${formatDisplayDate(record.dateInstalled)}` : ''}
                 {record.cost ? ` · $${record.cost.toFixed(2)}` : ''}
               </Text>
               {record.notes ? <Text style={[st.cardNotes, { color: theme.textMuted }]}>{record.notes}</Text> : null}

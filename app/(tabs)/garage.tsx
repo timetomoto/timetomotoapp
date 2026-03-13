@@ -16,6 +16,7 @@ import MaintenanceSection from '../../components/garage/MaintenanceSection';
 import ModificationsSection from '../../components/garage/ModificationsSection';
 import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSection';
 import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
+import SpecificationsSection from '../../components/garage/SpecificationsSection';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
@@ -117,7 +118,7 @@ export default function GarageScreen() {
                   style={[
                     styles.chip,
                     { borderColor: theme.border, backgroundColor: theme.bgCard },
-                    bike.id === selectedBikeId && { borderColor: theme.red, backgroundColor: 'rgba(211,47,47,0.12)' },
+                    bike.id === selectedBikeId && { borderColor: theme.red, backgroundColor: theme.red + '1F' },
                   ]}
                   onPress={() => selectBike(bike.id)}
                 >
@@ -201,16 +202,16 @@ export default function GarageScreen() {
               </View>
 
               {activeSection === 'MAINTENANCE' && selectedBike && (
-                <MaintenanceSection bikeId={selectedBike.id} />
+                <MaintenanceSection bikeId={selectedBike.id} userId={user?.id} />
               )}
               {activeSection === 'MODS' && selectedBike && (
-                <ModificationsSection bikeId={selectedBike.id} />
+                <ModificationsSection bikeId={selectedBike.id} userId={user?.id} />
               )}
               {activeSection === 'SERVICE' && selectedBike && (
                 <>
-                  <ServiceBulletinsSection bike={selectedBike} />
-                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
+                  <SpecificationsSection bike={selectedBike} />
                   <ServiceIntervalsSection bike={selectedBike} />
+                  <ServiceBulletinsSection bike={selectedBike} />
                 </>
               )}
             </View>

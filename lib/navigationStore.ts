@@ -13,7 +13,7 @@ export type NavMode =
   | 'recalculating'
   | 'completed';
 
-export type RoutePreference = 'fastest' | 'scenic' | 'no_highway' | 'offroad';
+export type RoutePreference = 'fastest' | 'scenic' | 'no_highway' | 'offroad' | 'no_tolls';
 
 export interface NavDestination {
   name: string;

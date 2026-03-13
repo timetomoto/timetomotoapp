@@ -30,7 +30,6 @@ interface Props {
   onToggleWeather: () => void;
   onToggleFuel: () => void;
   onToggleFood: () => void;
-  onLocateMe: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +49,6 @@ export default function MapControlDrawer({
   onToggleWeather,
   onToggleFuel,
   onToggleFood,
-  onLocateMe,
 }: Props) {
   const { theme } = useTheme();
   const translateX = useRef(new Animated.Value(280)).current;
@@ -194,7 +192,7 @@ export default function MapControlDrawer({
             <Switch
               value={weatherOn}
               onValueChange={onToggleWeather}
-              trackColor={{ false: theme.border, true: '#5B9BD5' }}
+              trackColor={{ false: '#9E9E9E', true: '#5B9BD5' }}
               thumbColor="#fff"
             />
           </View>
@@ -222,7 +220,7 @@ export default function MapControlDrawer({
             <Switch
               value={fuelOn}
               onValueChange={onToggleFuel}
-              trackColor={{ false: theme.border, true: '#FFD600' }}
+              trackColor={{ false: '#9E9E9E', true: '#FFD600' }}
               thumbColor="#fff"
               disabled={fuelLoading}
             />
@@ -251,26 +249,13 @@ export default function MapControlDrawer({
             <Switch
               value={foodOn}
               onValueChange={onToggleFood}
-              trackColor={{ false: theme.border, true: '#FF6B35' }}
+              trackColor={{ false: '#9E9E9E', true: '#FF6B35' }}
               thumbColor="#fff"
               disabled={foodLoading}
             />
           </View>
         </View>
 
-        {/* Section: MAP UTILITIES */}
-        <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>MAP UTILITIES</Text>
-
-        <Pressable
-          style={[styles.row, { borderBottomColor: theme.border }]}
-          onPress={() => {
-            onLocateMe();
-            onClose();
-          }}
-        >
-          <Feather name="crosshair" size={16} color={theme.textSecondary} />
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>Recenter / Locate</Text>
-        </Pressable>
       </Animated.View>
     </View>
   );

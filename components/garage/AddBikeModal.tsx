@@ -293,7 +293,16 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
       } else {
         const { error: dbError } = await supabase
           .from('bikes')
-          .update({ year: fields.year, make: fields.make, model: fields.model, odometer: fields.odometer, bike_type: fields.bike_type })
+          .update({
+            year: fields.year,
+            make: fields.make,
+            model: fields.model,
+            nickname: fields.nickname,
+            odometer: fields.odometer,
+            bike_type: fields.bike_type,
+            "fuelCapacity": fields.fuelCapacity,
+            "fuelCapacityUnit": fields.fuelCapacityUnit,
+          })
           .eq('id', editBike.id);
         setSaving(false);
         if (dbError) { setError(dbError.message); return; }
@@ -308,8 +317,11 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
           year: fields.year,
           make: fields.make,
           model: fields.model,
+          nickname: fields.nickname,
           odometer: fields.odometer,
           bike_type: fields.bike_type,
+          "fuelCapacity": fields.fuelCapacity,
+          "fuelCapacityUnit": fields.fuelCapacityUnit,
         })
         .select()
         .single();
@@ -387,9 +399,12 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
             <StyledInput
               value={model}
               onChangeText={setModel}
-              placeholder="e.g. Tiger 900"
+              placeholder="e.g. Tiger 900 Rally Pro"
               autoCorrect={false}
             />
+            <Text style={[styles.helperText, { color: theme.textMuted }]}>
+              Exact model name helps auto-fill specs and service data.
+            </Text>
 
             <FieldLabel label="NICKNAME — OPTIONAL" />
             <StyledInput
@@ -505,6 +520,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
     fontSize: 16,
+  },
+  helperText: {
+    fontSize: 11,
+    marginTop: 6,
+    letterSpacing: 0.2,
   },
   yearPickerWrapper: {
     borderWidth: 1,

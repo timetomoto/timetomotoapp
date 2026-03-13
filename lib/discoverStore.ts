@@ -54,7 +54,7 @@ type DiscoverStore = {
 // ---------------------------------------------------------------------------
 
 const NEWS_SOURCES = [
-  { name: 'ADVrider',                url: 'https://advrider.com/f/forums/-/index.rss',              accent: '#D32F2F', tag: 'COMMUNITY' },
+  { name: 'ADVrider',                url: 'https://advrider.com/f/forums/-/index.rss',              accent: '#E53935', tag: 'COMMUNITY' },
   { name: 'ADV Pulse',               url: 'https://www.advpulse.com/feed/',                          accent: '#FF6B35', tag: 'ADV' },
   { name: 'Cycle World',             url: 'https://www.cycleworld.com/rss/all.xml',                  accent: '#F7B731', tag: 'NEWS' },
   { name: 'RideApart',               url: 'https://rideapart.com/rss/articles/all',                  accent: '#4ECDC4', tag: 'NEWS' },

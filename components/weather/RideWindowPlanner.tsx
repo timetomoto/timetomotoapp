@@ -23,7 +23,7 @@ const RISK_COLOR: Record<RiskLevel, string> = {
   CLEAR:   '#4CAF50',
   WATCH:   '#FF9800',
   WARNING: '#F44336',
-  DANGER:  '#D32F2F',
+  DANGER:  '#E53935',
 };
 
 function formatETA(d: Date): string {

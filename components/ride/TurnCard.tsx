@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  LayoutChangeEvent,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { NavStep } from '../../lib/navigationStore';
+import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +22,15 @@ interface Props {
   isOffRoute: boolean;
   isRecalculating: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const CARD_LEFT = 12;
+const TAB_WIDTH = 28;
+const ANIM_DURATION = 280;
+const EASING = Easing.out(Easing.cubic);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,69 +67,89 @@ function formatStepDistance(miles: number): string {
 // ---------------------------------------------------------------------------
 
 export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
-  const translateX = useRef(new Animated.Value(-200)).current;
-  const [dismissed, setDismissed] = useState(false);
+  const { theme } = useTheme();
+  const translateX = useRef(new Animated.Value(-300)).current;
+  const [collapsed, setCollapsed] = useState(false);
   const [cardVisible, setCardVisible] = useState(false);
+  const [cardWidth, setCardWidth] = useState(160);
   const prevStepRef = useRef<string | null>(null);
+  const collapsedRef = useRef(false);
 
-  // Determine whether the card should show
-  const shouldShow = !dismissed && (isOffRoute || isRecalculating || (step && step.distanceMiles <= 0.5));
+  // Keep ref in sync
+  collapsedRef.current = collapsed;
 
-  // Fly in / out based on shouldShow
+  const expandedX = 0;
+  // Collapsed: slide left so only the tab peeks out at screen edge
+  const collapsedX = -(cardWidth + CARD_LEFT);
+
+  // Whether the card should be in the DOM at all
+  const shouldShow = isOffRoute || isRecalculating || (step != null && step.distanceMiles <= 0.5);
+
+  // Slide in / fully off-screen
   useEffect(() => {
     if (shouldShow) {
       setCardVisible(true);
+      setCollapsed(false);
+      collapsedRef.current = false;
       Animated.timing(translateX, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        toValue: expandedX,
+        duration: ANIM_DURATION,
+        easing: EASING,
+        useNativeDriver: false,
       }).start();
     } else {
       Animated.timing(translateX, {
-        toValue: -200,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        toValue: -300,
+        duration: ANIM_DURATION,
+        easing: EASING,
+        useNativeDriver: false,
       }).start(({ finished }) => {
         if (finished) setCardVisible(false);
       });
     }
   }, [shouldShow]);
 
-  // When step changes (new instruction), fly out then back in
+  // When step changes, fly out then back in
   useEffect(() => {
     if (!step) return;
     const stepKey = `${step.type}_${step.road}_${step.instruction}`;
-    if (prevStepRef.current && prevStepRef.current !== stepKey && !dismissed) {
-      // Fly out
+    if (prevStepRef.current && prevStepRef.current !== stepKey) {
+      setCollapsed(false);
+      collapsedRef.current = false;
       Animated.timing(translateX, {
-        toValue: -200,
+        toValue: -300,
         duration: 200,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        easing: EASING,
+        useNativeDriver: false,
       }).start(() => {
-        // Content updates via React, fly back in
         Animated.timing(translateX, {
-          toValue: 0,
-          duration: 300,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
+          toValue: expandedX,
+          duration: ANIM_DURATION,
+          easing: EASING,
+          useNativeDriver: false,
         }).start();
       });
     }
     prevStepRef.current = stepKey;
   }, [step?.type, step?.road, step?.instruction]);
 
-  // Reset dismissed state when step changes
-  useEffect(() => {
-    setDismissed(false);
-  }, [step?.type, step?.road]);
+  // Toggle collapsed / expanded
+  const toggleCollapse = useCallback(() => {
+    const next = !collapsedRef.current;
+    setCollapsed(next);
+    collapsedRef.current = next;
+    Animated.timing(translateX, {
+      toValue: next ? collapsedX : expandedX,
+      duration: ANIM_DURATION,
+      easing: EASING,
+      useNativeDriver: false,
+    }).start();
+  }, [collapsedX]);
 
-  // Swipe to dismiss
+  // Swipe gesture
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10,
       onPanResponderMove: (_, g) => {
         if (g.dx < 0) {
@@ -126,77 +157,92 @@ export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
         }
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dx < -60) {
+        if (g.dx < -60 || g.vx < -0.5) {
+          setCollapsed(true);
+          collapsedRef.current = true;
           Animated.timing(translateX, {
-            toValue: -200,
-            duration: 200,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }).start(() => {
-            setDismissed(true);
-          });
+            toValue: -(cardWidth + CARD_LEFT),
+            duration: ANIM_DURATION,
+            easing: EASING,
+            useNativeDriver: false,
+          }).start();
         } else {
+          setCollapsed(false);
+          collapsedRef.current = false;
           Animated.timing(translateX, {
-            toValue: 0,
-            duration: 200,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
+            toValue: expandedX,
+            duration: ANIM_DURATION,
+            easing: EASING,
+            useNativeDriver: false,
           }).start();
         }
       },
     }),
   ).current;
 
-  // Pull-tab to bring card back
-  const handlePullTab = () => {
-    setDismissed(false);
-  };
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (w > 0 && w !== cardWidth) setCardWidth(w);
+  }, [cardWidth]);
 
-  if (!cardVisible && !dismissed) return null;
+  if (!cardVisible) return null;
 
-  // Off-route / recalculating state
-  if (isRecalculating || isOffRoute) {
-    return (
-      <Animated.View
-        style={[styles.card, { transform: [{ translateX }] }]}
-        {...panResponder.panHandlers}
-      >
-        <Feather name="alert-triangle" size={28} color="#F59E0B" />
-        <Text style={styles.streetName}>
-          {isRecalculating ? 'Recalculating...' : 'OFF ROUTE'}
-        </Text>
-        <Text style={styles.distance}>Rerouting...</Text>
-      </Animated.View>
-    );
-  }
-
-  // Dismissed — show pull tab
-  if (dismissed && shouldShow) {
-    return (
-      <Pressable style={styles.pullTab} onPress={handlePullTab}>
-        <View style={styles.pullTabInner} />
-      </Pressable>
-    );
-  }
-
-  if (!step || !cardVisible) return null;
+  // Render content based on state
+  const isAlert = isRecalculating || isOffRoute;
+  const showStep = !isAlert && step;
 
   return (
     <Animated.View
-      style={[styles.card, { transform: [{ translateX }] }]}
-      {...panResponder.panHandlers}
+      style={[
+        styles.wrapper,
+        { transform: [{ translateX }] },
+      ]}
     >
-      <Feather name={turnIcon(step.type)} size={28} color="#fff" />
-      <Text style={styles.streetName} numberOfLines={2}>
-        {step.type === 'arrive'
-          ? 'Arriving at destination'
-          : step.road || step.instruction}
-      </Text>
-      {step.type !== 'arrive' && (
-        <Text style={styles.distance}>
-          {formatStepDistance(step.distanceMiles)}
-        </Text>
-      )}
+      {/* Card body */}
+      <View
+        style={[styles.card, { backgroundColor: theme.mapOverlayBg }]}
+        onLayout={handleLayout}
+        {...panResponder.panHandlers}
+      >
+        {isAlert ? (
+          <>
+            <Feather name="alert-triangle" size={28} color="#F59E0B" />
+            <Text style={[styles.streetName, { color: theme.textPrimary }]}>
+              {isRecalculating ? 'Recalculating...' : 'OFF ROUTE'}
+            </Text>
+            <Text style={[styles.distance, { color: theme.red }]}>Rerouting...</Text>
+          </>
+        ) : showStep ? (
+          <>
+            <Feather name={turnIcon(showStep.type)} size={28} color={theme.textPrimary} />
+            <Text style={[styles.streetName, { color: theme.textPrimary }]} numberOfLines={2}>
+              {showStep.type === 'arrive'
+                ? 'Arriving at destination'
+                : showStep.road || showStep.instruction}
+            </Text>
+            {showStep.type !== 'arrive' && (
+              <Text style={[styles.distance, { color: theme.red }]}>
+                {formatStepDistance(showStep.distanceMiles)}
+              </Text>
+            )}
+          </>
+        ) : null}
+      </View>
+
+      {/* Chevron tab */}
+      <Pressable
+        style={[styles.chevronTab, { backgroundColor: theme.red }]}
+        onPress={toggleCollapse}
+        accessibilityRole="button"
+        accessibilityLabel={collapsed ? 'Show turn card' : 'Hide turn card'}
+        hitSlop={4}
+      >
+        <Feather
+          name={collapsed ? 'chevron-right' : 'chevron-left'}
+          size={18}
+          color="#fff"
+        />
+      </Pressable>
     </Animated.View>
   );
 }
@@ -206,48 +252,44 @@ export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  card: {
+  wrapper: {
     position: 'absolute',
-    left: 12,
+    left: CARD_LEFT,
     top: '50%',
-    marginTop: -60,
-    width: 160,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(20, 20, 20, 0.92)',
+    marginTop: 140,
+    flexDirection: 'row',
+    alignItems: 'center',
     zIndex: 9990,
     elevation: 15,
   },
+  card: {
+    width: 160,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   streetName: {
-    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
     marginTop: 6,
     lineHeight: 20,
   },
   distance: {
-    color: '#D32F2F',
     fontSize: 13,
     fontWeight: '600',
     marginTop: 4,
   },
-  pullTab: {
-    position: 'absolute',
-    left: 0,
-    top: '50%',
-    marginTop: -20,
-    width: 16,
-    height: 40,
+  chevronTab: {
+    width: TAB_WIDTH,
+    height: 56,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9990,
-    elevation: 15,
-  },
-  pullTabInner: {
-    width: 4,
-    height: 40,
-    borderRadius: 2,
-    backgroundColor: '#D32F2F',
   },
 });

@@ -46,8 +46,10 @@ export async function fetchDirections(
   });
 
   // Apply route preference via avoid params
-  if (preference === 'no_highway') {
+  if (preference === 'no_highway' || preference === 'scenic') {
     params.set('exclude', 'motorway');
+  } else if (preference === 'no_tolls') {
+    params.set('exclude', 'toll');
   }
 
   const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${originLng},${originLat};${destLng},${destLat}?${params.toString()}`;

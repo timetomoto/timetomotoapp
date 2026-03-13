@@ -132,6 +132,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
   const [showContacts, setShowContacts]     = useState(false);
 
   function handleStart() {
+    if (selectedBike) selectBike(selectedBike);
     onStart({
       shareEnabled,
       checkInMinutes: checkInOn ? checkInMins : null,

@@ -98,6 +98,7 @@ If the model name is ambiguous use the closest known variant and note it in assu
 
 export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
   const { theme } = useTheme();
+  const [collapsed, setCollapsed] = useState(true);
   const [result, setResult]   = useState<CachedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -143,11 +144,30 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
 
   const bikeLabel = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
 
+  const itemCount = result?.items?.length ?? 0;
+
   return (
     <View style={s.root}>
-      {/* Header row */}
-      <View style={s.headerRow}>
+      {/* Collapsible header */}
+      <Pressable
+        style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
+        onPress={() => setCollapsed((p) => !p)}
+      >
         <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>SERVICE INTERVALS</Text>
+        <View style={s.collapseRight}>
+          {collapsed && itemCount > 0 && (
+            <View style={[s.countBadge, { backgroundColor: theme.red }]}>
+              <Text style={s.countText}>{itemCount}</Text>
+            </View>
+          )}
+          <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.textSecondary} />
+        </View>
+      </Pressable>
+
+      {!collapsed && (<View>
+      {/* Action row */}
+      <View style={s.headerRow}>
+        <View style={{ flex: 1 }} />
         {result && (
           <Pressable onPress={handleRefresh} hitSlop={8} style={s.iconBtn}>
             <Feather name="refresh-cw" size={15} color={theme.textSecondary} />
@@ -218,6 +238,7 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
           )}
         </>
       )}
+      </View>)}
     </View>
   );
 }
@@ -227,7 +248,25 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
-  root: { padding: 16 },
+  root: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
+
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  collapseRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  countText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 
   headerRow: {
     flexDirection: 'row',

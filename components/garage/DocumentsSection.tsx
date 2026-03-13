@@ -21,6 +21,7 @@ import {
   DOCUMENT_TYPES,
   type GarageDocument,
 } from '../../lib/garage';
+import DatePickerField, { formatDisplayDate } from './DatePickerField';
 
 type SortKey = 'date_desc' | 'date_asc' | 'title_asc' | 'title_desc';
 
@@ -131,14 +132,8 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
               </View>
             )}
 
-            <Text style={[fm.label, { color: theme.textSecondary }]}>DATE ADDED (YYYY-MM-DD)</Text>
-            <TextInput
-              style={[fm.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-              value={dateAdded} onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={theme.textMuted}
-              keyboardType="numbers-and-punctuation"
-            />
+            <Text style={[fm.label, { color: theme.textSecondary }]}>DATE ADDED</Text>
+            <DatePickerField value={dateAdded} onChange={setDate} />
 
             <Text style={[fm.label, { color: theme.textSecondary }]}>NOTES (OPTIONAL)</Text>
             <TextInput
@@ -162,7 +157,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
   );
 }
 
-export default function DocumentsSection({ bikeId }: { bikeId: string }) {
+export default function DocumentsSection({ bikeId, userId }: { bikeId: string; userId?: string }) {
   const { theme } = useTheme();
   const [records, setRecords]     = useState<GarageDocument[]>([]);
   const [sortKey, setSortKey]     = useState<SortKey>('date_desc');
@@ -172,16 +167,16 @@ export default function DocumentsSection({ bikeId }: { bikeId: string }) {
   const [showForm, setShowForm]   = useState(false);
   const [editing, setEditing]     = useState<GarageDocument | null>(null);
 
-  useEffect(() => { loadDocuments(bikeId).then(setRecords); }, [bikeId]);
+  useEffect(() => { loadDocuments(bikeId, userId).then(setRecords); }, [bikeId]);
 
   const sorted = sortRecords(records, sortKey);
 
   async function handleSave(record: GarageDocument) {
     if (editing) {
-      await updateDocument(bikeId, record);
+      await updateDocument(bikeId, record, userId);
       setRecords((prev) => prev.map((r) => r.id === record.id ? record : r));
     } else {
-      await addDocument(bikeId, record);
+      await addDocument(bikeId, record, userId);
       setRecords((prev) => [record, ...prev]);
     }
     setEditing(null);
@@ -193,7 +188,7 @@ export default function DocumentsSection({ bikeId }: { bikeId: string }) {
     Alert.alert('Delete Document?', `Delete "${r.title}"?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        await deleteDocument(bikeId, r.id);
+        await deleteDocument(bikeId, r.id, userId);
         setRecords((prev) => prev.filter((x) => x.id !== r.id));
       }},
     ]);
@@ -205,7 +200,7 @@ export default function DocumentsSection({ bikeId }: { bikeId: string }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         const ids = Array.from(selected);
-        await bulkDeleteDocuments(bikeId, ids);
+        await bulkDeleteDocuments(bikeId, ids, userId);
         setRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
         setSelected(new Set()); setSelectMode(false);
       }},
@@ -277,7 +272,7 @@ export default function DocumentsSection({ bikeId }: { bikeId: string }) {
             <View style={st.cardContent}>
               <Text style={[st.cardTitle, { color: theme.textPrimary }]}>{record.title}</Text>
               <Text style={[st.cardMeta, { color: theme.textSecondary }]}>
-                {record.documentType} · {record.dateAdded}
+                {record.documentType} · {formatDisplayDate(record.dateAdded)}
               </Text>
               {record.notes ? <Text style={[st.cardNotes, { color: theme.textMuted }]}>{record.notes}</Text> : null}
             </View>

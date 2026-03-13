@@ -37,7 +37,7 @@ export default function NavigationStatsBar({ speedMph, eta, remainingMiles }: Pr
   const { theme } = useTheme();
 
   return (
-    <View style={[styles.statsBar, { backgroundColor: 'rgba(20,20,20,0.95)', borderColor: theme.border }]}>
+    <View style={[styles.statsBar, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
       {/* Speed */}
       <View style={styles.statItem}>
         <Text style={[styles.statValue, { color: theme.textPrimary }]}>

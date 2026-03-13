@@ -125,7 +125,7 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
               ? <ActivityIndicator color="#fff" />
               : <>
                   <Feather name="save" size={18} color="#fff" />
-                  <Text style={s.saveBtnText}>SAVE TO LIBRARY</Text>
+                  <Text style={s.saveBtnText}>SAVE TO ROUTES</Text>
                 </>
             }
           </Pressable>

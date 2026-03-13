@@ -16,6 +16,9 @@ export interface Route {
   elevation_gain_ft: number;
   duration_seconds: number | null;
   category?: string | null;
+  source?: string | null;
+  recorded_at?: string | null;
+  bike_id?: string | null;
   created_at: string;
 }
 
@@ -54,20 +57,24 @@ export async function fetchUserRoutes(userId: string): Promise<Route[]> {
   try {
     const { data, error } = await supabase
       .from('saved_routes')
-      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, created_at')
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
+
+    if (error) console.error('fetchUserRoutes error:', error.message);
 
     if (!error && data && data.length > 0) {
       const localRoutes = await loadLocalRoutes(userId);
       const supabaseIds = new Set(data.map((r: Route) => r.id));
       const localOnly = localRoutes.filter((r) => !supabaseIds.has(r.id));
-      return [...localOnly, ...(data as Route[])];
+      const all = [...localOnly, ...(data as Route[])];
+      return all;
     }
-  } catch {
-    // Supabase unavailable
+  } catch (e) {
+    console.error('fetchUserRoutes exception:', e);
   }
-  return loadLocalRoutes(userId);
+  const local = await loadLocalRoutes(userId);
+  return local;
 }
 
 export async function createRoute(
@@ -78,7 +85,10 @@ export async function createRoute(
   elevationGainFt: number,
   durationSeconds: number | null,
   category?: string | null,
+  source: string = 'recorded',
+  bikeId?: string | null,
 ): Promise<Route | null> {
+  const recordedAt = source === 'recorded' ? new Date().toISOString() : null;
   try {
     const { data, error } = await supabase
       .from('saved_routes')
@@ -90,12 +100,16 @@ export async function createRoute(
         elevation_gain_ft: elevationGainFt,
         duration_seconds: durationSeconds,
         category: category ?? null,
+        source,
+        recorded_at: recordedAt,
+        bike_id: bikeId ?? null,
       })
       .select()
       .single();
+    if (error) console.error('createRoute Supabase error:', error.message, error.details, error.hint);
     if (!error && data) return data as Route;
-  } catch {
-    // fall through
+  } catch (e) {
+    console.error('createRoute exception:', e);
   }
 
   const route: Route = {
@@ -107,6 +121,9 @@ export async function createRoute(
     elevation_gain_ft: elevationGainFt,
     duration_seconds: durationSeconds,
     category: category ?? null,
+    source,
+    recorded_at: recordedAt,
+    bike_id: bikeId ?? null,
     created_at: new Date().toISOString(),
   };
   const local = await loadLocalRoutes(userId);
@@ -1706,29 +1723,29 @@ interface SeedRoute { name: string; points: TrackPoint[]; category?: string; }
 
 const SEED_ROUTES: SeedRoute[] = [
   { name: "LV Short Test Route", category: "Local Rides", points: LV_SHORT_TEST_ROUTE_POINTS },
-  { name: "Connect Colorado BDR to Wyoming BDR", category: "Backcountry Discovery Routes (BDR)", points: CONNECT_COLORADO_BDR_TO_WYOMING_BDR_POINTS },
-  { name: "BDR-X Texas Hill Country", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_TEXAS_HILL_COUNTRY_POINTS },
-  { name: "BDR-X Steens Alvord Oregon", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_STEENS_ALVORD_OREGON_POINTS },
-  { name: "BDR-X Red Desert Wyoming", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_RED_DESERT_WYOMING_POINTS },
-  { name: "BDR-X Pennsylvania Wilds", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_PENNSYLVANIA_WILDS_POINTS },
-  { name: "BDR-X Lost Coast California", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_LOST_COAST_CALIFORNIA_POINTS },
-  { name: "BDR-X Chattahoochee", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_CHATTAHOOCHEE_POINTS },
-  { name: "BDR-X Black Hills", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_BLACK_HILLS_POINTS },
-  { name: "BDR-X Big Bend", category: "Backcountry Discovery Routes (BDR)", points: BDR_X_BIG_BEND_POINTS },
-  { name: "Wyoming BDR", category: "Backcountry Discovery Routes (BDR)", points: WYOMING_BDR_POINTS },
-  { name: "Washington BDR", category: "Backcountry Discovery Routes (BDR)", points: WASHINGTON_BDR_POINTS },
-  { name: "Utah BDR", category: "Backcountry Discovery Routes (BDR)", points: UTAH_BDR_POINTS },
-  { name: "Southeast BDR", category: "Backcountry Discovery Routes (BDR)", points: SOUTHEAST_BDR_POINTS },
-  { name: "Oregon BDR", category: "Backcountry Discovery Routes (BDR)", points: OREGON_BDR_POINTS },
-  { name: "Nebraska BDR", category: "Backcountry Discovery Routes (BDR)", points: NEBRASKA_BDR_POINTS },
-  { name: "New Mexico BDR", category: "Backcountry Discovery Routes (BDR)", points: NEW_MEXICO_BDR_POINTS },
-  { name: "Mid-Atlantic BDR", category: "Backcountry Discovery Routes (BDR)", points: MID_ATLANTIC_BDR_POINTS },
-  { name: "Montana BDR", category: "Backcountry Discovery Routes (BDR)", points: MONTANA_BDR_POINTS },
-  { name: "Colorado BDR", category: "Backcountry Discovery Routes (BDR)", points: COLORADO_BDR_POINTS },
-  { name: "Idaho BDR", category: "Backcountry Discovery Routes (BDR)", points: IDAHO_BDR_POINTS },
-  { name: "California BDR North", category: "Backcountry Discovery Routes (BDR)", points: CALIFORNIA_BDR_NORTH_POINTS },
-  { name: "California BDR South", category: "Backcountry Discovery Routes (BDR)", points: CALIFORNIA_BDR_SOUTH_POINTS },
-  { name: "Arizona BDR", category: "Backcountry Discovery Routes (BDR)", points: ARIZONA_BDR_POINTS },
+  { name: "Connect Colorado BDR to Wyoming BDR", category: "Backcountry Discovery Routes", points: CONNECT_COLORADO_BDR_TO_WYOMING_BDR_POINTS },
+  { name: "BDR-X Texas Hill Country", category: "Backcountry Discovery Routes", points: BDR_X_TEXAS_HILL_COUNTRY_POINTS },
+  { name: "BDR-X Steens Alvord Oregon", category: "Backcountry Discovery Routes", points: BDR_X_STEENS_ALVORD_OREGON_POINTS },
+  { name: "BDR-X Red Desert Wyoming", category: "Backcountry Discovery Routes", points: BDR_X_RED_DESERT_WYOMING_POINTS },
+  { name: "BDR-X Pennsylvania Wilds", category: "Backcountry Discovery Routes", points: BDR_X_PENNSYLVANIA_WILDS_POINTS },
+  { name: "BDR-X Lost Coast California", category: "Backcountry Discovery Routes", points: BDR_X_LOST_COAST_CALIFORNIA_POINTS },
+  { name: "BDR-X Chattahoochee", category: "Backcountry Discovery Routes", points: BDR_X_CHATTAHOOCHEE_POINTS },
+  { name: "BDR-X Black Hills", category: "Backcountry Discovery Routes", points: BDR_X_BLACK_HILLS_POINTS },
+  { name: "BDR-X Big Bend", category: "Backcountry Discovery Routes", points: BDR_X_BIG_BEND_POINTS },
+  { name: "Wyoming BDR", category: "Backcountry Discovery Routes", points: WYOMING_BDR_POINTS },
+  { name: "Washington BDR", category: "Backcountry Discovery Routes", points: WASHINGTON_BDR_POINTS },
+  { name: "Utah BDR", category: "Backcountry Discovery Routes", points: UTAH_BDR_POINTS },
+  { name: "Southeast BDR", category: "Backcountry Discovery Routes", points: SOUTHEAST_BDR_POINTS },
+  { name: "Oregon BDR", category: "Backcountry Discovery Routes", points: OREGON_BDR_POINTS },
+  { name: "Nebraska BDR", category: "Backcountry Discovery Routes", points: NEBRASKA_BDR_POINTS },
+  { name: "New Mexico BDR", category: "Backcountry Discovery Routes", points: NEW_MEXICO_BDR_POINTS },
+  { name: "Mid-Atlantic BDR", category: "Backcountry Discovery Routes", points: MID_ATLANTIC_BDR_POINTS },
+  { name: "Montana BDR", category: "Backcountry Discovery Routes", points: MONTANA_BDR_POINTS },
+  { name: "Colorado BDR", category: "Backcountry Discovery Routes", points: COLORADO_BDR_POINTS },
+  { name: "Idaho BDR", category: "Backcountry Discovery Routes", points: IDAHO_BDR_POINTS },
+  { name: "California BDR North", category: "Backcountry Discovery Routes", points: CALIFORNIA_BDR_NORTH_POINTS },
+  { name: "California BDR South", category: "Backcountry Discovery Routes", points: CALIFORNIA_BDR_SOUTH_POINTS },
+  { name: "Arizona BDR", category: "Backcountry Discovery Routes", points: ARIZONA_BDR_POINTS },
 ];
 
 export async function seedRoutes(userId: string): Promise<void> {
@@ -1739,7 +1756,7 @@ export async function seedRoutes(userId: string): Promise<void> {
   for (const seed of SEED_ROUTES) {
     const existingRoute = existingByName.get(seed.name);
     if (existingRoute && seed.category &&
-        (!existingRoute.category || existingRoute.category === 'BDR Routes')) {
+        (!existingRoute.category || existingRoute.category === 'BDR Routes' || existingRoute.category === 'Backcountry Discovery Routes (BDR)')) {
       await updateRouteCategory(existingRoute.id, seed.category, userId);
     }
   }
@@ -1762,6 +1779,7 @@ export async function seedRoutes(userId: string): Promise<void> {
         elevation_gain_ft: elevationGainFt,
         duration_seconds: null,
         category: seed.category ?? null,
+        source: 'seeded',
       });
       savedToSupabase = !error;
     } catch {
@@ -1778,6 +1796,7 @@ export async function seedRoutes(userId: string): Promise<void> {
         elevation_gain_ft: elevationGainFt,
         duration_seconds: null,
         category: seed.category ?? null,
+        source: 'seeded',
         created_at: new Date().toISOString(),
       };
       const local = await loadLocalRoutes(userId);

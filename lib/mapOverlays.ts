@@ -8,6 +8,7 @@ export interface FuelStation {
   lng: number;
   name: string;
   address: string;
+  fuelTypes: string[];
 }
 
 export async function fetchFuelStations(
@@ -30,7 +31,26 @@ export async function fetchFuelStations(
       const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
       const city = t['addr:city'] ?? '';
       const address = [street, city].filter(Boolean).join(', ') || t['brand'] || '';
-      return { id: el.id, lat: el.lat, lng: el.lon, name: t.name ?? t.brand ?? 'Gas Station', address };
+      // Extract fuel types from tags like fuel:diesel=yes, fuel:octane_91=yes, etc.
+      const fuelTypes: string[] = [];
+      const fuelLabels: Record<string, string> = {
+        'fuel:diesel': 'Diesel',
+        'fuel:octane_87': '87',
+        'fuel:octane_89': '89',
+        'fuel:octane_91': '91',
+        'fuel:octane_93': '93',
+        'fuel:octane_95': '95',
+        'fuel:octane_98': '98',
+        'fuel:e85': 'E85',
+        'fuel:e10': 'E10',
+        'fuel:lpg': 'LPG',
+        'fuel:cng': 'CNG',
+        'fuel:electricity': 'EV Charging',
+      };
+      for (const [tag, label] of Object.entries(fuelLabels)) {
+        if (t[tag] === 'yes') fuelTypes.push(label);
+      }
+      return { id: el.id, lat: el.lat, lng: el.lon, name: t.name ?? t.brand ?? t.operator ?? t['brand:wikidata'] ?? 'Gas Station', address, fuelTypes };
     });
   } finally {
     clearTimeout(timer);
@@ -43,7 +63,7 @@ export function fuelStationsGeoJson(stations: FuelStation[]) {
     features: stations.map((s) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
-      properties: { id: s.id, name: s.name, address: s.address, lat: s.lat, lng: s.lng },
+      properties: { id: s.id, name: s.name, address: s.address, fuelTypes: s.fuelTypes.join(', '), lat: s.lat, lng: s.lng },
     })),
   };
 }

@@ -35,7 +35,7 @@ export default function TabLayout() {
         options={{
           title: 'RIDE',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="motorbike" size={22} color={color} accessibilityLabel="Ride tab" />
+            <MaterialCommunityIcons name="motorbike" size={24} color={color} accessibilityLabel="Ride tab" />
           ),
         }}
       />

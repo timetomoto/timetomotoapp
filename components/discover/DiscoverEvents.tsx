@@ -37,7 +37,7 @@ const RADIUS_OPTIONS: Array<{ label: string; value: 50 | 100 | 250 | 500 | 'nati
 ];
 
 const TYPE_COLORS: Record<string, string> = {
-  RALLY:       '#D32F2F',
+  RALLY:       '#E53935',
   'DUAL SPORT':'#4ECDC4',
   FESTIVAL:    '#FF9800',
   EXPO:        '#2196F3',

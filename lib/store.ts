@@ -181,6 +181,25 @@ export function bikeLabel(bike: { nickname?: string | null; year?: number | null
 
 export type BikeType = 'adventure' | 'dual_sport' | 'cruiser' | 'scooter' | 'sport' | 'touring' | 'classic';
 
+export type BikeSpecs = {
+  tirePressureFrontPsi?: number;
+  tirePressureRearPsi?: number;
+  tireFrontSize?: string;
+  tireRearSize?: string;
+  fuelType?: string;
+  engineDisplacement?: string;
+  engineType?: string;
+  maxLoadLbs?: number;
+  seatHeight?: string;
+  groundClearance?: string;
+  overallLength?: string;
+  overallWidth?: string;
+  overallHeight?: string;
+  wetWeightLbs?: number;
+  specsSource?: 'api' | 'gemini' | 'manual';
+  specsLookedUp?: boolean;
+};
+
 export interface Bike {
   id: string;
   user_id: string;
@@ -194,6 +213,7 @@ export interface Bike {
   fuelCapacity?: number | null;
   fuelCapacityUnit?: 'gallons' | 'liters' | null;
   bike_type?: BikeType | null;
+  specs?: BikeSpecs | null;
   created_at: string;
 }
 
@@ -226,7 +246,7 @@ export const useGarageStore = create<GarageState>((set, get) => ({
     }
     const { data, error } = await supabase
       .from('bikes')
-      .select('id, user_id, year, make, model, nickname, odometer, tank_gallons, avg_mpg, fuelCapacity, fuelCapacityUnit, created_at')
+      .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {
