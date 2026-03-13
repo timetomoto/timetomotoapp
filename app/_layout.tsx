@@ -35,33 +35,40 @@ Notifications.setNotificationHandler({
 // ---------------------------------------------------------------------------
 
 function AuthGuard() {
-  const { session, loading, setSession } = useAuthStore();
+  const { session, setSession, onboardingDone, setOnboardingDone } = useAuthStore();
   const segments = useSegments();
   const router   = useRouter();
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    let mounted = true;
+    supabase.auth.refreshSession().then(({ data: { session } }) => {
+      if (mounted) { setSession(session); setSessionChecked(true); }
+    }).catch(() => {
+      if (mounted) { setSession(null); setSessionChecked(true); }
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => setSession(session),
+      (_event, session) => { setSession(session); setSessionChecked(true); },
     );
-    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => setOnboardingDone(v === 'done'));
-    return () => subscription.unsubscribe();
+    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => {
+      if (mounted) setOnboardingDone(v === 'done');
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
-    if (loading || onboardingDone === null) return;
+    if (!sessionChecked || onboardingDone === null) return;
     const inAuthGroup   = segments[0] === 'auth';
     const inOnboarding  = segments[0] === 'onboarding';
 
-    if (!session && inAuthGroup) {
-      router.replace('/(tabs)/ride'); // DEV: skip login — redirect away from auth screen only
+    if (!session && !inAuthGroup) {
+      router.replace('/auth');
     } else if (session && !onboardingDone && !inOnboarding) {
       router.replace('/onboarding');
     } else if (session && onboardingDone && (inAuthGroup || inOnboarding)) {
       router.replace('/(tabs)/ride');
     }
-  }, [session, loading, segments, onboardingDone]);
+  }, [session, sessionChecked, segments, onboardingDone]);
 
   return null;
 }

@@ -104,6 +104,7 @@ export default function HamburgerMenu({ open, onClose }: Props) {
     router.replace('/auth');
   }
 
+  const displayName = user?.user_metadata?.display_name ?? '';
   const userEmail = user?.email ?? '';
 
   return (
@@ -140,13 +141,13 @@ export default function HamburgerMenu({ open, onClose }: Props) {
               <Feather name="x" size={18} color={theme.textMuted} />
             </Pressable>
           </View>
-          {userEmail ? (
+          {(displayName || userEmail) ? (
             <View style={styles.userEmailRow}>
               <View style={[styles.avatarCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <Feather name="user" size={16} color={theme.textSecondary} />
               </View>
               <Text style={[styles.userEmail, { color: theme.textSecondary }]} numberOfLines={1}>
-                {userEmail}
+                {displayName || userEmail}
               </Text>
             </View>
           ) : null}

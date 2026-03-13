@@ -138,16 +138,13 @@ export default function SettingsScreen() {
   const [tempUnit, setTempUnit] = useState<'fahrenheit' | 'celsius'>('fahrenheit');
   const [capacityUnit, setCapacityUnit] = useState<'gallons' | 'liters'>('gallons');
 
-  // ── Map ──
-  const [mapDefault, setMapDefault] = useState<'standard' | 'satellite' | 'terrain'>('standard');
-
   // ── Weather ──
   const [weatherDefaultFav, setWeatherDefaultFav] = useState(false);
 
   // Load persisted prefs
   useEffect(() => {
     (async () => {
-      const [rideStart, weather, discover, emergency, dist, temp, capacity, map, wdfav] = await Promise.all([
+      const [rideStart, weather, discover, emergency, dist, temp, capacity, wdfav] = await Promise.all([
         AsyncStorage.getItem('ttm_notif_ride_start'),
         AsyncStorage.getItem('ttm_notif_weather'),
         AsyncStorage.getItem('ttm_notif_discover'),
@@ -155,7 +152,6 @@ export default function SettingsScreen() {
         AsyncStorage.getItem('ttm_units_distance'),
         AsyncStorage.getItem('ttm_units_temp'),
         AsyncStorage.getItem('ttm_units_capacity'),
-        AsyncStorage.getItem('ttm_map_default'),
         AsyncStorage.getItem('ttm_weather_default_fav'),
       ]);
       if (rideStart !== null) setNotifRideStart(rideStart === 'true');
@@ -165,7 +161,6 @@ export default function SettingsScreen() {
       if (dist === 'miles' || dist === 'kilometers') setDistanceUnit(dist);
       if (temp === 'fahrenheit' || temp === 'celsius') setTempUnit(temp);
       if (capacity === 'gallons' || capacity === 'liters') setCapacityUnit(capacity);
-      if (map === 'standard' || map === 'satellite' || map === 'terrain') setMapDefault(map);
       if (wdfav !== null) setWeatherDefaultFav(wdfav === 'true');
     })();
   }, []);
@@ -188,11 +183,6 @@ export default function SettingsScreen() {
   async function setCapacity(v: 'gallons' | 'liters') {
     setCapacityUnit(v);
     await AsyncStorage.setItem('ttm_units_capacity', v);
-  }
-
-  async function setMapDef(v: 'standard' | 'satellite' | 'terrain') {
-    setMapDefault(v);
-    await AsyncStorage.setItem('ttm_map_default', v);
   }
 
   return (
@@ -309,21 +299,6 @@ export default function SettingsScreen() {
             ]}
             value={capacityUnit}
             onChange={setCapacity}
-          />
-        </View>
-
-        {/* MAP */}
-        <SectionHeader label="MAP" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <SegmentedRow
-            label="DEFAULT MAP TYPE"
-            options={[
-              { key: 'standard', label: 'STANDARD' },
-              { key: 'satellite', label: 'SAT' },
-              { key: 'terrain', label: 'TERRAIN' },
-            ]}
-            value={mapDefault}
-            onChange={setMapDef}
           />
         </View>
 

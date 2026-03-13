@@ -1,6 +1,6 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTheme } from '../../lib/useTheme';
 import type { NavDestination, NavRoute, RoutePreference } from '../../lib/navigationStore';
 
@@ -61,15 +61,50 @@ export default function RoutePreviewScreen({
 }: Props) {
   const { theme } = useTheme();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 8,
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) translateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.5) {
+          Animated.timing(translateY, {
+            toValue: 600,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => onCancel());
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 20,
+            stiffness: 200,
+          }).start();
+        }
+      },
+    }),
+  ).current;
 
   const selectedRoute = routes[selectedRouteIdx] ?? null;
 
   return (
     <View style={styles.overlay} pointerEvents="box-none">
       {/* Bottom sheet container */}
-      <View style={[styles.sheet, { backgroundColor: theme.bgPanel, borderTopColor: theme.border }]}>
-        {/* Handle */}
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
+      <Animated.View
+        style={[
+          styles.sheet,
+          { backgroundColor: theme.bgPanel, borderTopColor: theme.border },
+          { transform: [{ translateY }] },
+        ]}
+      >
+        {/* Handle — drag zone */}
+        <View {...panResponder.panHandlers} style={styles.handleZone}>
+          <View style={[styles.handle, { backgroundColor: theme.border }]} />
+        </View>
 
         {/* Destination header */}
         <View style={[styles.destRow, { borderBottomColor: theme.border }]}>
@@ -219,7 +254,7 @@ export default function RoutePreviewScreen({
             </View>
           </>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -242,13 +277,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
     paddingBottom: 32,
   },
+  handleZone: {
+    paddingTop: 8,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 8,
-    marginBottom: 12,
   },
   destRow: {
     flexDirection: 'row',

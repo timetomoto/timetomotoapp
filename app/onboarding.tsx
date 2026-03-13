@@ -2,10 +2,11 @@ import { useRef, useState } from 'react';
 import {
   Dimensions,
   FlatList,
+  Keyboard,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   type ViewToken,
 } from 'react-native';
@@ -17,39 +18,41 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useGarageStore, useSafetyStore } from '../lib/store';
 import { useTheme } from '../lib/useTheme';
+import TimetomotoLogo from '../components/common/TimetomotoLogo';
+import { StyledInput, MakeAutocomplete } from '../components/garage/AddBikeModal';
 
 export const ONBOARDING_KEY = '@ttm/onboarding_v1';
 
 const { width: SCREEN_W } = Dimensions.get('window');
+const LOGO_W = Math.round(SCREEN_W * 0.65);
+const LOGO_H = Math.round(LOGO_W * (31 / 162)); // preserve aspect ratio
 
 // ---------------------------------------------------------------------------
-// Screen 1 — Value prop
+// Screen 1 — Welcome
 // ---------------------------------------------------------------------------
 
 function Screen1() {
   const { theme } = useTheme();
   const features = [
-    { icon: 'shield',     text: 'Crash detection & emergency alerts' },
-    { icon: 'navigation', text: 'Live location sharing with contacts' },
-    { icon: 'cloud',      text: 'Ride window weather planning' },
-    { icon: 'map',        text: 'GPX routes & fuel range overlay' },
+    { icon: 'map' as const,    text: 'Navigate, record, and explore every ride' },
+    { icon: 'cloud' as const,  text: 'Weather planning built for riders' },
+    { icon: 'tool' as const,   text: 'Your garage, maintenance, and mods in one place' },
   ];
 
   return (
     <View style={s.screen}>
       <View style={s.logoBlock}>
-        <View style={[s.logoCircle, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <Feather name="navigation" size={40} color={theme.red} />
-        </View>
-        <Text style={[s.logoTitle, { color: theme.textPrimary }]}>TIME to MOTO</Text>
-        <Text style={[s.logoSub, { color: theme.textSecondary }]}>YOUR ADVENTURE HEADQUARTERS</Text>
+        <TimetomotoLogo width={LOGO_W} height={LOGO_H} disableLink />
+        <Text style={[s.logoSub, { color: theme.textSecondary }]}>
+          RIDE. TRACK. EXPLORE.
+        </Text>
       </View>
 
       <View style={s.featureList}>
         {features.map((f) => (
           <View key={f.icon} style={[s.featureRow, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
             <View style={[s.featureIcon, { backgroundColor: theme.red + '18' }]}>
-              <Feather name={f.icon as any} size={16} color={theme.red} />
+              <Feather name={f.icon} size={16} color={theme.red} />
             </View>
             <Text style={[s.featureText, { color: theme.textPrimary }]}>{f.text}</Text>
           </View>
@@ -73,20 +76,33 @@ function Screen2() {
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    if (!user || !make.trim() || !model.trim()) return;
+    if (!make.trim() || !model.trim()) return;
     setSaving(true);
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const { data } = await supabase
-      .from('bikes')
-      .insert({ user_id: user.id, make: make.trim(), model: model.trim(), year: new Date().getFullYear() })
-      .select()
-      .single();
-    if (data) { addBike(data); setSaved(true); }
+
+    const userId = user?.id;
+    if (userId) {
+      const { data } = await supabase
+        .from('bikes')
+        .insert({ user_id: userId, make: make.trim(), model: model.trim(), year: new Date().getFullYear() })
+        .select()
+        .single();
+      if (data) addBike(data);
+    }
+    setSaved(true);
     setSaving(false);
   }
 
+  const canSave = make.trim().length > 0 && model.trim().length > 0 && !saving;
+
   return (
-    <View style={s.screen}>
+    <ScrollView
+      style={{ width: SCREEN_W }}
+      contentContainerStyle={s.scrollScreen}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <Feather name="tool" size={36} color={theme.red} />
       </View>
@@ -95,41 +111,30 @@ function Screen2() {
         Get personalized fuel range, maintenance tracking, and ride stats.
       </Text>
 
-      {saved ? (
-        <View style={s.savedBadge}>
-          <Feather name="check-circle" size={20} color="#4CAF50" />
-          <Text style={s.savedText}>{make} {model} added!</Text>
-        </View>
-      ) : (
-        <View style={s.form}>
-          <TextInput
-            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder="Make (e.g. Triumph)"
-            placeholderTextColor={theme.textSecondary}
-            value={make}
-            onChangeText={setMake}
-            autoCorrect={false}
-          />
-          <TextInput
-            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder="Model (e.g. Tiger 900)"
-            placeholderTextColor={theme.textSecondary}
-            value={model}
-            onChangeText={setModel}
-            autoCorrect={false}
-          />
-          <Pressable
-            style={[s.formBtn, { backgroundColor: theme.red }, (!make.trim() || !model.trim() || saving) && s.formBtnDisabled]}
-            onPress={handleSave}
-            disabled={!make.trim() || !model.trim() || saving}
-            accessibilityLabel="Save bike"
-            accessibilityRole="button"
-          >
-            <Text style={s.formBtnText}>{saving ? 'SAVING…' : 'SAVE BIKE'}</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
+      <View style={s.form}>
+        <MakeAutocomplete value={make} onChange={setMake} />
+        <StyledInput
+          value={model}
+          onChangeText={setModel}
+          placeholder="e.g. Tiger 900"
+          autoCorrect={false}
+        />
+        <Pressable
+          style={[s.formBtn, { backgroundColor: theme.red }, !canSave && s.formBtnDisabled]}
+          onPress={handleSave}
+          disabled={!canSave || saved}
+        >
+          {saved ? (
+            <View style={s.savedInlineRow}>
+              <Feather name="check" size={16} color="#fff" />
+              <Text style={s.formBtnText}>Bike Saved</Text>
+            </View>
+          ) : (
+            <Text style={s.formBtnText}>{saving ? 'SAVING...' : 'SAVE BIKE'}</Text>
+          )}
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -147,16 +152,26 @@ function Screen3() {
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
-    if (!user || !name.trim() || !phone.trim()) return;
+    if (!name.trim() || !phone.trim()) return;
     setSaving(true);
+    Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await saveContacts(user.id, [{ name: name.trim(), phone: phone.trim() }]);
+
+    const userId = user?.id ?? 'local';
+    await saveContacts(userId, [{ name: name.trim(), phone: phone.trim() }]);
     setSaved(true);
     setSaving(false);
   }
 
+  const canSave = name.trim().length > 0 && phone.trim().length > 0 && !saving;
+
   return (
-    <View style={s.screen}>
+    <ScrollView
+      style={{ width: SCREEN_W }}
+      contentContainerStyle={s.scrollScreen}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <Feather name="shield" size={36} color={theme.red} />
       </View>
@@ -165,41 +180,35 @@ function Screen3() {
         Add a trusted contact who'll be notified instantly if crash detection triggers.
       </Text>
 
-      {saved ? (
-        <View style={s.savedBadge}>
-          <Feather name="check-circle" size={20} color="#4CAF50" />
-          <Text style={s.savedText}>{name} added as your safety contact</Text>
-        </View>
-      ) : (
-        <View style={s.form}>
-          <TextInput
-            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder="Contact name"
-            placeholderTextColor={theme.textSecondary}
-            value={name}
-            onChangeText={setName}
-            autoCorrect={false}
-          />
-          <TextInput
-            style={[s.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder="Phone number"
-            placeholderTextColor={theme.textSecondary}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-          <Pressable
-            style={[s.formBtn, { backgroundColor: theme.red }, (!name.trim() || !phone.trim() || saving) && s.formBtnDisabled]}
-            onPress={handleSave}
-            disabled={!name.trim() || !phone.trim() || saving}
-            accessibilityLabel="Save emergency contact"
-            accessibilityRole="button"
-          >
-            <Text style={s.formBtnText}>{saving ? 'SAVING…' : 'ADD CONTACT'}</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
+      <View style={s.form}>
+        <StyledInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Contact name"
+          autoCorrect={false}
+        />
+        <StyledInput
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="Phone number"
+          keyboardType="phone-pad"
+        />
+        <Pressable
+          style={[s.formBtn, { backgroundColor: theme.red }, !canSave && s.formBtnDisabled]}
+          onPress={handleSave}
+          disabled={!canSave || saved}
+        >
+          {saved ? (
+            <View style={s.savedInlineRow}>
+              <Feather name="check" size={16} color="#fff" />
+              <Text style={s.formBtnText}>Contact Added</Text>
+            </View>
+          ) : (
+            <Text style={s.formBtnText}>{saving ? 'SAVING...' : 'ADD CONTACT'}</Text>
+          )}
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -212,6 +221,7 @@ const TITLES  = ['01 / 03', '02 / 03', '03 / 03'];
 
 export default function OnboardingScreen() {
   const { theme } = useTheme();
+  const { setOnboardingDone } = useAuthStore();
   const router   = useRouter();
   const listRef  = useRef<FlatList>(null);
   const [index, setIndex] = useState(0);
@@ -223,6 +233,7 @@ export default function OnboardingScreen() {
   async function finish() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await AsyncStorage.setItem(ONBOARDING_KEY, 'done');
+    setOnboardingDone(true);
     router.replace('/(tabs)/ride');
   }
 
@@ -261,11 +272,8 @@ export default function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false}
-        renderItem={({ item: Screen }) => (
-          <View style={{ width: SCREEN_W }}>
-            <Screen />
-          </View>
-        )}
+        keyboardShouldPersistTaps="handled"
+        renderItem={({ item: Screen }) => <Screen />}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
       />
@@ -315,33 +323,26 @@ const s = StyleSheet.create({
 
   screen: {
     flex: 1,
+    width: SCREEN_W,
     paddingHorizontal: 32,
     paddingTop: 20,
     alignItems: 'center',
   },
+  scrollScreen: {
+    paddingHorizontal: 32,
+    paddingTop: 20,
+    alignItems: 'center',
+    flexGrow: 1,
+  },
 
   // Screen 1
   logoBlock: { alignItems: 'center', marginBottom: 48 },
-  logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  logoTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-    letterSpacing: 3,
-    marginBottom: 6,
-  },
   logoSub: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2,
     textAlign: 'center',
+    marginTop: 16,
   },
   featureList: { width: '100%', gap: 14 },
   featureRow: {
@@ -386,14 +387,6 @@ const s = StyleSheet.create({
     marginBottom: 32,
   },
   form: { width: '100%', gap: 12 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    minHeight: 50,
-  },
   formBtn: {
     borderRadius: 8,
     paddingVertical: 16,
@@ -403,20 +396,11 @@ const s = StyleSheet.create({
   },
   formBtnDisabled: { opacity: 0.45 },
   formBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 2 },
-  savedBadge: {
+  savedInlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#4CAF5018',
-    borderWidth: 1,
-    borderColor: '#4CAF5044',
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    width: '100%',
-    marginTop: 8,
+    gap: 8,
   },
-  savedText: { color: '#4CAF50', fontSize: 14, fontWeight: '600' },
 
   // Dots
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 16 },

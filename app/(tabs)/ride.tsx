@@ -46,7 +46,7 @@ import PlaceDetailPanel, { type PlaceDetail } from '../../components/ride/PlaceD
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import TimetomotoLogo from '../../components/common/TimetomotoLogo';
-import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT } from '../../lib/headerLayout';
+import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT, END_BUTTON_BOTTOM, END_BUTTON_RIGHT } from '../../lib/headerLayout';
 import { darkTheme } from '../../lib/theme';
 import { useTheme } from '../../lib/useTheme';
 import { useNavigationStore } from '../../lib/navigationStore';
@@ -54,7 +54,7 @@ import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMet
 import MapControlDrawer from '../../components/ride/MapControlDrawer';
 import SearchSheet from '../../components/ride/SearchSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
-import NavigationBanner from '../../components/ride/NavigationBanner';
+import TurnCard from '../../components/ride/TurnCard';
 import NavigationStatsBar from '../../components/ride/NavigationStatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
@@ -808,8 +808,9 @@ export default function RideScreen() {
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
           compassEnabled
-          compassPosition={{ top: Platform.OS === 'ios' ? 108 : 68, right: 12 }}
+          compassPosition={{ top: Platform.OS === 'ios' ? 116 : 76, right: 12 }}
           compassViewStyle={{ opacity: 0.7 }}
+          scaleBarEnabled={false}
           attributionEnabled
           attributionPosition={{ bottom: 8, right: 8 }}
           logoEnabled={false}
@@ -924,11 +925,10 @@ export default function RideScreen() {
           )}
         </MapView>
 
-        {/* ── Navigation Banner (top, during navigation) ── */}
+        {/* ── Floating turn card (left side, during navigation) ── */}
         {isNavigatingActive && (
-          <NavigationBanner
+          <TurnCard
             step={activeRoute?.steps[currentStepIndex] ?? null}
-            nextStep={activeRoute?.steps[currentStepIndex + 1] ?? null}
             isOffRoute={navMode === 'off_route'}
             isRecalculating={navMode === 'recalculating'}
           />
@@ -949,7 +949,7 @@ export default function RideScreen() {
             style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             onPress={() => setSearchSheetOpen(true)}
           >
-            <Feather name="search" size={18} color={theme.textPrimary} />
+            <Feather name="search" size={20} color={theme.textPrimary} />
           </Pressable>
         </View>
 
@@ -1191,7 +1191,7 @@ const styles = StyleSheet.create({
   },
   mapHeader: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 52 : 12,
+    top: Platform.OS === 'ios' ? 46 : 6,
     left: 12,
     right: 12,
     height: HEADER_HEIGHT,
@@ -1200,8 +1200,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIconBtn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
@@ -1210,7 +1210,7 @@ const styles = StyleSheet.create({
   // Crash detection toggle
   crashToggle: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 102 : 62,
+    top: Platform.OS === 'ios' ? 113 : 73,
     left: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1235,7 +1235,7 @@ const styles = StyleSheet.create({
   // Map control icon (layers button)
   mapControlIcon: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 102 : 62,
+    top: Platform.OS === 'ios' ? 110 : 70,
     right: 12,
     width: 44,
     height: 44,
@@ -1248,8 +1248,8 @@ const styles = StyleSheet.create({
   // End navigation button
   endNavBtn: {
     position: 'absolute',
-    bottom: 130,
-    right: 16,
+    bottom: END_BUTTON_BOTTOM,
+    right: END_BUTTON_RIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1264,10 +1264,10 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
 
-  // Stats bar (shifted down 10px per layout spec, Map sub-tab only)
+  // Stats bar
   statsBar: {
     position: 'absolute',
-    bottom: 61,
+    bottom: 54,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -1281,7 +1281,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, marginVertical: 4 },
 
   // Sub-nav (shifted down 5px per layout spec)
-  subNavWrapper: { position: 'absolute', bottom: -30, left: 0, right: 0 },
+  subNavWrapper: { position: 'absolute', bottom: -34, left: 0, right: 0 },
   subNav: {
     flexDirection: 'row',
     borderTopWidth: 1,

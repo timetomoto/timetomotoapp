@@ -17,9 +17,24 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore, useGarageStore, type Bike } from '../../lib/store';
+import { useAuthStore, useGarageStore, type Bike, type BikeType } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
+
+// ---------------------------------------------------------------------------
+// Bike type constants
+// ---------------------------------------------------------------------------
+
+const BIKE_TYPES: { key: BikeType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: 'adventure', label: 'ADV', icon: 'compass' },
+  { key: 'dual_sport', label: 'DUAL SPORT', icon: 'navigation-2' },
+  { key: 'cruiser', label: 'CRUISER', icon: 'sunset' },
+  { key: 'scooter', label: 'SCOOTER', icon: 'zap' },
+  { key: 'sport', label: 'SPORT', icon: 'fast-forward' },
+  { key: 'touring', label: 'TOURING', icon: 'map' },
+  { key: 'classic', label: 'CLASSIC', icon: 'clock' },
+];
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,12 +59,12 @@ const SHEET_HEIGHT = 700;
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function FieldLabel({ label }: { label: string }) {
+export function FieldLabel({ label }: { label: string }) {
   const { theme } = useTheme();
   return <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>;
 }
 
-function StyledInput(props: React.ComponentProps<typeof TextInput>) {
+export function StyledInput(props: React.ComponentProps<typeof TextInput>) {
   const { theme } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
@@ -103,7 +118,7 @@ function YearPicker({ value, onChange }: { value: string; onChange: (y: string) 
   );
 }
 
-function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: string) => void }) {
+export function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: string) => void }) {
   const { theme } = useTheme();
   const [showSuggestions, setShowSuggestions] = useState(false);
   const filtered = value.length > 0
@@ -138,6 +153,47 @@ function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: st
 }
 
 // ---------------------------------------------------------------------------
+// Bike type selector
+// ---------------------------------------------------------------------------
+
+function BikeTypeSelector({ value, onChange }: { value: BikeType | null; onChange: (t: BikeType | null) => void }) {
+  const { theme } = useTheme();
+  return (
+    <View style={styles.typeGrid}>
+      {BIKE_TYPES.map((type, idx) => {
+        const selected = value === type.key;
+        const isLast = idx === BIKE_TYPES.length - 1;
+        const isOdd = BIKE_TYPES.length % 2 === 1 && isLast;
+        return (
+          <Pressable
+            key={type.key}
+            style={[
+              styles.typeCard,
+              { backgroundColor: theme.bgCard, borderColor: theme.border },
+              selected && { borderColor: theme.red, borderWidth: 2 },
+              isOdd && styles.typeCardCentered,
+            ]}
+            onPress={() => onChange(selected ? null : type.key)}
+          >
+            <Feather
+              name={type.icon}
+              size={26}
+              color={selected ? theme.red : theme.textPrimary}
+            />
+            <Text style={[
+              styles.typeLabel,
+              { color: selected ? theme.red : theme.textPrimary },
+            ]}>
+              {type.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // AddBikeModal
 // ---------------------------------------------------------------------------
 
@@ -160,6 +216,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
   const [year, setYear]               = useState(editBike?.year ? String(editBike.year) : String(CURRENT_YEAR));
   const [make, setMake]               = useState(editBike?.make ?? '');
   const [model, setModel]             = useState(editBike?.model ?? '');
+  const [bikeType, setBikeType]       = useState<BikeType | null>(editBike?.bike_type ?? null);
   const [nickname, setNickname]       = useState(editBike?.nickname ?? '');
   const [odometer, setOdometer]       = useState(editBike?.odometer ? String(editBike.odometer) : '');
   const [fuelCapacity, setFuelCap]    = useState(editBike?.fuelCapacity ? String(editBike.fuelCapacity) : '');
@@ -217,6 +274,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
       year: parseInt(year, 10),
       make: make.trim(),
       model: model.trim(),
+      bike_type: bikeType,
       nickname: nickname.trim() || null,
       odometer: odometer ? parseInt(odometer, 10) : null,
       fuelCapacity: fuelCapacity ? parseFloat(fuelCapacity) : null,
@@ -235,7 +293,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
       } else {
         const { error: dbError } = await supabase
           .from('bikes')
-          .update({ year: fields.year, make: fields.make, model: fields.model, odometer: fields.odometer })
+          .update({ year: fields.year, make: fields.make, model: fields.model, odometer: fields.odometer, bike_type: fields.bike_type })
           .eq('id', editBike.id);
         setSaving(false);
         if (dbError) { setError(dbError.message); return; }
@@ -251,6 +309,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
           make: fields.make,
           model: fields.model,
           odometer: fields.odometer,
+          bike_type: fields.bike_type,
         })
         .select()
         .single();
@@ -356,6 +415,9 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
               placeholder={capacityUnit === 'gallons' ? 'e.g. 4.5' : 'e.g. 17'}
               keyboardType="decimal-pad"
             />
+
+            <FieldLabel label="BIKE TYPE" />
+            <BikeTypeSelector value={bikeType} onChange={setBikeType} />
 
             {error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
 
@@ -474,6 +536,29 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontSize: 15,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+  },
+  typeCard: {
+    width: '48.5%',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  typeCardCentered: {
+    marginHorizontal: '25.75%',
+  },
+  typeLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginTop: 6,
   },
   errorText: {
     fontSize: 13,

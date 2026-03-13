@@ -1,9 +1,12 @@
+import { Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import Svg, { Rect, Polygon, Path, G } from 'react-native-svg';
 import { useTheme } from '../../lib/useTheme';
 
 interface Props {
   width?: number;
   height?: number;
+  disableLink?: boolean;
 }
 
 /**
@@ -18,10 +21,11 @@ interface Props {
  * Background rects stay white (#fff) so the transparent TO letter cutouts
  * show white through the red box — giving solid-looking white letters.
  */
-export default function TimetomotoLogo({ width = 180, height = 34 }: Props) {
+export default function TimetomotoLogo({ width = 180, height = 34, disableLink }: Props) {
   const { theme } = useTheme();
+  const router = useRouter();
 
-  return (
+  const svg = (
     <Svg viewBox="0 0 1282.56 238.72" width={width} height={height}>
 
       {/* White background rects behind the moto icon — always white */}
@@ -75,5 +79,13 @@ export default function TimetomotoLogo({ width = 180, height = 34 }: Props) {
         />
       </G>
     </Svg>
+  );
+
+  if (disableLink) return svg;
+
+  return (
+    <Pressable onPress={() => router.push('/(tabs)/ride')} hitSlop={8}>
+      {svg}
+    </Pressable>
   );
 }

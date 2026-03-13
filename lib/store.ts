@@ -130,7 +130,9 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  onboardingDone: boolean | null;
   setSession: (session: Session | null) => void;
+  setOnboardingDone: (done: boolean) => void;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
@@ -140,9 +142,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
   loading: true,
+  onboardingDone: null,
 
   setSession: (session) =>
     set({ session, user: session?.user ?? null, loading: false }),
+
+  setOnboardingDone: (done) => set({ onboardingDone: done }),
 
   signIn: async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -174,6 +179,8 @@ export function bikeLabel(bike: { nickname?: string | null; year?: number | null
 // Garage store
 // ---------------------------------------------------------------------------
 
+export type BikeType = 'adventure' | 'dual_sport' | 'cruiser' | 'scooter' | 'sport' | 'touring' | 'classic';
+
 export interface Bike {
   id: string;
   user_id: string;
@@ -186,6 +193,7 @@ export interface Bike {
   avg_mpg: number | null;
   fuelCapacity?: number | null;
   fuelCapacityUnit?: 'gallons' | 'liters' | null;
+  bike_type?: BikeType | null;
   created_at: string;
 }
 

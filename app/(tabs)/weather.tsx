@@ -751,52 +751,27 @@ export default function WeatherScreen() {
           </View>
         </View>
         <View style={styles.headerRight}>
-          {activeTab === 'current' && (
-            <>
-              <TouchableOpacity
-                onPress={() => setShowSearch(true)}
-                style={styles.headerBtn}
-              >
-                <Feather name="search" size={18} color={theme.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => loadByGPS(true)}
-                style={styles.headerBtn}
-              >
-                <Feather name="navigation" size={18} color={theme.textSecondary} />
-              </TouchableOpacity>
-            </>
-          )}
+          <TouchableOpacity onPress={() => loadByGPS(true)} style={styles.headerBtn}>
+            <Feather name="navigation" size={18} color={theme.textSecondary} />
+          </TouchableOpacity>
         </View>
       </View>
-      {!!locationLabel && activeTab === 'current' && (
-        <TouchableOpacity
-          style={[styles.locationRow, { borderBottomColor: theme.border }]}
-          onPress={() => setShowSearch(true)}
-        >
-          <Feather name="map-pin" size={12} color={theme.red} />
-          <Text style={[styles.locationText, { color: theme.textSecondary }]}>{locationLabel}</Text>
-          <Feather name="chevron-down" size={12} color={theme.textSecondary} />
-        </TouchableOpacity>
-      )}
 
       {/* Sub-tab bar */}
       <View style={[styles.subTabBar, { borderBottomColor: theme.border }]}>
         <Pressable
-          key="current"
-          style={[styles.subTab, activeTab === 'current' && { borderBottomColor: theme.red, borderBottomWidth: 2 }]}
+          style={[styles.subTab, activeTab === 'current' && { backgroundColor: theme.red, borderRadius: 8 }]}
           onPress={() => setActiveTab('current')}
         >
-          <Text style={[styles.subTabText, { color: activeTab === 'current' ? theme.textPrimary : theme.textSecondary }]}>
+          <Text style={[styles.subTabText, { color: activeTab === 'current' ? '#fff' : theme.textMuted }]}>
             CURRENT
           </Text>
         </Pressable>
         <Pressable
-          key="ride-window"
-          style={[styles.subTab, activeTab === 'ride-window' && { backgroundColor: theme.red, borderBottomColor: 'transparent' }]}
+          style={[styles.subTab, activeTab === 'ride-window' && { backgroundColor: theme.red, borderRadius: 8 }]}
           onPress={() => setActiveTab('ride-window')}
         >
-          <Text style={[styles.subTabText, { color: activeTab === 'ride-window' ? '#fff' : theme.textSecondary }]}>
+          <Text style={[styles.subTabText, { color: activeTab === 'ride-window' ? '#fff' : theme.textMuted }]}>
             RIDE WINDOW
           </Text>
         </Pressable>
@@ -818,6 +793,16 @@ export default function WeatherScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.red} />
           }
         >
+          {!!locationLabel && (
+            <TouchableOpacity
+              style={[styles.locationRow, { borderColor: theme.border }]}
+              onPress={() => setShowSearch(true)}
+            >
+              <Feather name="map-pin" size={12} color={theme.red} />
+              <Text style={[styles.locationText, { color: theme.textSecondary }]}>{locationLabel}</Text>
+              <Feather name="chevron-down" size={12} color={theme.textSecondary} />
+            </TouchableOpacity>
+          )}
           {data && (
             <>
               <CurrentCard
@@ -879,10 +864,8 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
+    gap: 6,
+    marginBottom: 14,
   },
   locationText: {
     fontSize: 12,
@@ -893,13 +876,15 @@ const styles = StyleSheet.create({
   subTabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
   },
   subTab: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
   },
   subTabText: {
     fontSize: 11,

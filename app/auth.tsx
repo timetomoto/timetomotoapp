@@ -9,15 +9,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { useAuthStore } from '../lib/store';
 import { useTheme } from '../lib/useTheme';
 import { supabase } from '../lib/supabase';
 import TimetomotoLogo from '../components/common/TimetomotoLogo';
+import { ONBOARDING_KEY } from './onboarding';
 
 type Mode = 'signin' | 'signup' | 'reset';
 
 export default function AuthScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +29,7 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const { signIn, signUp } = useAuthStore();
+  const { signIn, signUp, setOnboardingDone } = useAuthStore();
 
   function reset() {
     setError(null);
@@ -53,8 +57,18 @@ export default function AuthScreen() {
       : await signUp(email, password);
 
     setLoading(false);
-    if (err) setError(err);
-    else if (mode === 'signup') setSuccessMsg('Check your email to confirm your account.');
+    if (err) { setError(err); return; }
+    if (mode === 'signup') { setSuccessMsg('Check your email to confirm your account.'); return; }
+
+    // After successful sign-in, check onboarding and navigate directly
+    const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
+    if (onboarded === 'done') {
+      setOnboardingDone(true);
+      router.replace('/(tabs)/ride');
+    } else {
+      setOnboardingDone(false);
+      router.replace('/onboarding');
+    }
   }
 
   return (
@@ -64,7 +78,7 @@ export default function AuthScreen() {
     >
       {/* Logo */}
       <View style={styles.logoArea}>
-        <TimetomotoLogo width={300} height={56} />
+        <TimetomotoLogo width={300} height={56} disableLink />
       </View>
 
       {/* Card */}

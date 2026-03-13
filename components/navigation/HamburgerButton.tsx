@@ -16,15 +16,17 @@ export default function HamburgerButton({ onPress }: Props) {
       accessibilityRole="button"
       hitSlop={8}
     >
-      <Feather name="menu" size={22} color={theme.textPrimary} />
+      <Feather name="menu" size={22} color="#fff" />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   btn: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#D32F2F',
     alignItems: 'center',
     justifyContent: 'center',
   },
