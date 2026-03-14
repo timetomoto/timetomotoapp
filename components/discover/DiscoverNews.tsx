@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,23 +12,45 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { FeedCardSkeleton } from '../common/SkeletonLoader';
 import NetworkError from '../common/NetworkError';
-import { useDiscoverStore } from '../../lib/discoverStore';
+import { useDiscoverStore, type NewsCategory } from '../../lib/discoverStore';
 import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const FILTER_CATEGORIES = ['ALL', 'ADV', 'GEAR', 'NEWS', 'REVIEWS', 'COMMUNITY', 'INDUSTRY'] as const;
+const FILTER_PILLS: { label: string; value: NewsCategory }[] = [
+  { label: 'ALL', value: 'all' },
+  { label: 'ADV', value: 'adv' },
+  { label: 'SPORT', value: 'sport' },
+  { label: 'TOURING', value: 'touring' },
+  { label: 'CRUISER', value: 'cruiser' },
+  { label: 'GEAR', value: 'gear' },
+  { label: 'SAFETY', value: 'safety' },
+  { label: 'EVENTS', value: 'events' },
+];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  all: 'ALL',
+  adv: 'ADV',
+  sport: 'SPORT',
+  touring: 'TOURING',
+  cruiser: 'CRUISER',
+  gear: 'GEAR',
+  safety: 'SAFETY',
+  moto_news: 'NEWS',
+  events: 'EVENTS',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function relativeTime(date: Date): string {
-  const diffMs  = Date.now() - date.getTime();
+  const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60_000);
-  if (diffMin < 60)   return `${diffMin}m ago`;
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
   if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
   return `${Math.floor(diffMin / 1440)}d ago`;
 }
@@ -40,20 +63,21 @@ const NewsCard = memo(function NewsCard({
   title,
   summary,
   source,
-  accent,
-  tag,
+  category,
+  imageUrl,
   publishedAt,
   url,
 }: {
   title: string;
   summary: string;
   source: string;
-  accent: string;
-  tag: string;
+  category: NewsCategory;
+  imageUrl: string | null;
   publishedAt: Date;
   url: string;
 }) {
   const { theme } = useTheme();
+  const [imgError, setImgError] = useState(false);
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,36 +88,49 @@ const NewsCard = memo(function NewsCard({
     });
   }
 
+  const catLabel = CATEGORY_LABELS[category] ?? category.toUpperCase();
+
   return (
     <Pressable
       style={({ pressed }) => [
         s.card,
-        { backgroundColor: theme.bgCard, borderColor: theme.border, borderLeftColor: accent },
+        { backgroundColor: theme.bgCard, borderColor: theme.border },
         pressed && { opacity: 0.82 },
       ]}
       onPress={handlePress}
       accessibilityLabel={`Read article: ${title}`}
       accessibilityRole="link"
     >
-      {/* Source row */}
-      <View style={s.cardHeader}>
-        <View style={[s.sourceBadge, { backgroundColor: accent + '22', borderColor: accent + '55' }]}>
-          <Text style={[s.sourceBadgeText, { color: accent }]}>{tag}</Text>
-        </View>
-        <Text style={[s.sourceName, { color: theme.textSecondary }]}>{source}</Text>
-        <Text style={[s.cardTime, { color: theme.textSecondary }]}>{relativeTime(publishedAt)}</Text>
-      </View>
-
-      {/* Title */}
-      <Text style={[s.cardTitle, { color: theme.textPrimary }]} numberOfLines={3}>{title.toUpperCase()}</Text>
-
-      {/* Summary */}
-      {!!summary && (
-        <Text style={[s.cardSummary, { color: theme.textMuted }]} numberOfLines={2}>{summary}</Text>
+      {imageUrl && !imgError && (
+        <Image
+          source={{ uri: imageUrl }}
+          style={s.cardImage}
+          resizeMode="cover"
+          onError={() => setImgError(true)}
+        />
       )}
 
-      {/* Read link */}
-      <Text style={[s.readLink, { color: theme.red }]}>READ →</Text>
+      <View style={s.cardBody}>
+        {/* Source · Category */}
+        <Text style={[s.cardMeta, { color: theme.textMuted }]}>
+          {source.toUpperCase()} · {catLabel}
+        </Text>
+
+        {/* Title */}
+        <Text style={[s.cardTitle, { color: theme.textPrimary }]} numberOfLines={2}>
+          {title}
+        </Text>
+
+        {/* Summary */}
+        {!!summary && (
+          <Text style={[s.cardSummary, { color: theme.textSecondary }]} numberOfLines={2}>
+            {summary}
+          </Text>
+        )}
+
+        {/* Relative time */}
+        <Text style={[s.cardTime, { color: theme.textMuted }]}>{relativeTime(publishedAt)}</Text>
+      </View>
     </Pressable>
   );
 });
@@ -106,21 +143,34 @@ type LoadState = 'loading' | 'done' | 'error';
 
 export default function DiscoverNews() {
   const { theme } = useTheme();
-  const { newsItems, newsFilter, newsLastFetched, fetchNews, setNewsFilter } = useDiscoverStore();
+  const {
+    newsItems,
+    activeNewsFilter,
+    newsLastFetched,
+    newsError,
+    fetchNews,
+    setNewsFilter,
+  } = useDiscoverStore();
   const [loadState, setLoadState] = useState<LoadState>(newsLastFetched ? 'done' : 'loading');
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) setLoadState('loading');
-    try {
-      await fetchNews();
-      setLoadState('done');
-    } catch {
-      setLoadState('error');
-    }
-  }, [fetchNews]);
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (!isRefresh) setLoadState('loading');
+      try {
+        await fetchNews();
+        const { newsError: err } = useDiscoverStore.getState();
+        setLoadState(err ? 'error' : 'done');
+      } catch {
+        setLoadState('error');
+      }
+    },
+    [fetchNews],
+  );
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -130,18 +180,28 @@ export default function DiscoverNews() {
   }, [load]);
 
   const filtered = useMemo(() => {
-    if (newsFilter === 'ALL') return newsItems;
-    return newsItems.filter((item) => item.tag === newsFilter);
-  }, [newsItems, newsFilter]);
+    if (activeNewsFilter === 'all') return newsItems;
+    return newsItems.filter((item) => item.category === activeNewsFilter);
+  }, [newsItems, activeNewsFilter]);
 
   if (loadState === 'error') {
-    return <NetworkError onRetry={() => load()} />;
+    return (
+      <NetworkError
+        onRetry={() => {
+          useDiscoverStore.setState({ newsLastFetched: null, newsError: null });
+          load();
+        }}
+        message={newsError ?? undefined}
+      />
+    );
   }
 
   if (loadState === 'loading') {
     return (
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        {[1, 2, 3].map((i) => <FeedCardSkeleton key={i} />)}
+        {[1, 2, 3].map((i) => (
+          <FeedCardSkeleton key={i} />
+        ))}
       </ScrollView>
     );
   }
@@ -149,22 +209,20 @@ export default function DiscoverNews() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.red} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.red} />}
     >
-      {/* Category filter pills */}
+      {/* Filter pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.pillsRow}
         style={[s.pillsContainer, { borderBottomColor: theme.border }]}
       >
-        {FILTER_CATEGORIES.map((cat) => {
-          const active = newsFilter === cat;
+        {FILTER_PILLS.map((pill) => {
+          const active = activeNewsFilter === pill.value;
           return (
             <Pressable
-              key={cat}
+              key={pill.value}
               style={[
                 s.pill,
                 active
@@ -173,14 +231,12 @@ export default function DiscoverNews() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setNewsFilter(cat);
+                setNewsFilter(pill.value);
               }}
-              accessibilityLabel={`Filter by ${cat}`}
+              accessibilityLabel={`Filter by ${pill.label}`}
               accessibilityRole="button"
             >
-              <Text style={[s.pillText, active ? s.pillTextActive : { color: theme.pillText }]}>
-                {cat}
-              </Text>
+              <Text style={[s.pillText, active ? s.pillTextActive : { color: theme.pillText }]}>{pill.label}</Text>
             </Pressable>
           );
         })}
@@ -191,15 +247,13 @@ export default function DiscoverNews() {
         {filtered.length === 0 ? (
           <View style={s.empty}>
             <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-              {newsFilter === 'ALL'
+              {activeNewsFilter === 'all'
                 ? 'No articles found. Pull down to refresh.'
-                : `Nothing in ${newsFilter} right now`}
+                : `Nothing in ${CATEGORY_LABELS[activeNewsFilter] ?? activeNewsFilter} right now`}
             </Text>
           </View>
         ) : (
-          filtered.map((item) => (
-            <NewsCard key={item.id} {...item} />
-          ))
+          filtered.map((item) => <NewsCard key={item.id} {...item} />)
         )}
       </View>
     </ScrollView>
@@ -231,7 +285,6 @@ const s = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
-    fontFamily: 'BarlowCondensed',
   },
   pillTextActive: { color: '#fff' },
 
@@ -239,52 +292,35 @@ const s = StyleSheet.create({
 
   card: {
     borderWidth: 1,
-    borderLeftWidth: 3,
-    borderRadius: 8,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  cardImage: {
+    width: '100%',
+    height: 180,
+  },
+  cardBody: {
     padding: 14,
-    marginBottom: 12,
-    gap: 8,
+    gap: 6,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sourceBadge: {
-    borderWidth: 1,
-    borderRadius: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  sourceBadgeText: {
+  cardMeta: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 1.5,
-    fontFamily: 'BarlowCondensed',
     textTransform: 'uppercase',
-  },
-  sourceName: {
-    fontSize: 11,
-    flex: 1,
-  },
-  cardTime: {
-    fontSize: 10,
   },
   cardTitle: {
     fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 21,
-    fontFamily: 'BarlowCondensed',
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    lineHeight: 22,
   },
   cardSummary: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
-  readLink: {
+  cardTime: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
     marginTop: 2,
   },
 

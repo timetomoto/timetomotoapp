@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import DiscoverNews from '../../components/discover/DiscoverNews';
-import DiscoverEvents from '../../components/discover/DiscoverEvents';
+import DiscoverRoutes from '../../components/discover/DiscoverRoutes';
+import DiscoverConditions from '../../components/discover/DiscoverConditions';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
@@ -12,7 +13,7 @@ import { useTheme } from '../../lib/useTheme';
 // Types
 // ---------------------------------------------------------------------------
 
-type SubTab = 'NEWS' | 'EVENTS';
+type SubTab = 'NEWS' | 'MY ROUTES' | 'CONDITIONS';
 
 // ---------------------------------------------------------------------------
 // Sub-nav
@@ -20,7 +21,7 @@ type SubTab = 'NEWS' | 'EVENTS';
 
 function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
   const { theme } = useTheme();
-  const tabs: SubTab[] = ['NEWS', 'EVENTS'];
+  const tabs: SubTab[] = ['MY ROUTES', 'CONDITIONS', 'NEWS'];
   return (
     <View style={[s.subNav, { backgroundColor: theme.subNavBg, borderBottomColor: theme.subNavBorder }]}>
       {tabs.map((tab) => (
@@ -34,7 +35,7 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
           accessibilityLabel={`${tab} sub-tab`}
           accessibilityRole="tab"
         >
-          <Text style={[s.subNavText, { color: theme.pillText }, active === tab && { color: theme.textPrimary }]}>
+          <Text style={[s.subNavText, { color: theme.pillText }, active === tab && { color: theme.red }]}>
             {tab}
           </Text>
           {active === tab && <View style={[s.subNavUnderline, { backgroundColor: theme.red }]} />}
@@ -50,7 +51,7 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
 
 export default function DiscoverScreen() {
   const { theme } = useTheme();
-  const [subTab, setSubTab] = useState<SubTab>('NEWS');
+  const [subTab, setSubTab] = useState<SubTab>('MY ROUTES');
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -67,8 +68,9 @@ export default function DiscoverScreen() {
       </View>
       <SubNav active={subTab} onChange={setSubTab} />
       <View style={s.content}>
-        {subTab === 'NEWS'   && <DiscoverNews />}
-        {subTab === 'EVENTS' && <DiscoverEvents />}
+        {subTab === 'NEWS' && <DiscoverNews />}
+        {subTab === 'MY ROUTES' && <DiscoverRoutes />}
+        {subTab === 'CONDITIONS' && <DiscoverConditions />}
       </View>
 
       <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -114,7 +116,6 @@ const s = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    fontFamily: 'BarlowCondensed',
   },
   subNavUnderline: {
     position: 'absolute',

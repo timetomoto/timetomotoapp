@@ -37,6 +37,9 @@ yarn-error.*
 .env.production
 .env*.local
 
+# Claude Code
+.claude/
+
 # typescript
 *.tsbuildinfo
 

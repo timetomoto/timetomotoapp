@@ -14,12 +14,9 @@ import Mapbox, {
   LineLayer,
   LocationPuck,
   MapView,
-  RasterLayer,
-  RasterSource,
   ShapeSource,
   StyleURL,
 } from '@rnmapbox/maps';
-// LineLayer kept for live track and overlay route layers
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
@@ -1005,7 +1002,7 @@ export default function RideScreen() {
         </MapView>
 
         {/* ── Recenter / locate me button (below compass) ── */}
-        {!drawerOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
+        {!drawerOpen && !searchSheetOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
           <Pressable
             style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             hitSlop={8}

@@ -1,10 +1,15 @@
 import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useCallback, useRef, useState } from 'react';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from '../../lib/useTheme';
-import { useGarageStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, bikeLabel } from '../../lib/store';
 import { fetchDirections } from '../../lib/directions';
 import type { NavDestination, NavRoute, RoutePreference } from '../../lib/navigationStore';
+import {
+  loadFavorites,
+  toggleFavorite as toggleFavoriteApi,
+  type FavoriteLocation,
+} from '../../lib/favorites';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,10 +88,26 @@ export default function RoutePreviewScreen({
   onGeometryChange,
 }: Props) {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
+  const userId = user?.id ?? 'local';
   const { bikes, selectedBikeId } = useGarageStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
   const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
   const translateY = useRef(new Animated.Value(0)).current;
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Check if destination is favorited on mount / destination change
+  useEffect(() => {
+    loadFavorites(userId).then((favs) => {
+      setIsFavorite(favs.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+    });
+  }, [destination.name, destination.lat, destination.lng, userId]);
+
+  const toggleFavorite = useCallback(async () => {
+    const fav: FavoriteLocation = { name: destination.name, lat: destination.lat, lng: destination.lng };
+    const updated = await toggleFavoriteApi(fav, userId);
+    setIsFavorite(updated.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+  }, [destination.name, destination.lat, destination.lng, userId]);
 
   // ── Saved route pill state ──
   const [selectedPill, setSelectedPill] = useState<SavedRoutePill>('this_route');
@@ -224,6 +245,13 @@ export default function RoutePreviewScreen({
               </Text>
             ) : null}
           </View>
+          <Pressable onPress={toggleFavorite} hitSlop={8} style={styles.favBtn}>
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isFavorite ? theme.red : '#666666'}
+            />
+          </Pressable>
         </View>
 
         {/* ── Saved route pills ── */}
@@ -464,6 +492,12 @@ const styles = StyleSheet.create({
   },
   destInfo: {
     flex: 1,
+  },
+  favBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   destName: {
     fontSize: 17,

@@ -187,14 +187,14 @@ function RouteCard({
           <Feather name="map" size={11} color={theme.textSecondary} />
           <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
         </View>
-        <View style={[s.metaSep, { backgroundColor: theme.border }]} />
+        <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
         <View style={s.metaItem}>
           <Feather name="trending-up" size={11} color={theme.textSecondary} />
           <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
         </View>
         {dur && (
           <>
-            <View style={[s.metaSep, { backgroundColor: theme.border }]} />
+            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
             <View style={s.metaItem}>
               <Feather name="clock" size={11} color={theme.textSecondary} />
               <Text style={[s.metaText, { color: theme.textSecondary }]}>{dur}</Text>
@@ -203,12 +203,12 @@ function RouteCard({
         )}
       </View>
 
-      <View style={[s.cardActions, { borderTopColor: theme.border }]}>
+      <View style={[s.cardActions, { borderTopColor: theme.cardDivider }]}>
         <Pressable style={s.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
           <Text style={[s.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
-        <View style={[s.actionDivider, { backgroundColor: theme.border }]} />
+        <View style={[s.actionDivider, { backgroundColor: theme.cardDivider }]} />
         <Pressable style={s.actionBtn} onPress={onExport}>
           <Feather name="download" size={13} color={theme.textSecondary} />
           <Text style={[s.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
@@ -268,7 +268,7 @@ function SavedRideCard({
               <Feather name="calendar" size={11} color={theme.textSecondary} />
               <Text style={[s.metaText, { color: theme.textSecondary }]}>{dateStr}</Text>
             </View>
-            <View style={[s.metaSep, { backgroundColor: theme.border }]} />
+            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
           </>
         ) : null}
         <View style={s.metaItem}>
@@ -277,14 +277,14 @@ function SavedRideCard({
         </View>
         {dur && (
           <>
-            <View style={[s.metaSep, { backgroundColor: theme.border }]} />
+            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
             <View style={s.metaItem}>
               <Feather name="clock" size={11} color={theme.textSecondary} />
               <Text style={[s.metaText, { color: theme.textSecondary }]}>{dur}</Text>
             </View>
           </>
         )}
-        <View style={[s.metaSep, { backgroundColor: theme.border }]} />
+        <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
         <View style={s.metaItem}>
           <Feather name="trending-up" size={11} color={theme.textSecondary} />
           <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
@@ -298,12 +298,12 @@ function SavedRideCard({
         </View>
       ) : null}
 
-      <View style={[s.cardActions, { borderTopColor: theme.border }]}>
+      <View style={[s.cardActions, { borderTopColor: theme.cardDivider }]}>
         <Pressable style={s.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
           <Text style={[s.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
-        <View style={[s.actionDivider, { backgroundColor: theme.border }]} />
+        <View style={[s.actionDivider, { backgroundColor: theme.cardDivider }]} />
         <Pressable style={s.actionBtn} onPress={onExport}>
           <Feather name="download" size={13} color={theme.textSecondary} />
           <Text style={[s.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
@@ -790,6 +790,14 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
               </View>
             )}
 
+            {/* Search returned no results */}
+            {!loading && routes.length > 0 && query && filteredRoutes.length === 0 && (
+              <View style={s.emptyState}>
+                <Feather name="search" size={28} color={theme.border} />
+                <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No routes match your search</Text>
+              </View>
+            )}
+
             {/* Saved Rides section — collapsible */}
             {!loading && savedRides.length > 0 && (
               <SavedRidesSection
@@ -802,7 +810,7 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
               />
             )}
 
-            {!loading && savedRides.length === 0 && otherRoutes.length > 0 && (
+            {!loading && !query && savedRides.length === 0 && otherRoutes.length > 0 && (
               <View style={sr.emptyRides}>
                 <Feather name="disc" size={20} color={theme.border} />
                 <Text style={[s.emptyDetail, { color: theme.textSecondary }]}>No saved rides yet. Head to the RECORD tab to log your first ride.</Text>

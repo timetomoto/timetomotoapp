@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   fetchWeather,
@@ -33,22 +33,37 @@ import RideWindowPlanner from '../../components/weather/RideWindowPlanner';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthStore } from '../../lib/store';
+import {
+  loadFavorites,
+  toggleFavorite as toggleFavoriteApi,
+  removeFavorite as removeFavoriteApi,
+  type FavoriteLocation as SharedFavorite,
+} from '../../lib/favorites';
 
 // ---------------------------------------------------------------------------
 // AsyncStorage keys
 // ---------------------------------------------------------------------------
 
-const FAVORITES_KEY = 'ttm_weather_favorites';
 const RECENTS_KEY   = 'ttm_weather_recents';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/** @deprecated Use SharedFavorite from lib/favorites instead. Kept for compat. */
 export interface FavoriteLocation {
   name: string;
   lat: number;
   lon: number;
+}
+
+// Mapping helpers between weather's `lon` and shared module's `lng`
+function toShared(f: FavoriteLocation): SharedFavorite {
+  return { name: f.name, lat: f.lat, lng: f.lon };
+}
+function fromShared(f: SharedFavorite): FavoriteLocation {
+  return { name: f.name, lat: f.lat, lon: f.lng };
 }
 
 // ---------------------------------------------------------------------------
@@ -92,19 +107,8 @@ async function geocodeQuery(query: string): Promise<GeoResult[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Favorites helpers
+// Recents helpers (local only)
 // ---------------------------------------------------------------------------
-
-async function loadFavorites(): Promise<FavoriteLocation[]> {
-  try {
-    const raw = await AsyncStorage.getItem(FAVORITES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-async function saveFavorites(favs: FavoriteLocation[]): Promise<void> {
-  await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
-}
 
 async function loadRecents(): Promise<FavoriteLocation[]> {
   try {
@@ -290,7 +294,7 @@ function LocationSearchModal({
                         onClose();
                       }}
                     >
-                      <Feather name="star" size={11} color={theme.red} />
+                      <Ionicons name="heart" size={11} color={theme.red} />
                       <Text style={[styles.pillText, { color: theme.red }]}>{fav.name}</Text>
                     </Pressable>
                   ))}
@@ -334,10 +338,10 @@ function LocationSearchModal({
                       hitSlop={8}
                       onPress={() => onToggleFavorite({ name: r.label, lat: r.lat, lon: r.lng })}
                     >
-                      <Feather
-                        name="star"
+                      <Ionicons
+                        name={isFavorite(r.label) ? 'heart' : 'heart-outline'}
                         size={16}
-                        color={isFavorite(r.label) ? '#FFD600' : theme.textSecondary}
+                        color={isFavorite(r.label) ? theme.red : theme.textSecondary}
                       />
                     </Pressable>
                   </Pressable>
@@ -361,10 +365,10 @@ function LocationSearchModal({
                       hitSlop={8}
                       onPress={() => onToggleFavorite({ name: r.label, lat: r.lat, lon: r.lng })}
                     >
-                      <Feather
-                        name="star"
+                      <Ionicons
+                        name={isFavorite(r.label) ? 'heart' : 'heart-outline'}
                         size={16}
-                        color={isFavorite(r.label) ? '#FFD600' : theme.textSecondary}
+                        color={isFavorite(r.label) ? theme.red : theme.textSecondary}
                       />
                     </Pressable>
                   </Pressable>
@@ -437,10 +441,11 @@ function CurrentCard({
           <Feather name={meta.icon as any} size={64} color={theme.red} />
           {!!locationLabel && (
             <Pressable onPress={onToggleFav} style={styles.favBtn} hitSlop={8}>
-              <Feather
-                name="star"
-                size={18}
-                color={isFav ? '#FFD600' : theme.textSecondary}
+              <Ionicons
+                name={isFav ? 'heart' : 'heart-outline'}
+                size={20}
+                color={isFav ? theme.red : theme.textSecondary}
+                style={{ marginTop: 6 }}
               />
             </Pressable>
           )}
@@ -540,6 +545,8 @@ type WeatherTab = 'current' | 'ride-window';
 
 export default function WeatherScreen() {
   const { theme } = useTheme();
+  const { user } = useAuthStore();
+  const userId = user?.id ?? 'local';
   const [activeTab, setActiveTab]   = useState<WeatherTab>('current');
   const [state, setState]           = useState<LoadState>('idle');
   const [data, setData]             = useState<WeatherData | null>(null);
@@ -555,11 +562,11 @@ export default function WeatherScreen() {
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
   const [recents, setRecents]     = useState<FavoriteLocation[]>([]);
 
-  // Load favorites + recents on mount
+  // Load favorites from Supabase (with local cache fallback) + recents on mount
   useEffect(() => {
-    loadFavorites().then(setFavorites);
+    loadFavorites(userId).then((shared) => setFavorites(shared.map(fromShared)));
     loadRecents().then(setRecents);
-  }, []);
+  }, [userId]);
 
   // Is current location a favorite?
   const isCurrentFav = !!locationLabel && favorites.some((f) => f.name === locationLabel);
@@ -572,27 +579,14 @@ export default function WeatherScreen() {
       lat: coordsRef.current.lat,
       lon: coordsRef.current.lng,
     };
-    let updated: FavoriteLocation[];
-    if (isCurrentFav) {
-      updated = favorites.filter((f) => f.name !== locationLabel);
-    } else {
-      updated = [...favorites, loc];
-    }
-    setFavorites(updated);
-    await saveFavorites(updated);
+    const updated = await toggleFavoriteApi(toShared(loc), userId);
+    setFavorites(updated.map(fromShared));
   }
 
   // Toggle favorite from search modal
   async function handleToggleFavorite(loc: FavoriteLocation) {
-    const exists = favorites.some((f) => f.name === loc.name);
-    let updated: FavoriteLocation[];
-    if (exists) {
-      updated = favorites.filter((f) => f.name !== loc.name);
-    } else {
-      updated = [...favorites, loc];
-    }
-    setFavorites(updated);
-    await saveFavorites(updated);
+    const updated = await toggleFavoriteApi(toShared(loc), userId);
+    setFavorites(updated.map(fromShared));
   }
 
   // Load by GPS coords
@@ -758,22 +752,18 @@ export default function WeatherScreen() {
       </View>
 
       {/* Sub-tab bar */}
-      <View style={[styles.subTabBar, { borderBottomColor: theme.border }]}>
-        <Pressable
-          style={[styles.subTab, activeTab === 'current' && { backgroundColor: theme.red, borderRadius: 8 }]}
-          onPress={() => setActiveTab('current')}
-        >
-          <Text style={[styles.subTabText, { color: activeTab === 'current' ? '#fff' : theme.textMuted }]}>
+      <View style={[styles.subTabBar, { backgroundColor: theme.subNavBg, borderBottomColor: theme.subNavBorder }]}>
+        <Pressable style={styles.subTab} onPress={() => setActiveTab('current')}>
+          <Text style={[styles.subTabText, { color: theme.pillText }, activeTab === 'current' && { color: theme.red }]}>
             CURRENT
           </Text>
+          {activeTab === 'current' && <View style={[styles.subTabUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
-        <Pressable
-          style={[styles.subTab, activeTab === 'ride-window' && { backgroundColor: theme.red, borderRadius: 8 }]}
-          onPress={() => setActiveTab('ride-window')}
-        >
-          <Text style={[styles.subTabText, { color: activeTab === 'ride-window' ? '#fff' : theme.textMuted }]}>
+        <Pressable style={styles.subTab} onPress={() => setActiveTab('ride-window')}>
+          <Text style={[styles.subTabText, { color: theme.pillText }, activeTab === 'ride-window' && { color: theme.red }]}>
             RIDE WINDOW
           </Text>
+          {activeTab === 'ride-window' && <View style={[styles.subTabUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
       </View>
 
@@ -876,20 +866,26 @@ const styles = StyleSheet.create({
   subTabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 8,
+    height: 44,
   },
   subTab: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   subTabText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  subTabUnderline: {
+    position: 'absolute',
+    bottom: 0,
+    left: '20%',
+    right: '20%',
+    height: 2,
+    borderRadius: 1,
   },
 
   // Scroll

@@ -24,6 +24,7 @@ export interface Theme {
   pillBg: string;
   pillBorder: string;
   pillText: string;
+  cardDivider: string;
   mapOverlayBg: string;
 }
 
@@ -43,7 +44,7 @@ export const darkTheme: Theme = {
   tabBarBg:        '#141414',
   tabBarBorder:    '#242424',
   tabBarActive:    '#E53935',
-  tabBarInactive:  '#383838',
+  tabBarInactive:  '#9E9E9E',
   subNavBg:        '#141414',
   subNavBorder:    '#242424',
   inputBg:         '#1A1A1A',
@@ -52,7 +53,8 @@ export const darkTheme: Theme = {
   inputPlaceholder:'#555555',
   pillBg:          '#1A1A1A',
   pillBorder:      '#242424',
-  pillText:        '#666666',
+  pillText:        '#9E9E9E',
+  cardDivider:     '#444444',
   mapOverlayBg:    '#000000AA',
 };
 
@@ -72,7 +74,7 @@ export const lightTheme: Theme = {
   tabBarBg:        '#FFFFFF',
   tabBarBorder:    '#E0E0E0',
   tabBarActive:    '#C62828',
-  tabBarInactive:  '#AAAAAA',
+  tabBarInactive:  '#111111',
   subNavBg:        '#FFFFFF',
   subNavBorder:    '#E0E0E0',
   inputBg:         '#F9F9F9',
@@ -81,6 +83,7 @@ export const lightTheme: Theme = {
   inputPlaceholder:'#AAAAAA',
   pillBg:          '#F0F0F0',
   pillBorder:      '#E0E0E0',
-  pillText:        '#888888',
+  pillText:        '#111111',
+  cardDivider:     '#E0E0E0',
   mapOverlayBg:    'rgba(255,255,255,0.85)',
 };

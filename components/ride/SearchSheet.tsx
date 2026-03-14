@@ -10,9 +10,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthStore } from '../../lib/store';
+import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,6 +80,9 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
   const [results, setResults] = useState<GeocodingFeature[]>([]);
   const [loading, setLoading] = useState(false);
   const [recents, setRecents] = useState<Destination[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+  const { user } = useAuthStore();
+  const userId = user?.id ?? 'local';
   const [panelMounted, setPanelMounted] = useState(visible);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -86,6 +91,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
     if (visible) {
       setPanelMounted(true);
       loadRecents().then(setRecents);
+      loadFavorites(userId).then(setFavorites);
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
@@ -121,7 +127,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
     debounceTimer.current = setTimeout(async () => {
       try {
         const encoded = encodeURIComponent(query.trim());
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=place,address,poi&limit=6`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=place,address,postcode&limit=6`;
         const res = await fetch(url);
         const json = await res.json();
         setResults(json.features ?? []);
@@ -216,29 +222,62 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
             );
           })}
 
+        {/* Favorite destinations — show at top when query is empty */}
+        {!query.trim() && favorites.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
+              FAVORITES
+            </Text>
+            {favorites.map((fav, idx) => (
+              <Pressable
+                key={`fav-${fav.lat}-${fav.lng}-${idx}`}
+                style={[styles.resultRow, { borderBottomColor: theme.border }]}
+                onPress={() => handleSelect({ name: fav.name, lat: fav.lat, lng: fav.lng })}
+              >
+                <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
+                  <Ionicons name="heart" size={14} color={theme.red} />
+                </View>
+                <View style={styles.resultText}>
+                  <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
+                    {fav.name}
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={14} color={theme.textMuted} />
+              </Pressable>
+            ))}
+          </>
+        )}
+
         {/* Recent destinations — show when query is empty */}
         {!query.trim() && recents.length > 0 && (
           <>
             <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
               RECENT DESTINATIONS
             </Text>
-            {recents.map((dest, idx) => (
-              <Pressable
-                key={`${dest.lat}-${dest.lng}-${idx}`}
-                style={[styles.resultRow, { borderBottomColor: theme.border }]}
-                onPress={() => handleSelect(dest)}
-              >
-                <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
-                  <Feather name="clock" size={14} color={theme.textSecondary} />
-                </View>
-                <View style={styles.resultText}>
-                  <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {dest.name}
-                  </Text>
-                </View>
-                <Feather name="chevron-right" size={14} color={theme.textMuted} />
-              </Pressable>
-            ))}
+            {recents.map((dest, idx) => {
+              const isFav = favorites.some((f) => f.name === dest.name && f.lat === dest.lat && f.lng === dest.lng);
+              return (
+                <Pressable
+                  key={`${dest.lat}-${dest.lng}-${idx}`}
+                  style={[styles.resultRow, { borderBottomColor: theme.border }]}
+                  onPress={() => handleSelect(dest)}
+                >
+                  <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
+                    {isFav ? (
+                      <Ionicons name="heart" size={14} color={theme.red} />
+                    ) : (
+                      <Feather name="clock" size={14} color={theme.textSecondary} />
+                    )}
+                  </View>
+                  <View style={styles.resultText}>
+                    <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
+                      {dest.name}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={14} color={theme.textMuted} />
+                </Pressable>
+              );
+            })}
           </>
         )}
 

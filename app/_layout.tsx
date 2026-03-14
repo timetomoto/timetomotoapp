@@ -240,7 +240,7 @@ function RootLayoutInner() {
       <StatusBar style={mode === 'light' ? 'dark' : 'light'} backgroundColor={theme.bg} />
       <AuthGuard />
       <SafetyService />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg }, animation: 'slide_from_right' }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="auth" />
         <Stack.Screen name="onboarding" />

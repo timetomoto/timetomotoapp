@@ -8,35 +8,30 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/lib/useTheme';
-import type { FavoriteLocation } from './(tabs)/weather';
-
-const FAVORITES_KEY = 'ttm_weather_favorites';
-
-async function loadFavorites(): Promise<FavoriteLocation[]> {
-  try {
-    const raw = await AsyncStorage.getItem(FAVORITES_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-async function saveFavorites(favs: FavoriteLocation[]): Promise<void> {
-  await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
-}
+import { useAuthStore } from '@/lib/store';
+import {
+  loadFavorites,
+  removeFavorite,
+  type FavoriteLocation,
+} from '@/lib/favorites';
 
 export default function WeatherFavoritesScreen() {
   const { theme } = useTheme();
   const router    = useRouter();
+  const { user }  = useAuthStore();
+  const userId    = user?.id ?? 'local';
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
 
   useEffect(() => {
-    loadFavorites().then(setFavorites);
-  }, []);
+    loadFavorites(userId).then(setFavorites);
+  }, [userId]);
 
   async function handleDelete(name: string) {
+    const fav = favorites.find((f) => f.name === name);
+    if (!fav) return;
     Alert.alert(
       'Remove Favorite',
       `Remove "${name}" from favorites?`,
@@ -46,9 +41,8 @@ export default function WeatherFavoritesScreen() {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
-            const updated = favorites.filter((f) => f.name !== name);
+            const updated = await removeFavorite(fav, userId);
             setFavorites(updated);
-            await saveFavorites(updated);
           },
         },
       ],
@@ -69,10 +63,10 @@ export default function WeatherFavoritesScreen() {
       <ScrollView contentContainerStyle={s.content}>
         {favorites.length === 0 ? (
           <View style={s.emptyState}>
-            <Feather name="star" size={40} color={theme.border} />
+            <Ionicons name="heart-outline" size={40} color={theme.border} />
             <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No favorites yet</Text>
             <Text style={[s.emptyDetail, { color: theme.textSecondary }]}>
-              Search for a location in the Weather tab and tap the star icon to save it here.
+              Search for a location in the Weather tab and tap the heart icon to save it here.
             </Text>
           </View>
         ) : (
@@ -88,11 +82,11 @@ export default function WeatherFavoritesScreen() {
                     isLast && { borderBottomWidth: 0 },
                   ]}
                 >
-                  <Feather name="star" size={16} color="#FFD600" style={{ marginRight: 12 }} />
+                  <Ionicons name="heart" size={16} color={theme.red} style={{ marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
                     <Text style={[s.favName, { color: theme.textPrimary }]}>{fav.name}</Text>
                     <Text style={[s.favCoords, { color: theme.textSecondary }]}>
-                      {fav.lat.toFixed(3)}, {fav.lon.toFixed(3)}
+                      {fav.lat.toFixed(3)}, {fav.lng.toFixed(3)}
                     </Text>
                   </View>
                   <Pressable onPress={() => handleDelete(fav.name)} hitSlop={8}>

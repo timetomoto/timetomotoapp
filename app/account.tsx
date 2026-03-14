@@ -11,11 +11,16 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/lib/store';
 import { useTheme } from '@/lib/useTheme';
+import {
+  loadFavorites,
+  removeFavorite,
+  type FavoriteLocation,
+} from '@/lib/favorites';
 
 // ---------------------------------------------------------------------------
 // Section header
@@ -176,6 +181,8 @@ export default function AccountScreen() {
   const [defaultLocationSharing, setDefaultLocationSharing] = useState(false);
 
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [favLocations, setFavLocations] = useState<FavoriteLocation[]>([]);
+  const userId = user?.id ?? 'local';
 
   useEffect(() => {
     if (user?.user_metadata) {
@@ -183,6 +190,28 @@ export default function AccountScreen() {
       setPhone(user.user_metadata.phone ?? '');
     }
   }, [user]);
+
+  useEffect(() => {
+    loadFavorites(userId).then(setFavLocations);
+  }, [userId]);
+
+  async function handleRemoveFavorite(fav: FavoriteLocation) {
+    Alert.alert(
+      'Remove Favorite',
+      `Remove "${fav.name}" from favorites?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = await removeFavorite(fav, userId);
+            setFavLocations(updated);
+          },
+        },
+      ],
+    );
+  }
 
   async function handleSaveProfile() {
     setProfileError(null);
@@ -290,6 +319,44 @@ export default function AccountScreen() {
             value={defaultLocationSharing}
             onValueChange={setDefaultLocationSharing}
           />
+        </View>
+
+        {/* FAVORITE LOCATIONS */}
+        <SectionHeader label="FAVORITE LOCATIONS" />
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          {favLocations.length === 0 ? (
+            <View style={styles.favEmpty}>
+              <Ionicons name="heart-outline" size={20} color={theme.textMuted} />
+              <Text style={[styles.favEmptyText, { color: theme.textMuted }]}>
+                No favorite locations saved yet.
+              </Text>
+            </View>
+          ) : (
+            favLocations.map((fav, i) => {
+              const isLast = i === favLocations.length - 1;
+              return (
+                <View
+                  key={`${fav.name}-${fav.lat}-${fav.lng}`}
+                  style={[
+                    styles.settingRow,
+                    { borderBottomColor: theme.border },
+                    isLast && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <Ionicons name="heart" size={16} color={theme.red} style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>{fav.name}</Text>
+                    <Text style={{ fontSize: 11, color: theme.textSecondary, marginTop: 2 }}>
+                      {fav.lat.toFixed(3)}, {fav.lng.toFixed(3)}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => handleRemoveFavorite(fav)} hitSlop={8}>
+                    <Feather name="trash-2" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                </View>
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -413,4 +480,14 @@ const styles = StyleSheet.create({
 
   errorText: { fontSize: 13, textAlign: 'center' },
   successText: { color: '#4CAF50', fontSize: 13, textAlign: 'center' },
+
+  favEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  favEmptyText: {
+    fontSize: 13,
+  },
 });
