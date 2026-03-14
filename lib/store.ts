@@ -339,19 +339,19 @@ type ThemeStore = {
 };
 
 export const useThemeStore = create<ThemeStore>()((set, get) => ({
-  mode: 'system',
-  theme: darkTheme,
+  mode: 'light',
+  theme: lightTheme,
   setMode: async (mode, systemScheme = null) => {
     await AsyncStorage.setItem('ttm_theme_mode', mode);
     const resolved = mode === 'system'
-      ? (systemScheme === 'light' ? lightTheme : darkTheme)
+      ? (systemScheme === 'dark' ? darkTheme : lightTheme)
       : mode === 'light' ? lightTheme : darkTheme;
     set({ mode, theme: resolved });
   },
   resolveTheme: (systemScheme) => {
     const { mode } = get();
     const resolved = mode === 'system'
-      ? (systemScheme === 'light' ? lightTheme : darkTheme)
+      ? (systemScheme === 'dark' ? darkTheme : lightTheme)
       : mode === 'light' ? lightTheme : darkTheme;
     set({ theme: resolved });
   },

@@ -135,7 +135,9 @@ export default function AuthScreen() {
         {mode !== 'reset' ? (
           <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); reset(); }}>
             <Text style={[styles.toggleText, { color: theme.textSecondary }]}>
-              {mode === 'signin' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {mode === 'signin'
+                ? <>Don't have an account? <Text style={{ textDecorationLine: 'underline' }}>Sign up</Text></>
+                : <>Already have an account? <Text style={{ textDecorationLine: 'underline' }}>Sign in</Text></>}
             </Text>
           </Pressable>
         ) : (

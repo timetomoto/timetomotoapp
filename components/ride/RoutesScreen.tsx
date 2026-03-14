@@ -3,7 +3,6 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
-  Animated,
   Platform,
   Pressable,
   StyleSheet,
@@ -341,26 +340,14 @@ function CategoryHeader({
   onSortChange: (mode: SortMode) => void;
 }) {
   const { theme } = useTheme();
-  const rotation = useRef(new Animated.Value(isExpanded ? 1 : 0)).current;
   const isUncategorized = label === UNCATEGORIZED;
-
-  useEffect(() => {
-    Animated.timing(rotation, {
-      toValue: isExpanded ? 1 : 0,
-      duration: 180,
-      useNativeDriver: true,
-    }).start();
-  }, [isExpanded]);
-
-  const rotate = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] });
 
   return (
     <View>
       <Pressable
         style={[
           s.categoryHeader,
-          !isExpanded && { borderBottomColor: theme.border },
-          isExpanded && { borderBottomWidth: 0 },
+          { borderBottomColor: isExpanded ? theme.border : 'transparent' },
           isDragging && {
             backgroundColor: theme.bgCard,
             shadowColor: '#000',
@@ -373,27 +360,30 @@ function CategoryHeader({
         onPress={onToggle}
         onLongPress={onLongPress}
       >
-        <View style={s.categoryHeaderLeft}>
-          <Feather name={isUncategorized ? 'inbox' : 'folder'} size={14} color={theme.textSecondary} />
-          <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>
-            {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
-          </Text>
-          <Text style={[s.categoryCount, { color: theme.textMuted }]}>{count}</Text>
-        </View>
+        <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>
+          {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
+        </Text>
         <View style={s.categoryHeaderRight}>
+          {!isExpanded && count > 0 && (
+            <View style={[s.categoryCountBadge, { backgroundColor: theme.red }]}>
+              <Text style={s.categoryCountText}>{count}</Text>
+            </View>
+          )}
           {!isUncategorized && (
             <>
-              <Pressable onPress={() => onRenameCategory(label)} hitSlop={8} style={{ marginRight: 10 }}>
+              <Pressable onPress={() => onRenameCategory(label)} hitSlop={8}>
                 <Feather name="edit-2" size={12} color={theme.textMuted} />
               </Pressable>
-              <Pressable onPress={() => onDeleteCategory(label)} hitSlop={8} style={{ marginRight: 8 }}>
+              <Pressable onPress={() => onDeleteCategory(label)} hitSlop={8}>
                 <Feather name="trash-2" size={12} color={theme.red} />
               </Pressable>
             </>
           )}
-          <Animated.View style={{ transform: [{ rotate }] }}>
-            <Feather name="chevron-right" size={16} color={theme.textMuted} />
-          </Animated.View>
+          <Feather
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={theme.textSecondary}
+          />
         </View>
       </Pressable>
 
@@ -446,29 +436,26 @@ function SavedRidesSection({
 }) {
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
-  const rotation = useRef(new Animated.Value(0)).current;
-
-  function toggle() {
-    const toValue = open ? 0 : 1;
-    Animated.timing(rotation, { toValue, duration: 180, useNativeDriver: true }).start();
-    setOpen((v) => !v);
-  }
-
-  const rotate = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '90deg'] });
 
   return (
     <View style={{ marginBottom: 20 }}>
-      <Pressable style={[s.categoryHeader, { borderBottomColor: theme.border }]} onPress={toggle}>
-        <View style={s.categoryHeaderLeft}>
-          <Feather name="disc" size={14} color={theme.textSecondary} />
-          <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>SAVED RIDES</Text>
-          <View style={[sr.countBadge, { backgroundColor: theme.red }]}>
-            <Text style={sr.countText}>{rides.length}</Text>
-          </View>
+      <Pressable
+        style={[s.categoryHeader, { borderBottomColor: open ? theme.border : 'transparent' }]}
+        onPress={() => setOpen((v) => !v)}
+      >
+        <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>SAVED RIDES</Text>
+        <View style={s.categoryHeaderRight}>
+          {!open && rides.length > 0 && (
+            <View style={[s.categoryCountBadge, { backgroundColor: theme.red }]}>
+              <Text style={s.categoryCountText}>{rides.length}</Text>
+            </View>
+          )}
+          <Feather
+            name={open ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={theme.textSecondary}
+          />
         </View>
-        <Animated.View style={{ transform: [{ rotate }] }}>
-          <Feather name="chevron-right" size={16} color={theme.textMuted} />
-        </Animated.View>
       </Pressable>
 
       {open && rides.map((route) => (
@@ -728,6 +715,9 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
         keyExtractor={(item) => item}
         onDragEnd={handleDragEnd}
         renderItem={renderCategoryItem}
+        ItemSeparatorComponent={() => (
+          <View style={[s.categoryDivider, { backgroundColor: theme.border }]} />
+        )}
         contentContainerStyle={s.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
@@ -877,33 +867,42 @@ const s = StyleSheet.create({
   },
 
   categorySection: {
-    marginBottom: 8,
+    marginBottom: 0,
+  },
+  categoryDivider: {
+    height: 1,
+    marginHorizontal: 16,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    marginBottom: 8,
-  },
-  categoryHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    paddingBottom: 12,
+    paddingTop: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   categoryHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   categoryLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2,
   },
-  categoryCount: {
-    fontSize: 10,
-    fontWeight: '600',
+  categoryCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  categoryCountText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   sortRow: {
@@ -1024,19 +1023,6 @@ const sr = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
-  },
-  countBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  countText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
   },
   nameRow: {
     flex: 1,

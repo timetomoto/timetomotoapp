@@ -10,7 +10,7 @@ export default function HamburgerButton({ onPress }: Props) {
   const { theme } = useTheme();
   return (
     <Pressable
-      style={styles.btn}
+      style={[styles.btn, { backgroundColor: theme.red }]}
       onPress={onPress}
       accessibilityLabel="Open menu"
       accessibilityRole="button"
@@ -26,7 +26,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: '#E53935',
     alignItems: 'center',
     justifyContent: 'center',
   },

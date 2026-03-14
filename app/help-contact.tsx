@@ -63,7 +63,9 @@ export default function HelpContactScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
 
-  const [name, setName]               = useState(user?.email?.split('@')[0] ?? '');
+  const [name, setName]               = useState(
+    user?.user_metadata?.display_name || user?.email?.split('@')[0] || '',
+  );
   const [email, setEmail]             = useState(user?.email ?? '');
   const [phone, setPhone]             = useState('');
   const [description, setDescription] = useState('');
@@ -113,7 +115,7 @@ export default function HelpContactScreen() {
       const body = encodeURIComponent(
         `Name: ${name.trim()}\nEmail: ${email.trim()}${phone.trim() ? `\nPhone: ${phone.trim()}` : ''}\nPlatform: ${Platform.OS}\n\n${description.trim()}`,
       );
-      const mailto = `mailto:timetomotoman@gmail.com?subject=${subject}&body=${body}`;
+      const mailto = `mailto:keith@timetomoto.com?subject=${subject}&body=${body}`;
       const canOpen = await Linking.canOpenURL(mailto);
       if (canOpen) {
         await Linking.openURL(mailto);
@@ -124,7 +126,7 @@ export default function HelpContactScreen() {
       // mailto also failed
     }
 
-    setErrorMsg('Could not send message. Please email timetomotoman@gmail.com directly.');
+    setErrorMsg('Could not send message. Please email keith@timetomoto.com directly.');
     setScreenState('error');
   }
 
