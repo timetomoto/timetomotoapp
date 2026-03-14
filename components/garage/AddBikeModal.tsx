@@ -414,6 +414,9 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
               autoCorrect={false}
               autoCapitalize="words"
             />
+            <Text style={[styles.helperText, { color: theme.textMuted }]}>
+              Your nickname appears on the ride screen, route previews, and the Ride With selector.
+            </Text>
 
             <FieldLabel label="CURRENT ODOMETER (MI) — OPTIONAL" />
             <StyledInput

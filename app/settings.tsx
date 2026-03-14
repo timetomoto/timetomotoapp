@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { useSafetyStore } from '@/lib/store';
+import { useAuthStore, useSafetyStore } from '@/lib/store';
 import { useTheme } from '@/lib/useTheme';
 
 // ---------------------------------------------------------------------------
@@ -125,7 +126,13 @@ function PlainRow({ label, subtitle, muted }: { label: string; subtitle?: string
 export default function SettingsScreen() {
   const { theme, mode, setMode } = useTheme();
   const router = useRouter();
-  const { isMonitoring, setMonitoring, shareActive, setShareActive } = useSafetyStore();
+  const { isMonitoring, setMonitoring, shareActive, setShareActive, emergencyContacts, loadContacts } = useSafetyStore();
+  const { user } = useAuthStore();
+
+  // Load emergency contacts so the crash-detection check is accurate
+  useEffect(() => {
+    loadContacts(user?.id ?? 'local');
+  }, [user?.id]);
 
   // ── Notifications ──
   const [notifRideStart, setNotifRideStart] = useState(true);
@@ -201,11 +208,32 @@ export default function SettingsScreen() {
         {/* SAFETY */}
         <SectionHeader label="SAFETY" />
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <ToggleRow
-            label="Crash Detection"
-            value={isMonitoring}
-            onValueChange={setMonitoring}
-          />
+          <View>
+            <ToggleRow
+              label="Crash Detection"
+              value={isMonitoring}
+              onValueChange={(v) => {
+                if (v && emergencyContacts.length === 0) {
+                  Alert.alert(
+                    'No Emergency Contacts',
+                    'Add at least one emergency contact so someone can be notified if a crash is detected. Without a contact, crash alerts cannot be sent.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
+                      { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
+                    ],
+                  );
+                } else {
+                  setMonitoring(v);
+                }
+              }}
+            />
+            {isMonitoring && emergencyContacts.length === 0 && (
+              <Text style={[styles.toggleWarning, { color: theme.red }]}>
+                No emergency contacts added
+              </Text>
+            )}
+          </View>
           <ToggleRow
             label="Live Location Sharing"
             value={shareActive}
@@ -396,6 +424,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     flex: 1,
+  },
+  toggleWarning: {
+    fontSize: 11,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    marginTop: -6,
+    opacity: 0.85,
   },
   rowSubtitle: {
     fontSize: 11,

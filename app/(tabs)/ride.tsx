@@ -1050,13 +1050,13 @@ export default function RideScreen() {
           ]}
           onPress={() => setMonitoring(!isMonitoring)}
         >
-          <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textMuted} />
+          <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textSecondary} />
           <View>
-            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textMuted }]}>
+            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
               {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
             </Text>
             {selectedBike && (
-              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textMuted }]}>
+              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textSecondary }]}>
                 {bikeLabel(selectedBike)}
               </Text>
             )}

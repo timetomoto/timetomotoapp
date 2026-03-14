@@ -70,10 +70,11 @@ function Screen2() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { addBike } = useGarageStore();
-  const [make, setMake]   = useState('');
-  const [model, setModel] = useState('');
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [make, setMake]         = useState('');
+  const [model, setModel]       = useState('');
+  const [nickname, setNickname] = useState('');
+  const [saved, setSaved]       = useState(false);
+  const [saving, setSaving]     = useState(false);
 
   async function handleSave() {
     if (!make.trim() || !model.trim()) return;
@@ -85,7 +86,7 @@ function Screen2() {
     if (userId) {
       const { data } = await supabase
         .from('bikes')
-        .insert({ user_id: userId, make: make.trim(), model: model.trim(), year: new Date().getFullYear() })
+        .insert({ user_id: userId, make: make.trim(), model: model.trim(), nickname: nickname.trim() || null, year: new Date().getFullYear() })
         .select()
         .single();
       if (data) addBike(data);
@@ -119,6 +120,16 @@ function Screen2() {
           placeholder="e.g. Tiger 900"
           autoCorrect={false}
         />
+        <StyledInput
+          value={nickname}
+          onChangeText={setNickname}
+          placeholder="Nickname (optional)"
+          autoCorrect={false}
+          autoCapitalize="words"
+        />
+        <Text style={[s.helperText, { color: theme.textSecondary }]}>
+          Your nickname appears on the ride screen, route previews, and the Ride With selector.
+        </Text>
         <Pressable
           style={[s.formBtn, { backgroundColor: theme.red }, !canSave && s.formBtnDisabled]}
           onPress={handleSave}
@@ -387,6 +398,7 @@ const s = StyleSheet.create({
     marginBottom: 32,
   },
   form: { width: '100%', gap: 12 },
+  helperText: { fontSize: 11, marginTop: -4, letterSpacing: 0.2 },
   formBtn: {
     borderRadius: 8,
     paddingVertical: 16,

@@ -210,7 +210,9 @@ export default function GarageScreen() {
               {activeSection === 'SERVICE' && selectedBike && (
                 <>
                   <SpecificationsSection bike={selectedBike} />
+                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
                   <ServiceIntervalsSection bike={selectedBike} />
+                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
                   <ServiceBulletinsSection bike={selectedBike} />
                 </>
               )}
