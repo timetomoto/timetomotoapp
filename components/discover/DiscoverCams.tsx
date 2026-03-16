@@ -590,7 +590,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -675,7 +675,7 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textAlign: 'center',
   },
   emptyBody: {
@@ -694,7 +694,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   // Modal

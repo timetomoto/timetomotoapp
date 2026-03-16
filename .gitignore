@@ -37,6 +37,9 @@ yarn-error.*
 .env.production
 .env*.local
 
+# Supabase temp
+supabase/.temp/
+
 # Claude Code
 .claude/
 

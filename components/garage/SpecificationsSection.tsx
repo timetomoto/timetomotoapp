@@ -591,7 +591,7 @@ const st = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   countBadge: {
     minWidth: 20,

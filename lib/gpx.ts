@@ -102,8 +102,8 @@ export function parseGpx(xml: string): ParsedRoute {
 
   let durationSeconds: number | null = null;
   if (points.length >= 2 && points[0].time && points[points.length - 1].time) {
-    const t0 = new Date(points[0].time).getTime();
-    const t1 = new Date(points[points.length - 1].time).getTime();
+    const t0 = new Date(points[0].time!).getTime();
+    const t1 = new Date(points[points.length - 1].time!).getTime();
     if (!isNaN(t0) && !isNaN(t1)) durationSeconds = Math.round((t1 - t0) / 1000);
   }
 

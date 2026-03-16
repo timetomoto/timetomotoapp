@@ -440,7 +440,7 @@ const s = StyleSheet.create({
   cardTitle: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     marginBottom: 14,
   },
 
@@ -449,7 +449,7 @@ const s = StyleSheet.create({
   cityLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 6,
   },
   cityInputRow: {
@@ -476,14 +476,14 @@ const s = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
   },
-  chipText: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  chipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7 },
 
   // Time picker
   timeLabelRow: { marginBottom: 8 },
   fieldLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   timeBtn: {
@@ -519,7 +519,7 @@ const s = StyleSheet.create({
   },
   planBtnPressed: { opacity: 0.8 },
   planBtnDisabled: { opacity: 0.5 },
-  planBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 2 },
+  planBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1.4 },
   planError: { fontSize: 13, marginBottom: 10, textAlign: 'center' },
 
   // Recommendation box
@@ -531,7 +531,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   recHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  recTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  recTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4 },
   recSubtitle: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   recMeta: { fontSize: 12, marginBottom: 10 },
   recText: { fontSize: 14, lineHeight: 20 },
@@ -540,7 +540,7 @@ const s = StyleSheet.create({
   segSectionTitle: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     marginBottom: 10,
   },
   segCard: {
@@ -563,7 +563,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  riskText: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  riskText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7 },
   segBody: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   segStat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   segStatText: { fontSize: 13 },

@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 8,

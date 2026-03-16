@@ -336,14 +336,14 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     marginBottom: 8,
   },
 
   sectionLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 5,
     marginTop: 2,
   },
@@ -360,7 +360,7 @@ const s = StyleSheet.create({
   bikeChipText: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   emptyCard: {
     borderWidth: 1,
@@ -416,7 +416,7 @@ const s = StyleSheet.create({
   rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 9 },
   rowIconWrap: { width: 33, height: 33, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
   rowText: { flex: 1, gap: 2 },
-  rowTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  rowTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   rowDetail: { fontSize: 10, lineHeight: 14 },
   rowRight: { marginLeft: 10 },
 
@@ -447,7 +447,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
   },
-  durationChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
+  durationChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
 
   startBtn: {
     flexDirection: 'row',
@@ -459,7 +459,7 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   startBtnPressed: { opacity: 0.8 },
-  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 2 },
+  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1.4 },
 
   contactsBtn: {
     flexDirection: 'row',
@@ -473,6 +473,6 @@ const s = StyleSheet.create({
   contactsBtnText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 });

@@ -125,6 +125,7 @@ function PlainRow({ label, subtitle, muted }: { label: string; subtitle?: string
 
 export default function SettingsScreen() {
   const { theme, mode, setMode } = useTheme();
+  const isDark = theme.bg === '#0D0D0D';
   const router = useRouter();
   const { isMonitoring, setMonitoring, shareActive, setShareActive, emergencyContacts, loadContacts } = useSafetyStore();
   const { user } = useAuthStore();
@@ -137,7 +138,6 @@ export default function SettingsScreen() {
   // ── Notifications ──
   const [notifRideStart, setNotifRideStart] = useState(true);
   const [notifWeather, setNotifWeather] = useState(true);
-  const [notifDiscover, setNotifDiscover] = useState(false);
   const [notifEmergency, setNotifEmergency] = useState(true);
 
   // ── Units ──
@@ -151,10 +151,9 @@ export default function SettingsScreen() {
   // Load persisted prefs
   useEffect(() => {
     (async () => {
-      const [rideStart, weather, discover, emergency, dist, temp, capacity, wdfav] = await Promise.all([
+      const [rideStart, weather, emergency, dist, temp, capacity, wdfav] = await Promise.all([
         AsyncStorage.getItem('ttm_notif_ride_start'),
         AsyncStorage.getItem('ttm_notif_weather'),
-        AsyncStorage.getItem('ttm_notif_discover'),
         AsyncStorage.getItem('ttm_notif_emergency'),
         AsyncStorage.getItem('ttm_units_distance'),
         AsyncStorage.getItem('ttm_units_temp'),
@@ -163,7 +162,6 @@ export default function SettingsScreen() {
       ]);
       if (rideStart !== null) setNotifRideStart(rideStart === 'true');
       if (weather !== null) setNotifWeather(weather === 'true');
-      if (discover !== null) setNotifDiscover(discover === 'true');
       if (emergency !== null) setNotifEmergency(emergency === 'true');
       if (dist === 'miles' || dist === 'kilometers') setDistanceUnit(dist);
       if (temp === 'fahrenheit' || temp === 'celsius') setTempUnit(temp);
@@ -205,42 +203,6 @@ export default function SettingsScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
 
-        {/* SAFETY */}
-        <SectionHeader label="SAFETY" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <View>
-            <ToggleRow
-              label="Crash Detection"
-              value={isMonitoring}
-              onValueChange={(v) => {
-                if (v && emergencyContacts.length === 0) {
-                  Alert.alert(
-                    'No Emergency Contacts',
-                    'Add at least one emergency contact so someone can be notified if a crash is detected. Without a contact, crash alerts cannot be sent.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
-                      { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
-                    ],
-                  );
-                } else {
-                  setMonitoring(v);
-                }
-              }}
-            />
-            {isMonitoring && emergencyContacts.length === 0 && (
-              <Text style={[styles.toggleWarning, { color: theme.red }]}>
-                No emergency contacts added
-              </Text>
-            )}
-          </View>
-          <ToggleRow
-            label="Live Location Sharing"
-            value={shareActive}
-            onValueChange={setShareActive}
-          />
-        </View>
-
         {/* APPEARANCE */}
         <SectionHeader label="APPEARANCE" />
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
@@ -273,30 +235,120 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* NOTIFICATIONS */}
-        <SectionHeader label="NOTIFICATIONS" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <ToggleRow
-            label="Ride start alerts"
-            value={notifRideStart}
-            onValueChange={(v) => { setNotifRideStart(v); toggleNotif('ttm_notif_ride_start', v); }}
-          />
-          <ToggleRow
-            label="Weather alerts"
-            value={notifWeather}
-            onValueChange={(v) => { setNotifWeather(v); toggleNotif('ttm_notif_weather', v); }}
-          />
-          <ToggleRow
-            label="News & Events updates"
-            value={notifDiscover}
-            onValueChange={(v) => { setNotifDiscover(v); toggleNotif('ttm_notif_discover', v); }}
-          />
-          <ToggleRow
-            label="Emergency alerts"
-            value={notifEmergency}
-            onValueChange={(v) => { setNotifEmergency(v); toggleNotif('ttm_notif_emergency', v); }}
-          />
-        </View>
+        {/* Dark: SAFETY then NOTIFICATIONS — Light: NOTIFICATIONS then SAFETY */}
+        {isDark ? (
+          <>
+            <SectionHeader label="SAFETY" />
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <View>
+                <ToggleRow
+                  label="Crash Detection"
+                  value={isMonitoring}
+                  onValueChange={(v) => {
+                    if (v && emergencyContacts.length === 0) {
+                      Alert.alert(
+                        'No Emergency Contacts',
+                        'Add at least one emergency contact so someone can be notified if a crash is detected. Without a contact, crash alerts cannot be sent.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
+                          { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
+                        ],
+                      );
+                    } else {
+                      setMonitoring(v);
+                    }
+                  }}
+                />
+                {isMonitoring && emergencyContacts.length === 0 && (
+                  <Text style={[styles.toggleWarning, { color: theme.red }]}>
+                    No emergency contacts added
+                  </Text>
+                )}
+              </View>
+              <ToggleRow
+                label="Live Location Sharing"
+                value={shareActive}
+                onValueChange={setShareActive}
+              />
+            </View>
+
+            <SectionHeader label="NOTIFICATIONS" />
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <ToggleRow
+                label="Ride start alerts"
+                value={notifRideStart}
+                onValueChange={(v) => { setNotifRideStart(v); toggleNotif('ttm_notif_ride_start', v); }}
+              />
+              <ToggleRow
+                label="Weather alerts"
+                value={notifWeather}
+                onValueChange={(v) => { setNotifWeather(v); toggleNotif('ttm_notif_weather', v); }}
+              />
+              <ToggleRow
+                label="Emergency alerts"
+                value={notifEmergency}
+                onValueChange={(v) => { setNotifEmergency(v); toggleNotif('ttm_notif_emergency', v); }}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <SectionHeader label="NOTIFICATIONS" />
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <ToggleRow
+                label="Ride start alerts"
+                value={notifRideStart}
+                onValueChange={(v) => { setNotifRideStart(v); toggleNotif('ttm_notif_ride_start', v); }}
+              />
+              <ToggleRow
+                label="Weather alerts"
+                value={notifWeather}
+                onValueChange={(v) => { setNotifWeather(v); toggleNotif('ttm_notif_weather', v); }}
+              />
+              <ToggleRow
+                label="Emergency alerts"
+                value={notifEmergency}
+                onValueChange={(v) => { setNotifEmergency(v); toggleNotif('ttm_notif_emergency', v); }}
+              />
+            </View>
+
+            <SectionHeader label="SAFETY" />
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <View>
+                <ToggleRow
+                  label="Crash Detection"
+                  value={isMonitoring}
+                  onValueChange={(v) => {
+                    if (v && emergencyContacts.length === 0) {
+                      Alert.alert(
+                        'No Emergency Contacts',
+                        'Add at least one emergency contact so someone can be notified if a crash is detected. Without a contact, crash alerts cannot be sent.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
+                          { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
+                        ],
+                      );
+                    } else {
+                      setMonitoring(v);
+                    }
+                  }}
+                />
+                {isMonitoring && emergencyContacts.length === 0 && (
+                  <Text style={[styles.toggleWarning, { color: theme.red }]}>
+                    No emergency contacts added
+                  </Text>
+                )}
+              </View>
+              <ToggleRow
+                label="Live Location Sharing"
+                value={shareActive}
+                onValueChange={setShareActive}
+              />
+            </View>
+          </>
+        )}
 
         {/* UNITS */}
         <SectionHeader label="UNITS" />
@@ -387,7 +439,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 4,
+    letterSpacing: 2.8,
   },
 
   scrollContent: {
@@ -398,7 +450,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
     fontFamily: 'BarlowCondensed',
     marginTop: 20,
@@ -448,7 +500,7 @@ const styles = StyleSheet.create({
   segRowLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   segControl: {
@@ -466,7 +518,7 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   appearanceInner: {

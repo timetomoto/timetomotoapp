@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,7 @@ import DiscoverConditions from '../../components/discover/DiscoverConditions';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
+import { useTabResetStore } from '../../lib/store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +54,10 @@ export default function DiscoverScreen() {
   const { theme } = useTheme();
   const [subTab, setSubTab] = useState<SubTab>('MY ROUTES');
   const [menuOpen, setMenuOpen] = useState(false);
+  const discoverReset = useTabResetStore((s) => s.discoverReset);
+  useEffect(() => {
+    if (discoverReset > 0) setSubTab('MY ROUTES');
+  }, [discoverReset]);
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.bg }]} edges={['top']}>
@@ -96,7 +101,7 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     textTransform: 'uppercase',
   },
   headerSpacer: { width: 40 },
@@ -114,7 +119,7 @@ const s = StyleSheet.create({
   subNavText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   subNavUnderline: {

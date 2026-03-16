@@ -33,7 +33,7 @@ import RideWindowPlanner from '../../components/weather/RideWindowPlanner';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useTabResetStore } from '../../lib/store';
 import {
   loadFavorites,
   toggleFavorite as toggleFavoriteApi,
@@ -89,12 +89,11 @@ function round(n: number) { return Math.round(n); }
 interface GeoResult { lat: number; lng: number; label: string }
 
 async function geocodeQuery(query: string): Promise<GeoResult[]> {
-  const results = await Location.geocodeAsync(query, { useGoogleMaps: false });
+  const results = await Location.geocodeAsync(query);
   const out: GeoResult[] = [];
   for (const r of results.slice(0, 5)) {
     const [place] = await Location.reverseGeocodeAsync(
       { latitude: r.latitude, longitude: r.longitude },
-      { useGoogleMaps: false },
     );
     if (!place) continue;
     const city    = place.city || place.subregion || place.district || '';
@@ -275,10 +274,37 @@ function LocationSearchModal({
             showsVerticalScrollIndicator={false}
             style={{ maxHeight: 380 }}
           >
+            {/* Results */}
+            {results.length > 0 && (
+              <>
+                <Text style={[styles.searchSuggestLabel, { color: theme.textSecondary }]}>RESULTS</Text>
+                {results.map((r, i) => (
+                  <Pressable
+                    key={i}
+                    style={[styles.searchSuggestItem, { borderBottomColor: theme.border }]}
+                    onPress={() => { onSelect(r); onClose(); }}
+                  >
+                    <Feather name="map-pin" size={14} color={theme.red} style={{ marginRight: 10 }} />
+                    <Text style={[styles.searchSuggestText, { color: theme.textPrimary, flex: 1 }]}>{r.label}</Text>
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => onToggleFavorite({ name: r.label, lat: r.lat, lon: r.lng })}
+                    >
+                      <Ionicons
+                        name={isFavorite(r.label) ? 'heart' : 'heart-outline'}
+                        size={16}
+                        color={isFavorite(r.label) ? theme.red : theme.textSecondary}
+                      />
+                    </Pressable>
+                  </Pressable>
+                ))}
+              </>
+            )}
+
             {/* Favorites section */}
             {favorites.length > 0 && (
               <>
-                <Text style={[styles.searchSuggestLabel, { color: theme.textSecondary }]}>FAVORITES</Text>
+                <Text style={[styles.searchSuggestLabel, { color: theme.textSecondary, marginTop: 7 }]}>FAVORITES</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -317,33 +343,6 @@ function LocationSearchModal({
                   >
                     <Feather name="clock" size={14} color={theme.textSecondary} style={{ marginRight: 10 }} />
                     <Text style={[styles.searchSuggestText, { color: theme.textPrimary, flex: 1 }]}>{r.name}</Text>
-                  </Pressable>
-                ))}
-              </>
-            )}
-
-            {/* Results */}
-            {results.length > 0 && (
-              <>
-                <Text style={[styles.searchSuggestLabel, { color: theme.textSecondary }]}>RESULTS</Text>
-                {results.map((r, i) => (
-                  <Pressable
-                    key={i}
-                    style={[styles.searchSuggestItem, { borderBottomColor: theme.border }]}
-                    onPress={() => { onSelect(r); onClose(); }}
-                  >
-                    <Feather name="map-pin" size={14} color={theme.red} style={{ marginRight: 10 }} />
-                    <Text style={[styles.searchSuggestText, { color: theme.textPrimary, flex: 1 }]}>{r.label}</Text>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => onToggleFavorite({ name: r.label, lat: r.lat, lon: r.lng })}
-                    >
-                      <Ionicons
-                        name={isFavorite(r.label) ? 'heart' : 'heart-outline'}
-                        size={16}
-                        color={isFavorite(r.label) ? theme.red : theme.textSecondary}
-                      />
-                    </Pressable>
                   </Pressable>
                 ))}
               </>
@@ -548,6 +547,10 @@ export default function WeatherScreen() {
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
   const [activeTab, setActiveTab]   = useState<WeatherTab>('current');
+  const weatherReset = useTabResetStore((s) => s.weatherReset);
+  useEffect(() => {
+    if (weatherReset > 0) setActiveTab('current');
+  }, [weatherReset]);
   const [state, setState]           = useState<LoadState>('idle');
   const [data, setData]             = useState<WeatherData | null>(null);
   const [locationLabel, setLocationLabel] = useState('');
@@ -848,7 +851,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     textTransform: 'uppercase',
   },
   locationRow: {
@@ -876,7 +879,7 @@ const styles = StyleSheet.create({
   subTabText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   subTabUnderline: {
@@ -899,11 +902,11 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 32,
   },
-  loadingText: { fontSize: 13, letterSpacing: 1, marginTop: 8 },
+  loadingText: { fontSize: 13, letterSpacing: 0.7, marginTop: 8 },
   errorTitle: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     marginTop: 16,
   },
   errorMsg: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
@@ -916,7 +919,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  retryText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
+  retryText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 1.4 },
 
   // Alert banner
   alertBanner: {
@@ -928,7 +931,7 @@ const styles = StyleSheet.create({
   },
   alertLeft:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, flex: 1 },
   alertText:  { flex: 1 },
-  alertTitle: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
+  alertTitle: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
   alertMeta:  { color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 },
 
   // Current card
@@ -956,7 +959,7 @@ const styles = StyleSheet.create({
   conditionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginTop: 6,
   },
   statsGrid: {
@@ -966,7 +969,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   statCell:  { width: '50%', paddingVertical: 10, paddingRight: 16, gap: 4 },
-  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 2, marginTop: 4 },
+  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 4 },
   statValue: { fontSize: 15, fontWeight: '600' },
 
   // Section
@@ -974,7 +977,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     marginBottom: 10,
   },
 
@@ -1004,7 +1007,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  dayName:    { fontSize: 13, fontWeight: '600', letterSpacing: 1, width: 56 },
+  dayName:    { fontSize: 13, fontWeight: '600', letterSpacing: 0.7, width: 56 },
   dayPrecip:  { color: '#5B9BD5', fontSize: 12, fontWeight: '600', width: 36, marginLeft: 12, textAlign: 'right' },
   dayTemps:   { flexDirection: 'row', marginLeft: 'auto', gap: 12 },
   dayHigh:    { fontSize: 15, fontWeight: '700' },
@@ -1043,7 +1046,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
   },
-  searchHeading: { fontSize: 14, fontWeight: '700', letterSpacing: 3 },
+  searchHeading: { fontSize: 14, fontWeight: '700', letterSpacing: 2.1 },
   searchInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1065,7 +1068,7 @@ const styles = StyleSheet.create({
   searchSuggestLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 8,
     marginTop: 4,
   },

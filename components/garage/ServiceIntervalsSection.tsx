@@ -274,7 +274,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   iconBtn: { padding: 4 },
 
   assumptionBanner: {
@@ -294,7 +294,7 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 8,
   },
-  emptyTitle: { fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', letterSpacing: 0.7 },
   emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
   lookupBtn: {
@@ -306,12 +306,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 8,
   },
-  lookupBtnText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 2 },
+  lookupBtnText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 1.4 },
 
   loadingState: { alignItems: 'center', paddingVertical: 40, gap: 14 },
   loadingText: { fontSize: 13 },
 
-  fetchedAt: { fontSize: 10, letterSpacing: 1, marginBottom: 10 },
+  fetchedAt: { fontSize: 10, letterSpacing: 0.7, marginBottom: 10 },
 
   card: {
     borderWidth: 1,

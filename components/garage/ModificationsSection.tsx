@@ -16,7 +16,6 @@ import {
   addModification,
   updateModification,
   deleteModification,
-  bulkDeleteModifications,
   generateId,
   MODIFICATION_CATEGORIES,
   type Modification,
@@ -185,8 +184,6 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
   const [records, setRecords]     = useState<Modification[]>([]);
   const [sortKey, setSortKey]     = useState<SortKey>('date_desc');
   const [showSort, setShowSort]   = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected]   = useState<Set<string>>(new Set());
   const [showForm, setShowForm]   = useState(false);
   const [editing, setEditing]     = useState<Modification | null>(null);
 
@@ -217,38 +214,13 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
     ]);
   }
 
-  function handleBulkDelete() {
-    const count = selected.size;
-    Alert.alert(`Delete ${count} mod${count > 1 ? 's' : ''}?`, 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        const ids = Array.from(selected);
-        await bulkDeleteModifications(bikeId, ids, userId);
-        setRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
-        setSelected(new Set()); setSelectMode(false);
-      }},
-    ]);
-  }
-
-  function toggleSelect(id: string) {
-    setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  }
-
   return (
     <View style={st.root}>
       <View style={st.sectionHeader}>
         <Text style={[st.sectionTitle, { color: theme.textSecondary }]}>MODIFICATIONS</Text>
         <View style={st.headerActions}>
-          {selectMode && selected.size > 0 && (
-            <Pressable onPress={handleBulkDelete} hitSlop={8} style={st.iconBtn}>
-              <Feather name="trash-2" size={16} color={theme.red} />
-            </Pressable>
-          )}
           <Pressable onPress={() => setShowSort(!showSort)} hitSlop={8} style={st.iconBtn}>
             <Feather name="sliders" size={16} color={theme.textSecondary} />
-          </Pressable>
-          <Pressable onPress={() => setSelectMode(!selectMode)} hitSlop={8} style={st.iconBtn}>
-            <Feather name="check-square" size={16} color={selectMode ? theme.red : theme.textSecondary} />
           </Pressable>
           <Pressable
             hitSlop={8}
@@ -274,24 +246,16 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
         </View>
       )}
 
-      {selectMode && <Text style={[st.selectCount, { color: theme.textSecondary }]}>{selected.size} selected</Text>}
-
       {records.length === 0 && (
         <View style={st.emptyState}>
           <Feather name="settings" size={28} color={theme.border} />
-          <Text style={[st.emptyText, { color: theme.textSecondary }]}>No modifications recorded yet</Text>
+          <Text style={[st.emptyText, { color: theme.textSecondary }]}>Add upgrades and custom parts.</Text>
         </View>
       )}
 
       {sorted.map((record) => (
         <View key={record.id} style={[st.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <View style={st.cardRow}>
-            {selectMode && (
-              <Pressable onPress={() => toggleSelect(record.id)} style={st.checkbox} hitSlop={8}>
-                <Feather name={selected.has(record.id) ? 'check-square' : 'square'} size={18}
-                  color={selected.has(record.id) ? theme.red : theme.textSecondary} />
-              </Pressable>
-            )}
             <View style={st.cardContent}>
               <Text style={[st.cardTitle, { color: theme.textPrimary }]}>{record.title}</Text>
               <Text style={[st.cardMeta, { color: theme.textSecondary }]}>
@@ -302,16 +266,14 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
               </Text>
               {record.notes ? <Text style={[st.cardNotes, { color: theme.textMuted }]}>{record.notes}</Text> : null}
             </View>
-            {!selectMode && (
-              <View style={st.cardActions}>
-                <Pressable onPress={() => handleEdit(record)} hitSlop={8} style={st.iconBtn}>
-                  <Feather name="edit-2" size={14} color={theme.textSecondary} />
-                </Pressable>
-                <Pressable onPress={() => handleDelete(record)} hitSlop={8} style={st.iconBtn}>
-                  <Feather name="trash-2" size={14} color={theme.textSecondary} />
-                </Pressable>
-              </View>
-            )}
+            <View style={st.cardActions}>
+              <Pressable onPress={() => handleEdit(record)} hitSlop={8} style={st.iconBtn}>
+                <Feather name="edit-2" size={14} color={theme.textSecondary} />
+              </Pressable>
+              <Pressable onPress={() => handleDelete(record)} hitSlop={8} style={st.iconBtn}>
+                <Feather name="trash-2" size={14} color={theme.textSecondary} />
+              </Pressable>
+            </View>
           </View>
         </View>
       ))}
@@ -330,8 +292,8 @@ const fm = StyleSheet.create({
   sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40, maxHeight: '90%' },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  heading: { fontSize: 15, fontWeight: '700', letterSpacing: 2 },
-  label: { fontSize: 10, fontWeight: '700', letterSpacing: 2, marginTop: 16, marginBottom: 6 },
+  heading: { fontSize: 15, fontWeight: '700', letterSpacing: 1.4 },
+  label: { fontSize: 10, fontWeight: '700', letterSpacing: 1.4, marginTop: 16, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
   textArea: { minHeight: 72, textAlignVertical: 'top' },
   pickerBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -339,20 +301,20 @@ const fm = StyleSheet.create({
   pickerItem: { paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1 },
   pickerItemText: { fontSize: 14 },
   saveBtn: { borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 2 },
+  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.4 },
 });
 
 const st = StyleSheet.create({
   root: { padding: 16 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { padding: 4 },
   addBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   sortDropdown: { borderWidth: 1, borderRadius: 6, marginBottom: 8, overflow: 'hidden' },
   sortItem: { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1 },
   sortItemText: { fontSize: 13 },
-  selectCount: { fontSize: 11, letterSpacing: 1, marginBottom: 8 },
+  selectCount: { fontSize: 11, letterSpacing: 0.7, marginBottom: 8 },
   emptyState: { alignItems: 'center', paddingVertical: 32, gap: 10 },
   emptyText: { fontSize: 13 },
   card: { borderWidth: 1, borderRadius: 8, marginBottom: 8, overflow: 'hidden' },

@@ -34,6 +34,7 @@ export interface BulletinResult {
   nhtsaMake: string;
   nhtsaModel: string;
   totalComplaints: number;
+  error: string | null;
 }
 
 interface ServiceBulletinsStore {

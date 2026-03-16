@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAuthStore, useGarageStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import AddBikeModal from '../../components/garage/AddBikeModal';
 import MaintenanceSection from '../../components/garage/MaintenanceSection';
 import ModificationsSection from '../../components/garage/ModificationsSection';
@@ -30,6 +30,10 @@ export default function GarageScreen() {
   const [editingBike, setEditingBike] = useState<typeof bikes[0] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<'MAINTENANCE' | 'MODS' | 'SERVICE'>('MAINTENANCE');
+  const garageReset = useTabResetStore((s) => s.garageReset);
+  useEffect(() => {
+    if (garageReset > 0) setActiveSection('MAINTENANCE');
+  }, [garageReset]);
 
   useEffect(() => {
     fetchBikes(user?.id ?? 'local');
@@ -254,7 +258,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
     textTransform: 'uppercase',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -267,7 +271,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   // Loading / empty
@@ -280,7 +284,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 8,
   },
   emptySubtitle: {
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 
   // Scroll
@@ -323,7 +327,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
 
   // Bike card
@@ -342,7 +346,7 @@ const styles = StyleSheet.create({
   bikeYear: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 2,
   },
   bikeNameContainer: {
@@ -352,7 +356,7 @@ const styles = StyleSheet.create({
   bikeName: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   bikeNickname: {
     fontSize: 18,
@@ -363,7 +367,7 @@ const styles = StyleSheet.create({
   bikeRealName: {
     fontSize: 11,
     fontWeight: '500',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   bikeCardActions: {
     alignItems: 'flex-end',
@@ -391,7 +395,7 @@ const styles = StyleSheet.create({
   },
   odoLabel: {
     fontSize: 10,
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginTop: 2,
   },
 
@@ -414,7 +418,7 @@ const styles = StyleSheet.create({
   sectionTabText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 
 });

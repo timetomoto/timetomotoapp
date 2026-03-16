@@ -10,7 +10,7 @@ import { updateShareLocation } from './liveShare';
 
 export const LOCATION_TASK = 'ttm-background-location';
 
-TaskManager.defineTask(LOCATION_TASK, ({ data, error }: any) => {
+TaskManager.defineTask(LOCATION_TASK, async ({ data, error }: any) => {
   if (error || !data?.locations?.length) return;
   const loc: Location.LocationObject = data.locations[0];
   const lat = loc.coords.latitude;

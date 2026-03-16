@@ -189,13 +189,14 @@ export default function ContactPickerSheet({ onSelect, onClose }: Props) {
     setLoading(true);
     try {
       const { status } = await Contacts.requestPermissionsAsync();
+      const statusStr = status as string;
 
-      if (status === 'limited') {
+      if (statusStr === 'limited') {
         setIsLimited(true);
         // fall through — getContactsAsync still returns the allowed subset
       }
 
-      if (status === 'denied') {
+      if (statusStr === 'denied') {
         setLoading(false);
         Alert.alert(
           'Contacts Access Required',
@@ -208,13 +209,13 @@ export default function ContactPickerSheet({ onSelect, onClose }: Props) {
         return;
       }
 
-      if (status === 'restricted') {
+      if (statusStr === 'restricted') {
         setLoading(false);
         setEmptyMessage('Contacts access is restricted on this device.');
         return;
       }
 
-      if (status !== 'granted' && status !== 'limited') {
+      if (statusStr !== 'granted' && statusStr !== 'limited') {
         setLoading(false);
         setEmptyMessage('Contacts permission was not granted.');
         return;
@@ -352,7 +353,6 @@ export default function ContactPickerSheet({ onSelect, onClose }: Props) {
         ) : (
           <FlashList
             data={filtered}
-            estimatedItemSize={64}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <ContactItem

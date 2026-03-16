@@ -38,7 +38,7 @@ const s = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -63,6 +63,6 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 });

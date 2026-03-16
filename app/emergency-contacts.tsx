@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
   },
 
   scrollContent: {
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   emptySubtitle: {
     fontSize: 12,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   primaryBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   contactName: {
     fontSize: 17,
@@ -608,14 +608,14 @@ const styles = StyleSheet.create({
   formTitle: {
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   fieldLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
     marginTop: 4,
   },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   saveBtn: {
     flex: 1,
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   addBtnRow: {
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   addBtnOutlinedText: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   addBtnFilled: {
     flex: 1,
@@ -691,6 +691,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 });

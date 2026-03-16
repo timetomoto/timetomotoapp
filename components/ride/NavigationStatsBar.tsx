@@ -91,11 +91,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   statLabel: {
     fontSize: 10,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     marginTop: 2,
   },
   statDivider: {

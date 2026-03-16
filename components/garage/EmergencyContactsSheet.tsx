@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
   },
   subHeading: {
     fontSize: 12,
@@ -275,12 +275,12 @@ const styles = StyleSheet.create({
   contactNum: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   fieldLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 6,
     marginTop: 10,
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   addContactText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 
   errorText: { fontSize: 13, marginBottom: 12, textAlign: 'center' },
@@ -324,6 +324,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 });

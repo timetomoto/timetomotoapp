@@ -438,7 +438,7 @@ function SavedRidesSection({
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={{ marginBottom: 20 }}>
+    <View style={{ marginBottom: 0 }}>
       <Pressable
         style={[s.categoryHeader, { borderBottomColor: open ? theme.border : 'transparent' }]}
         onPress={() => setOpen((v) => !v)}
@@ -490,6 +490,7 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categorySorts, setCategorySorts] = useState<Record<string, SortMode>>({});
   const orderLoadedRef = useRef(false);
+  const autoExpandedRef = useRef(false);
 
   useEffect(() => {
     const userId = user?.id ?? 'local';
@@ -541,6 +542,16 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
       AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(current));
     }
   }, [allGroupKeys.join(','), loading]);
+
+  // Auto-expand first category with items on initial load
+  useEffect(() => {
+    if (autoExpandedRef.current || loading || orderedKeys.length === 0) return;
+    const first = orderedKeys.find((k) => (grouped.get(k) ?? []).length > 0);
+    if (first) {
+      setExpandedCategories((prev) => ({ ...prev, [first]: true }));
+      autoExpandedRef.current = true;
+    }
+  }, [orderedKeys, grouped, loading]);
 
   function toggleCategory(category: string) {
     setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
@@ -807,11 +818,9 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
               </View>
             )}
 
-            {/* ROUTES heading */}
-            {!loading && otherRoutes.length > 0 && (
-              <View style={sr.sectionHeader}>
-                <Text style={[s.heading, { color: theme.textSecondary }]}>ROUTES</Text>
-              </View>
+            {/* Divider between saved rides and route categories */}
+            {!loading && savedRides.length > 0 && otherRoutes.length > 0 && (
+              <View style={[s.categoryDivider, { backgroundColor: theme.border }]} />
             )}
           </>
         }
@@ -837,7 +846,7 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
   },
   headerActions: {
     flexDirection: 'row',
@@ -863,7 +872,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
 
   categorySection: {
@@ -889,7 +898,7 @@ const s = StyleSheet.create({
   categoryLabel: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   categoryCountBadge: {
     minWidth: 20,
@@ -924,7 +933,7 @@ const s = StyleSheet.create({
   sortPillText: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
 
   searchRow: {
@@ -998,7 +1007,7 @@ const s = StyleSheet.create({
   actionText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   actionDivider: { width: 1, marginVertical: 8 },
 
@@ -1050,7 +1059,7 @@ const sr = StyleSheet.create({
     color: '#E53935',
     fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   emptyRides: {
     alignItems: 'center',

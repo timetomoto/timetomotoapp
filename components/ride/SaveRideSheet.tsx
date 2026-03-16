@@ -167,7 +167,7 @@ const s = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     textAlign: 'center',
   },
 
@@ -179,13 +179,13 @@ const s = StyleSheet.create({
   },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 18, fontWeight: '700' },
-  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
+  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1 },
   statDivider: { width: 1, marginVertical: 4 },
 
   inputLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: -8,
   },
   input: {
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   discardBtn: {
     alignItems: 'center',
@@ -216,6 +216,6 @@ const s = StyleSheet.create({
   },
   discardBtnText: {
     fontSize: 13,
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
 });

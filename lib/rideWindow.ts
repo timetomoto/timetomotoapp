@@ -67,12 +67,11 @@ export function haversine(lat1: number, lng1: number, lat2: number, lng2: number
 
 export async function geocodePlace(query: string): Promise<GeoPlace | null> {
   try {
-    const results = await Location.geocodeAsync(query, { useGoogleMaps: false });
+    const results = await Location.geocodeAsync(query);
     if (!results.length) return null;
     const r = results[0];
     const [place] = await Location.reverseGeocodeAsync(
       { latitude: r.latitude, longitude: r.longitude },
-      { useGoogleMaps: false },
     );
     const city = place?.city || place?.subregion || place?.region || '';
     const region = place?.region || '';

@@ -43,7 +43,7 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
     }
   }, [place]);
 
-  if (!place && slideAnim.__getValue() >= 299) return null;
+  if (!place && (slideAnim as any).__getValue() >= 299) return null;
 
   function handleNavigate() {
     if (!place) return;
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   subtype: {
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     marginTop: 2,
   },
   infoRow: {
@@ -221,6 +221,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 });

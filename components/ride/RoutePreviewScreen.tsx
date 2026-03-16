@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   loadingContainer: {
     flex: 1,
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   bikeSelector: {
     paddingHorizontal: 20,
@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
   bikeSelectorLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     paddingHorizontal: 0,
     marginBottom: 8,
   },

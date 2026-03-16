@@ -355,7 +355,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   headerLeft: { flex: 1, gap: 2 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   checkedAt: { fontSize: 9, letterSpacing: 0.5 },
 
   checkBtn: {
@@ -366,7 +366,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 
   idleBox: {
     flexDirection: 'row',
@@ -408,7 +408,7 @@ const s = StyleSheet.create({
   groupLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 8,
   },
 
@@ -427,7 +427,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  badgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 1.5 },
+  badgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 1 },
   bulletinId: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
   bulletinComponent: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
   bulletinBody: { fontSize: 12, lineHeight: 18 },
@@ -440,7 +440,7 @@ const s = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
-  remedyLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 2 },
+  remedyLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1.4 },
   remedyText: { fontSize: 11, lineHeight: 17 },
 
   bulletinMeta: { fontSize: 10, letterSpacing: 0.3 },

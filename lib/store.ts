@@ -303,17 +303,20 @@ export const useRideWindowStore = create<RideWindowStoreState>((set) => ({
 interface RoutesState {
   routes: Route[];
   loading: boolean;
+  pendingNavigateRoute: Route | null;
   setRoutes: (routes: Route[]) => void;
   setLoading: (v: boolean) => void;
   addRoute: (r: Route) => void;
   removeRoute: (id: string) => void;
   updateRouteName: (id: string, name: string) => void;
   updateRouteCategory: (id: string, category: string | null) => void;
+  setPendingNavigateRoute: (route: Route | null) => void;
 }
 
 export const useRoutesStore = create<RoutesState>((set) => ({
   routes: [],
   loading: false,
+  pendingNavigateRoute: null,
   setRoutes:  (routes)  => set({ routes }),
   setLoading: (loading) => set({ loading }),
   addRoute:   (r)       => set((s) => ({ routes: [r, ...s.routes] })),
@@ -322,6 +325,7 @@ export const useRoutesStore = create<RoutesState>((set) => ({
     set((s) => ({ routes: s.routes.map((r) => r.id === id ? { ...r, name } : r) })),
   updateRouteCategory: (id, category) =>
     set((s) => ({ routes: s.routes.map((r) => r.id === id ? { ...r, category } : r) })),
+  setPendingNavigateRoute: (route) => set({ pendingNavigateRoute: route }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -359,4 +363,24 @@ export const useThemeStore = create<ThemeStore>()((set, get) => ({
     const saved = await AsyncStorage.getItem('ttm_theme_mode') as ThemeMode | null;
     if (saved) set({ mode: saved });
   },
+}));
+
+// ---------------------------------------------------------------------------
+// Tab reset store — signals tabs to reset to default sub-screen
+// ---------------------------------------------------------------------------
+
+interface TabResetState {
+  rideReset: number;
+  weatherReset: number;
+  garageReset: number;
+  discoverReset: number;
+  resetTab: (tab: 'ride' | 'weather' | 'garage' | 'discover') => void;
+}
+
+export const useTabResetStore = create<TabResetState>((set) => ({
+  rideReset: 0,
+  weatherReset: 0,
+  garageReset: 0,
+  discoverReset: 0,
+  resetTab: (tab) => set((s) => ({ [`${tab}Reset`]: s[`${tab}Reset` as keyof TabResetState] as number + 1 })),
 }));

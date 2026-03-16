@@ -14,6 +14,8 @@ import Mapbox, {
   LineLayer,
   LocationPuck,
   MapView,
+  RasterLayer,
+  RasterSource,
   ShapeSource,
   StyleURL,
 } from '@rnmapbox/maps';
@@ -21,7 +23,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
 import { routeGeoJson, routeBounds, calcDistance } from '../../lib/gpx';
@@ -64,7 +66,7 @@ Mapbox.setTelemetryEnabled(false);
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type SubTab   = 'MAP' | 'ROUTES' | 'RECORD';
+type SubTab   = 'MAP' | 'MY ROUTES' | 'RECORD';
 type MapStyle = 'standard' | 'terrain' | 'satellite' | 'hybrid';
 
 const MAP_STYLES: Record<MapStyle, string> = {
@@ -117,7 +119,7 @@ const wl = StyleSheet.create({
   title: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     marginBottom: 4,
   },
   row: {
@@ -344,7 +346,7 @@ function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: 
 
 const SubNav = memo(function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
   const { theme } = useTheme();
-  const tabs: SubTab[] = ['MAP', 'ROUTES', 'RECORD'];
+  const tabs: SubTab[] = ['MAP', 'MY ROUTES', 'RECORD'];
   return (
     <View style={[styles.subNav, { backgroundColor: theme.subNavBg, borderTopColor: theme.subNavBorder }]}>
       {tabs.map((tab) => (
@@ -367,8 +369,12 @@ export default function RideScreen() {
   const { theme } = useTheme();
   const [subTab, setSubTab]     = useState<SubTab>('MAP');
   const [mapStyle, setMapStyle] = useState<MapStyle>('standard');
+  const rideReset = useTabResetStore((s) => s.rideReset);
+  useEffect(() => {
+    if (rideReset > 0) setSubTab('MAP');
+  }, [rideReset]);
   const { user }                = useAuthStore();
-  const { addRoute }            = useRoutesStore();
+  const { addRoute, pendingNavigateRoute, setPendingNavigateRoute } = useRoutesStore();
   const { bikes, selectedBikeId, fetchBikes } = useGarageStore();
 
   useEffect(() => {
@@ -764,6 +770,14 @@ export default function RideScreen() {
     }
   }
 
+  // Consume pending navigate route from Discover MY ROUTES
+  useEffect(() => {
+    if (pendingNavigateRoute) {
+      handleNavigate(pendingNavigateRoute);
+      setPendingNavigateRoute(null);
+    }
+  }, [pendingNavigateRoute]);
+
   // GPX import: preview route on map + switch to MAP
   function handleImportRoute(points: TrackPoint[], name: string) {
     setOverlayPoints(points);
@@ -787,7 +801,7 @@ export default function RideScreen() {
       if (saved) {
         addRoute(saved);
         showToast('Ride saved!');
-        setSubTab('ROUTES');
+        setSubTab('MY ROUTES');
       }
     }
     clearRecordedPoints();
@@ -885,6 +899,7 @@ export default function RideScreen() {
           styleURL={activeMapStyle}
           compassEnabled
           compassPosition={{ top: Platform.OS === 'ios' ? 116 : 76, right: 12 }}
+          // @ts-expect-error compassViewStyle exists at runtime but missing from types
           compassViewStyle={{ opacity: 0.7 }}
           scaleBarEnabled={false}
           attributionEnabled
@@ -1177,7 +1192,7 @@ export default function RideScreen() {
       </View>
 
       {/* ── Sub-screens ── */}
-      {subTab === 'ROUTES' && (
+      {subTab === 'MY ROUTES' && (
         <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
           <RoutesScreen
             onImportRoute={handleImportRoute}
@@ -1329,7 +1344,7 @@ const styles = StyleSheet.create({
   crashToggleText: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
   },
   crashToggleBike: {
     fontSize: 8,
@@ -1367,7 +1382,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   // Stats bar
@@ -1382,8 +1397,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   statItem:  { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 1 },
-  statLabel: { fontSize: 10, letterSpacing: 1.5, marginTop: 2 },
+  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 0.7 },
+  statLabel: { fontSize: 10, letterSpacing: 1, marginTop: 2 },
   statDivider: { width: 1, marginVertical: 4 },
 
   // Sub-nav (shifted down 5px per layout spec)
@@ -1394,7 +1409,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   subNavItem:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  subNavText:      { fontSize: 11, fontWeight: '700', letterSpacing: 2 },
+  subNavText:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
   subNavUnderline: {
     position: 'absolute',
     bottom: 0,
@@ -1424,7 +1439,7 @@ const styles = StyleSheet.create({
   recordTimerText: {
     fontSize: 32,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     color: '#fff',
   },
   recordActiveCenter: {
@@ -1438,7 +1453,7 @@ const styles = StyleSheet.create({
   recordElapsed: {
     fontSize: 48,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginBottom: 8,
   },
   recordCircleActive: {
@@ -1453,7 +1468,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
-  recordHint: { fontSize: 13, letterSpacing: 1 },
+  recordHint: { fontSize: 13, letterSpacing: 0.7 },
   monitoringBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1503,7 +1518,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 
   // Toast

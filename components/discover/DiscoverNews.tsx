@@ -1,13 +1,16 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import { FeedCardSkeleton } from '../common/SkeletonLoader';
@@ -153,6 +156,8 @@ export default function DiscoverNews() {
   } = useDiscoverStore();
   const [loadState, setLoadState] = useState<LoadState>(newsLastFetched ? 'done' : 'loading');
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -179,10 +184,33 @@ export default function DiscoverNews() {
     setRefreshing(false);
   }, [load]);
 
+  const handleManualRefresh = useCallback(async () => {
+    setManualRefreshing(true);
+    useDiscoverStore.setState({ newsLastFetched: null });
+    await load(true);
+    setManualRefreshing(false);
+  }, [load]);
+
   const filtered = useMemo(() => {
-    if (activeNewsFilter === 'all') return newsItems;
-    return newsItems.filter((item) => item.category === activeNewsFilter);
-  }, [newsItems, activeNewsFilter]);
+    let items = newsItems;
+
+    // Category filter
+    if (activeNewsFilter !== 'all') {
+      items = items.filter((item) => item.category === activeNewsFilter);
+    }
+
+    // Search filter
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      items = items.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.summary.toLowerCase().includes(q),
+      );
+    }
+
+    return items;
+  }, [newsItems, activeNewsFilter, searchQuery]);
 
   if (loadState === 'error') {
     return (
@@ -211,6 +239,41 @@ export default function DiscoverNews() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.red} />}
     >
+      {/* Search bar + refresh */}
+      <View style={s.searchSection}>
+        <View style={[s.searchRow, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Feather name="search" size={14} color={theme.textMuted} />
+          <TextInput
+            style={[s.searchInput, { color: theme.textPrimary }]}
+            placeholder="Search news..."
+            placeholderTextColor={theme.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Feather name="x" size={14} color={theme.textMuted} />
+            </Pressable>
+          )}
+        </View>
+        <Pressable
+          onPress={handleManualRefresh}
+          disabled={manualRefreshing}
+          style={[s.refreshBtn, { borderColor: theme.border }]}
+          accessibilityLabel="Refresh news"
+          accessibilityRole="button"
+        >
+          {manualRefreshing ? (
+            <ActivityIndicator size="small" color={theme.textSecondary} />
+          ) : (
+            <Feather name="refresh-cw" size={14} color={theme.textSecondary} />
+          )}
+        </Pressable>
+      </View>
+
       {/* Filter pills */}
       <ScrollView
         horizontal
@@ -247,9 +310,11 @@ export default function DiscoverNews() {
         {filtered.length === 0 ? (
           <View style={s.empty}>
             <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-              {activeNewsFilter === 'all'
-                ? 'No articles found. Pull down to refresh.'
-                : `Nothing in ${CATEGORY_LABELS[activeNewsFilter] ?? activeNewsFilter} right now`}
+              {searchQuery.trim()
+                ? 'No news matching your search'
+                : activeNewsFilter === 'all'
+                  ? 'No articles found. Pull down to refresh.'
+                  : `Nothing in ${CATEGORY_LABELS[activeNewsFilter] ?? activeNewsFilter} right now`}
             </Text>
           </View>
         ) : (
@@ -265,6 +330,39 @@ export default function DiscoverNews() {
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
+  searchSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  searchRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
+  refreshBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+  },
+
   pillsContainer: {
     borderBottomWidth: 1,
   },
@@ -283,7 +381,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -307,7 +405,7 @@ const s = StyleSheet.create({
   cardMeta: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   cardTitle: {

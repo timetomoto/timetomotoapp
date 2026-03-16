@@ -7,7 +7,7 @@ export function useTheme() {
   const { theme, mode, setMode, resolveTheme } = useThemeStore();
 
   useEffect(() => {
-    resolveTheme(systemScheme);
+    resolveTheme(systemScheme === 'dark' || systemScheme === 'light' ? systemScheme : null);
   }, [systemScheme]);
 
   return { theme, mode, setMode };

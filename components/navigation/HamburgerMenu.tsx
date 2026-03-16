@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
     fontFamily: 'BarlowCondensed',
   },

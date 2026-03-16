@@ -118,15 +118,33 @@ function categorize(item: NewsItem): NewsCategory {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, ' ')
+function decodeHtmlEntities(text: string): string {
+  if (!text) return '';
+  return text
+    // Named entities
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
+    .replace(/&mdash;/g, '\u2014')
+    .replace(/&ndash;/g, '\u2013')
+    .replace(/&lsquo;/g, '\u2018')
+    .replace(/&rsquo;/g, '\u2019')
+    .replace(/&ldquo;/g, '\u201C')
+    .replace(/&rdquo;/g, '\u201D')
+    .replace(/&hellip;/g, '\u2026')
+    // Decimal numeric entities &#NNN;
+    .replace(/&#(\d+);/g, (_, dec) =>
+      String.fromCharCode(parseInt(dec, 10))
+    )
+    // Hex numeric entities &#xHHH;
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
+      String.fromCharCode(parseInt(hex, 16))
+    )
+    // Strip any remaining HTML tags
+    .replace(/<[^>]*>/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -208,8 +226,8 @@ async function fetchSource(
         (typeof item.link === 'string' ? item.link : item.link?.['#text'] ?? item.link?.['@_href']) ?? '';
       const rawSummary: string =
         item.description ?? item.summary ?? item['content:encoded'] ?? item.content?.['#text'] ?? '';
-      const summary = truncate(stripHtml(String(rawSummary)));
-      const title = stripHtml(String(item.title ?? ''));
+      const summary = truncate(decodeHtmlEntities(String(rawSummary)));
+      const title = decodeHtmlEntities(String(item.title ?? ''));
       const pubDate = item.pubDate ?? item.published ?? item.updated ?? item['dc:date'];
       const imageUrl = extractImage(item);
 

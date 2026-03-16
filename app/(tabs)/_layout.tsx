@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../lib/useTheme';
+import { useTabResetStore } from '../../lib/store';
+import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 
 export default function TabLayout() {
   const { theme } = useTheme();
+  const resetTab = useTabResetStore((s) => s.resetTab);
 
   return (
     <Tabs
@@ -22,12 +25,9 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize:      10,
           fontWeight:    '600',
-          letterSpacing: 1,
+          letterSpacing: 0.7,
         },
         headerShown: false,
-      }}
-      screenListeners={{
-        tabPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
       }}
     >
       <Tabs.Screen
@@ -35,9 +35,15 @@ export default function TabLayout() {
         options={{
           title: 'RIDE',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="motorbike" size={Math.round(size * 1.1)} color={color} accessibilityLabel="Ride tab" />
+            <MotorcycleIcon size={Math.round((size + 4) * 1.75)} color={color} />
           ),
         }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            resetTab('ride');
+          },
+        })}
       />
       <Tabs.Screen
         name="weather"
@@ -47,6 +53,12 @@ export default function TabLayout() {
             <Feather name="cloud" size={size} color={color} accessibilityLabel="Weather tab" />
           ),
         }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            resetTab('weather');
+          },
+        })}
       />
       <Tabs.Screen
         name="garage"
@@ -56,6 +68,12 @@ export default function TabLayout() {
             <Feather name="tool" size={size} color={color} accessibilityLabel="Garage tab" />
           ),
         }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            resetTab('garage');
+          },
+        })}
       />
       <Tabs.Screen
         name="discover"
@@ -65,6 +83,12 @@ export default function TabLayout() {
             <Feather name="compass" size={size} color={color} accessibilityLabel="Discover tab" />
           ),
         }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            resetTab('discover');
+          },
+        })}
       />
     </Tabs>
   );

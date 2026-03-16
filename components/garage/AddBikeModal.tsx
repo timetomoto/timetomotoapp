@@ -502,18 +502,18 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 3,
+    letterSpacing: 2.1,
   },
   cancelBtn: { paddingHorizontal: 4 },
   cancelText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
   label: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
     marginTop: 20,
     marginBottom: 8,
   },
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
   typeLabel: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     marginTop: 6,
   },
   errorText: {
@@ -599,6 +599,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 2,
+    letterSpacing: 1.4,
   },
 });

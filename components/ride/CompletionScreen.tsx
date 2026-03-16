@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     marginTop: 3,
   },
   statDivider: {
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   dismissBtn: {
     paddingVertical: 10,
