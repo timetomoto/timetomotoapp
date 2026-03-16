@@ -75,6 +75,7 @@ const MAP_STYLES: Record<MapStyle, string> = {
 };
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
+const EMPTY_LINE: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 const TOMORROW_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
 
@@ -843,7 +844,7 @@ export default function RideScreen() {
   // Overlay GeoJSON (imported/navigating route)
   const overlayGeoJson = overlayPoints && overlayPoints.length >= 2
     ? routeGeoJson(overlayPoints)
-    : null;
+    : EMPTY_LINE;
 
   // Map style — respect theme for standard, always use correct style for others
   const activeMapStyle = (() => {
@@ -953,29 +954,25 @@ export default function RideScreen() {
           )}
 
           {/* ── Saved / imported route overlay ── */}
-          {overlayGeoJson && (
-            <ShapeSource id="overlay-route" shape={overlayGeoJson}>
-              <LineLayer
-                id="overlay-route-line"
-                style={{
-                  lineColor: theme.red,
-                  lineWidth: 3,
-                  lineDasharray: [2, 1.5],
-                  lineOpacity: 0.9,
-                }}
+          <ShapeSource id="overlay-route" shape={overlayGeoJson}>
+            <LineLayer
+              id="overlay-route-line"
+              style={{
+                lineColor: theme.red,
+                lineWidth: 3,
+                lineDasharray: [2, 1.5],
+                lineOpacity: 0.9,
+              }}
               />
-            </ShapeSource>
-          )}
+          </ShapeSource>
 
           {/* ── Navigation route layer (rendered above overlay) ── */}
-          {navRouteGeojson && (
-            <ShapeSource id="nav-route-src" shape={navRouteGeojson}>
-              <LineLayer
-                id="nav-route-line"
-                style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
-              />
-            </ShapeSource>
-          )}
+          <ShapeSource id="nav-route-src" shape={navRouteGeojson ?? EMPTY_LINE}>
+            <LineLayer
+              id="nav-route-line"
+              style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
+            />
+          </ShapeSource>
 
           {/* ── Live GPS track ── */}
           {liveTrackGeoJson && (
