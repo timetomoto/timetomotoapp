@@ -227,6 +227,10 @@ export default function DiscoverNews() {
   if (loadState === 'loading') {
     return (
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+        <View style={s.loadingRow}>
+          <ActivityIndicator size="small" color={theme.red} />
+          <Text style={[s.loadingText, { color: theme.textSecondary }]}>Loading latest news…</Text>
+        </View>
         {[1, 2, 3].map((i) => (
           <FeedCardSkeleton key={i} />
         ))}
@@ -381,11 +385,22 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
 
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
   content: { padding: 16, paddingBottom: 40 },
 
   card: {
@@ -403,9 +418,9 @@ const s = StyleSheet.create({
     gap: 6,
   },
   cardMeta: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   cardTitle: {

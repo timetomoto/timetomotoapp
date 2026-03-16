@@ -336,14 +336,14 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     marginBottom: 8,
   },
 
   sectionLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 5,
     marginTop: 2,
   },
@@ -360,7 +360,7 @@ const s = StyleSheet.create({
   bikeChipText: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   emptyCard: {
     borderWidth: 1,
@@ -447,7 +447,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
   },
-  durationChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.7 },
+  durationChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
 
   startBtn: {
     flexDirection: 'row',
@@ -459,7 +459,7 @@ const s = StyleSheet.create({
     marginTop: 2,
   },
   startBtnPressed: { opacity: 0.8 },
-  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1.4 },
+  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.7 },
 
   contactsBtn: {
     flexDirection: 'row',
@@ -473,6 +473,6 @@ const s = StyleSheet.create({
   contactsBtnText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });

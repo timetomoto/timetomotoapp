@@ -296,15 +296,15 @@ const styles = StyleSheet.create({
   drawerTitle: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   closeBtn: {
     padding: 4,
   },
   sectionHeader: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 6,

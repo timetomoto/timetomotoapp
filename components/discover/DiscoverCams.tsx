@@ -551,7 +551,7 @@ const s = StyleSheet.create({
   helperText: {
     fontSize: 10,
     marginTop: 6,
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   dropdown: {
     borderWidth: 1,
@@ -590,7 +590,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -632,9 +632,9 @@ const s = StyleSheet.create({
   },
   liveBadgeText: {
     color: '#fff',
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   offlineOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -646,7 +646,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   cardInfo: {
     padding: 8,
@@ -675,7 +675,7 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textAlign: 'center',
   },
   emptyBody: {
@@ -694,7 +694,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   // Modal

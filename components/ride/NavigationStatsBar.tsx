@@ -76,7 +76,7 @@ export default function NavigationStatsBar({ speedMph, eta, remainingMiles }: Pr
 const styles = StyleSheet.create({
   statsBar: {
     position: 'absolute',
-    bottom: 54,
+    bottom: 29,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -91,11 +91,11 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   statLabel: {
     fontSize: 10,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginTop: 2,
   },
   statDivider: {

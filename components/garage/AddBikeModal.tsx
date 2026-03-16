@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -20,6 +22,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useGarageStore, type Bike, type BikeType } from '../../lib/store';
+import { pickAndUploadBikePhoto, saveBikePhotoUrl } from '../../lib/bikePhoto';
+import MotorcycleIcon from '../icons/MotorcycleIcon';
 import { useTheme } from '../../lib/useTheme';
 
 // ---------------------------------------------------------------------------
@@ -200,9 +204,10 @@ function BikeTypeSelector({ value, onChange }: { value: BikeType | null; onChang
 interface Props {
   onClose: () => void;
   bike?: import('../../lib/store').Bike; // edit mode when provided
+  defaultPhotoUrl?: string | null; // wiki/default photo (not user-uploaded)
 }
 
-export default function AddBikeModal({ onClose, bike: editBike }: Props) {
+export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
@@ -221,6 +226,8 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
   const [odometer, setOdometer]       = useState(editBike?.odometer ? String(editBike.odometer) : '');
   const [fuelCapacity, setFuelCap]    = useState(editBike?.fuelCapacity ? String(editBike.fuelCapacity) : '');
   const [capacityUnit, setCapUnit]    = useState<'gallons' | 'liters'>(editBike?.fuelCapacityUnit ?? 'gallons');
+  const [photoUrl, setPhotoUrl]        = useState<string | null>(editBike?.photo_url ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState<string | null>(null);
 
@@ -261,6 +268,52 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
     ]).start(() => onClose());
   }
 
+  // The display photo: user upload takes priority, then wiki default
+  const displayPhoto = photoUrl || defaultPhotoUrl || null;
+  const hasUserPhoto = !!photoUrl;
+
+  async function handleChangePhoto() {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Sign in to add bike photos.');
+      return;
+    }
+    const bikeId = editBike?.id ?? `pending_${Date.now()}`;
+    setUploadingPhoto(true);
+    try {
+      const url = await pickAndUploadBikePhoto(user.id, bikeId);
+      console.log('[BIKE PHOTO] upload url:', url);
+      if (url) {
+        setPhotoUrl(url);
+        // If editing existing bike, save immediately
+        if (editBike && !editBike.id.startsWith('local_')) {
+          await saveBikePhotoUrl(editBike.id, url);
+          updateBike({ ...editBike, photo_url: url });
+        }
+      }
+    } catch (err) {
+      console.error('Photo pick error:', err);
+    }
+    setUploadingPhoto(false);
+  }
+
+  async function handleRemovePhoto() {
+    Alert.alert('Remove Photo', 'Remove your uploaded photo?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          setPhotoUrl(null);
+          if (editBike && !editBike.id.startsWith('local_')) {
+            await saveBikePhotoUrl(editBike.id, '');
+            await supabase.from('bikes').update({ photo_url: null }).eq('id', editBike.id);
+            updateBike({ ...editBike, photo_url: null });
+          }
+        },
+      },
+    ]);
+  }
+
   async function handleSave() {
     if (!make.trim()) { setError('Make is required.'); return; }
     if (!model.trim()) { setError('Model is required.'); return; }
@@ -279,6 +332,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
       odometer: odometer ? parseInt(odometer, 10) : null,
       fuelCapacity: fuelCapacity ? parseFloat(fuelCapacity) : null,
       fuelCapacityUnit: capacityUnit,
+      photo_url: photoUrl,
     };
 
     if (isEdit && editBike) {
@@ -302,6 +356,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
             bike_type: fields.bike_type,
             "fuelCapacity": fields.fuelCapacity,
             "fuelCapacityUnit": fields.fuelCapacityUnit,
+            photo_url: fields.photo_url,
           })
           .eq('id', editBike.id);
         setSaving(false);
@@ -322,6 +377,7 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
           bike_type: fields.bike_type,
           "fuelCapacity": fields.fuelCapacity,
           "fuelCapacityUnit": fields.fuelCapacityUnit,
+          photo_url: fields.photo_url,
         })
         .select()
         .single();
@@ -388,6 +444,41 @@ export default function AddBikeModal({ onClose, bike: editBike }: Props) {
                 <Text style={[styles.cancelText, { color: theme.textSecondary }]}>CANCEL</Text>
               </Pressable>
             </View>
+
+            {/* Photo section — only show in edit mode */}
+            {isEdit && (
+              <View style={[styles.photoSection, { borderColor: theme.border }]}>
+                {displayPhoto ? (
+                  <Image source={{ uri: displayPhoto }} style={styles.photoPreview} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.photoPlaceholder, { backgroundColor: theme.bgCard }]}>
+                    <MotorcycleIcon size={40} color={theme.textMuted} />
+                  </View>
+                )}
+                <View style={[styles.photoBtnRow, { borderTopWidth: 1, borderTopColor: theme.border }]}>
+                  {uploadingPhoto ? (
+                    <View style={styles.photoBtn}>
+                      <ActivityIndicator size="small" color={theme.red} />
+                    </View>
+                  ) : (
+                    <>
+                      <Pressable style={styles.photoBtn} onPress={handleChangePhoto}>
+                        <Feather name="camera" size={14} color={theme.red} />
+                        <Text style={[styles.photoBtnText, { color: theme.red }]}>
+                          {hasUserPhoto ? 'CHANGE PHOTO' : displayPhoto ? 'CHANGE PHOTO' : 'ADD PHOTO'}
+                        </Text>
+                      </Pressable>
+                      {hasUserPhoto && (
+                        <Pressable style={[styles.photoBtn, { borderLeftWidth: 1, borderLeftColor: theme.border }]} onPress={handleRemovePhoto}>
+                          <Feather name="trash-2" size={14} color={theme.red} />
+                          <Text style={[styles.photoBtnText, { color: theme.red }]}>REMOVE</Text>
+                        </Pressable>
+                      )}
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
 
             <FieldLabel label="YEAR" />
             <YearPicker value={year} onChange={setYear} />
@@ -502,18 +593,50 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
+  },
+  photoSection: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  photoPreview: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  photoPlaceholder: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoBtnRow: {
+    flexDirection: 'row',
+  },
+  photoBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+  },
+  photoBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   cancelBtn: { paddingHorizontal: 4 },
   cancelText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
   label: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginTop: 20,
     marginBottom: 8,
   },
@@ -527,7 +650,7 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 11,
     marginTop: 6,
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   yearPickerWrapper: {
     borderWidth: 1,
@@ -580,7 +703,7 @@ const styles = StyleSheet.create({
   typeLabel: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     marginTop: 6,
   },
   errorText: {
@@ -599,6 +722,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 });

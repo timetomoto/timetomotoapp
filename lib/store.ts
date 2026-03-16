@@ -214,6 +214,7 @@ export interface Bike {
   fuelCapacityUnit?: 'gallons' | 'liters' | null;
   bike_type?: BikeType | null;
   specs?: BikeSpecs | null;
+  photo_url?: string | null;
   created_at: string;
 }
 
@@ -241,7 +242,9 @@ export const useGarageStore = create<GarageState>((set, get) => ({
     if (userId === 'local') {
       const stored = await AsyncStorage.getItem(LOCAL_BIKES_KEY);
       const bikes: Bike[] = stored ? JSON.parse(stored) : [];
-      set({ bikes, selectedBikeId: bikes[0]?.id ?? null, loading: false });
+      const current = get().selectedBikeId;
+      const selected = (current && bikes.some((b) => b.id === current)) ? current : (bikes[0]?.id ?? null);
+      set({ bikes, selectedBikeId: selected, loading: false });
       return;
     }
     const { data, error } = await supabase
@@ -250,7 +253,9 @@ export const useGarageStore = create<GarageState>((set, get) => ({
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {
-      set({ bikes: data as Bike[], selectedBikeId: data[0]?.id ?? null });
+      const current = get().selectedBikeId;
+      const selected = (current && data.some((b) => b.id === current)) ? current : (data[0]?.id ?? null);
+      set({ bikes: data as Bike[], selectedBikeId: selected });
     }
     set({ loading: false });
   },

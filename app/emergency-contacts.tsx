@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
   },
 
   scrollContent: {
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 15,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   emptySubtitle: {
     fontSize: 12,
@@ -566,19 +566,19 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   primaryBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
   contactName: {
     fontSize: 17,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   contactRelationship: {
     fontSize: 12,
     fontWeight: '500',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   contactPhone: {
     fontSize: 14,
@@ -606,16 +606,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   formTitle: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   fieldLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
     marginTop: 4,
   },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   saveBtn: {
     flex: 1,
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   addBtnRow: {
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   addBtnOutlinedText: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   addBtnFilled: {
     flex: 1,
@@ -691,6 +691,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 });

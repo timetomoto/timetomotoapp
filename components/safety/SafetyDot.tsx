@@ -85,7 +85,7 @@ const s = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   labelActive:   { color: ACTIVE_COLOR },
   labelInactive: { color: INACTIVE_COLOR },

@@ -14,7 +14,7 @@ import { useTabResetStore } from '../../lib/store';
 // Types
 // ---------------------------------------------------------------------------
 
-type SubTab = 'NEWS' | 'MY ROUTES' | 'CONDITIONS';
+type SubTab = 'NEWS' | 'ROUTES' | 'CONDITIONS';
 
 // ---------------------------------------------------------------------------
 // Sub-nav
@@ -22,7 +22,8 @@ type SubTab = 'NEWS' | 'MY ROUTES' | 'CONDITIONS';
 
 function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
   const { theme } = useTheme();
-  const tabs: SubTab[] = ['MY ROUTES', 'CONDITIONS', 'NEWS'];
+  const tabs: SubTab[] = ['ROUTES', 'CONDITIONS', 'NEWS'];
+  const labels: Record<SubTab, string> = { ROUTES: 'ROUTES', CONDITIONS: 'ROAD CONDITIONS', NEWS: 'NEWS' };
   return (
     <View style={[s.subNav, { backgroundColor: theme.subNavBg, borderBottomColor: theme.subNavBorder }]}>
       {tabs.map((tab) => (
@@ -37,7 +38,7 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
           accessibilityRole="tab"
         >
           <Text style={[s.subNavText, { color: theme.pillText }, active === tab && { color: theme.red }]}>
-            {tab}
+            {labels[tab]}
           </Text>
           {active === tab && <View style={[s.subNavUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
@@ -52,11 +53,11 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
 
 export default function DiscoverScreen() {
   const { theme } = useTheme();
-  const [subTab, setSubTab] = useState<SubTab>('MY ROUTES');
+  const [subTab, setSubTab] = useState<SubTab>('ROUTES');
   const [menuOpen, setMenuOpen] = useState(false);
   const discoverReset = useTabResetStore((s) => s.discoverReset);
   useEffect(() => {
-    if (discoverReset > 0) setSubTab('MY ROUTES');
+    if (discoverReset > 0) setSubTab('ROUTES');
   }, [discoverReset]);
 
   return (
@@ -74,7 +75,7 @@ export default function DiscoverScreen() {
       <SubNav active={subTab} onChange={setSubTab} />
       <View style={s.content}>
         {subTab === 'NEWS' && <DiscoverNews />}
-        {subTab === 'MY ROUTES' && <DiscoverRoutes />}
+        {subTab === 'ROUTES' && <DiscoverRoutes />}
         {subTab === 'CONDITIONS' && <DiscoverConditions />}
       </View>
 
@@ -101,7 +102,7 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   headerSpacer: { width: 40 },
@@ -119,7 +120,7 @@ const s = StyleSheet.create({
   subNavText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   subNavUnderline: {

@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontWeight: '500',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   menuList: {
     flex: 1,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
     fontFamily: 'BarlowCondensed',
   },

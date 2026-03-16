@@ -13,31 +13,18 @@ import {
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Feather } from '@expo/vector-icons';
 import { useAuthStore, useGarageStore, useRoutesStore, bikeLabel } from '../../lib/store';
 import {
-  fetchUserRoutes,
   deleteRoute,
   updateRouteName,
   updateRouteCategory,
-  seedRoutes,
 } from '../../lib/routes';
-import { parseGpx, serializeGpx } from '../../lib/gpx';
+import { serializeGpx } from '../../lib/gpx';
 import type { Route } from '../../lib/routes';
-import type { TrackPoint } from '../../lib/gpx';
 import { useTheme } from '../../lib/useTheme';
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
-interface Props {
-  onImportRoute: (points: TrackPoint[], name: string) => void;
-  onNavigate: (route: Route) => void;
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -165,52 +152,52 @@ function RouteCard({
   }
 
   return (
-    <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-      <View style={s.cardHeader}>
-        <Text style={[s.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
-        <View style={s.cardHeaderActions}>
-          <Pressable onPress={onRename} hitSlop={8} style={s.cardHeaderBtn}>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+      <View style={styles.cardHeader}>
+        <Text style={[styles.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
+        <View style={styles.cardHeaderActions}>
+          <Pressable onPress={onRename} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="edit-2" size={14} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={showCategorySheet} hitSlop={8} style={s.cardHeaderBtn}>
+          <Pressable onPress={showCategorySheet} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="folder" size={14} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={onDelete} hitSlop={8} style={s.cardHeaderBtn}>
+          <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="trash-2" size={15} color={theme.textSecondary} />
           </Pressable>
         </View>
       </View>
 
-      <View style={s.cardMeta}>
-        <View style={s.metaItem}>
+      <View style={styles.cardMeta}>
+        <View style={styles.metaItem}>
           <Feather name="map" size={11} color={theme.textSecondary} />
-          <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
+          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
         </View>
-        <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
-        <View style={s.metaItem}>
+        <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
+        <View style={styles.metaItem}>
           <Feather name="trending-up" size={11} color={theme.textSecondary} />
-          <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
+          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
         </View>
         {dur && (
           <>
-            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
-            <View style={s.metaItem}>
+            <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
+            <View style={styles.metaItem}>
               <Feather name="clock" size={11} color={theme.textSecondary} />
-              <Text style={[s.metaText, { color: theme.textSecondary }]}>{dur}</Text>
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>{dur}</Text>
             </View>
           </>
         )}
       </View>
 
-      <View style={[s.cardActions, { borderTopColor: theme.cardDivider }]}>
-        <Pressable style={s.actionBtn} onPress={onNavigate}>
+      <View style={[styles.cardActions, { borderTopColor: theme.cardDivider }]}>
+        <Pressable style={styles.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
-          <Text style={[s.actionText, { color: theme.red }]}>NAVIGATE</Text>
+          <Text style={[styles.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
-        <View style={[s.actionDivider, { backgroundColor: theme.cardDivider }]} />
-        <Pressable style={s.actionBtn} onPress={onExport}>
+        <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
+        <Pressable style={styles.actionBtn} onPress={onExport}>
           <Feather name="download" size={13} color={theme.textSecondary} />
-          <Text style={[s.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
+          <Text style={[styles.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
         </Pressable>
       </View>
     </View>
@@ -218,7 +205,7 @@ function RouteCard({
 }
 
 // ---------------------------------------------------------------------------
-// Saved ride card (recorded rides)
+// Saved ride card
 // ---------------------------------------------------------------------------
 
 function SavedRideCard({
@@ -241,71 +228,71 @@ function SavedRideCard({
   const dateStr = fmtDate(route.recorded_at ?? route.created_at);
 
   return (
-    <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-      <View style={s.cardHeader}>
-        <View style={sr.nameRow}>
-          <View style={sr.recBadge}>
-            <View style={sr.recDot} />
-            <Text style={sr.recText}>REC</Text>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+      <View style={styles.cardHeader}>
+        <View style={srStyles.nameRow}>
+          <View style={srStyles.recBadge}>
+            <View style={srStyles.recDot} />
+            <Text style={srStyles.recText}>REC</Text>
           </View>
-          <Text style={[s.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
+          <Text style={[styles.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
         </View>
-        <View style={s.cardHeaderActions}>
-          <Pressable onPress={onRename} hitSlop={8} style={s.cardHeaderBtn}>
+        <View style={styles.cardHeaderActions}>
+          <Pressable onPress={onRename} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="edit-2" size={14} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={onDelete} hitSlop={8} style={s.cardHeaderBtn}>
+          <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="trash-2" size={15} color={theme.textSecondary} />
           </Pressable>
         </View>
       </View>
 
-      <View style={s.cardMeta}>
+      <View style={styles.cardMeta}>
         {dateStr ? (
           <>
-            <View style={s.metaItem}>
+            <View style={styles.metaItem}>
               <Feather name="calendar" size={11} color={theme.textSecondary} />
-              <Text style={[s.metaText, { color: theme.textSecondary }]}>{dateStr}</Text>
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>{dateStr}</Text>
             </View>
-            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
+            <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
           </>
         ) : null}
-        <View style={s.metaItem}>
+        <View style={styles.metaItem}>
           <Feather name="map" size={11} color={theme.textSecondary} />
-          <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
+          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
         </View>
         {dur && (
           <>
-            <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
-            <View style={s.metaItem}>
+            <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
+            <View style={styles.metaItem}>
               <Feather name="clock" size={11} color={theme.textSecondary} />
-              <Text style={[s.metaText, { color: theme.textSecondary }]}>{dur}</Text>
+              <Text style={[styles.metaText, { color: theme.textSecondary }]}>{dur}</Text>
             </View>
           </>
         )}
-        <View style={[s.metaSep, { backgroundColor: theme.cardDivider }]} />
-        <View style={s.metaItem}>
+        <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
+        <View style={styles.metaItem}>
           <Feather name="trending-up" size={11} color={theme.textSecondary} />
-          <Text style={[s.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
+          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
         </View>
       </View>
 
       {bikeName ? (
-        <View style={[sr.bikeRow, { borderTopColor: theme.border }]}>
+        <View style={[srStyles.bikeRow, { borderTopColor: theme.border }]}>
           <Feather name="disc" size={11} color={theme.textMuted} />
-          <Text style={[sr.bikeText, { color: theme.textMuted }]}>{bikeName}</Text>
+          <Text style={[srStyles.bikeText, { color: theme.textMuted }]}>{bikeName}</Text>
         </View>
       ) : null}
 
-      <View style={[s.cardActions, { borderTopColor: theme.cardDivider }]}>
-        <Pressable style={s.actionBtn} onPress={onNavigate}>
+      <View style={[styles.cardActions, { borderTopColor: theme.cardDivider }]}>
+        <Pressable style={styles.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
-          <Text style={[s.actionText, { color: theme.red }]}>NAVIGATE</Text>
+          <Text style={[styles.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
-        <View style={[s.actionDivider, { backgroundColor: theme.cardDivider }]} />
-        <Pressable style={s.actionBtn} onPress={onExport}>
+        <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
+        <Pressable style={styles.actionBtn} onPress={onExport}>
           <Feather name="download" size={13} color={theme.textSecondary} />
-          <Text style={[s.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
+          <Text style={[styles.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
         </Pressable>
       </View>
     </View>
@@ -313,7 +300,7 @@ function SavedRideCard({
 }
 
 // ---------------------------------------------------------------------------
-// Collapsible category header
+// Category header (no sort pills — global sort at top instead)
 // ---------------------------------------------------------------------------
 
 function CategoryHeader({
@@ -325,8 +312,6 @@ function CategoryHeader({
   isDragging,
   onRenameCategory,
   onDeleteCategory,
-  sortMode,
-  onSortChange,
 }: {
   label: string;
   count: number;
@@ -336,82 +321,53 @@ function CategoryHeader({
   isDragging?: boolean;
   onRenameCategory: (oldName: string) => void;
   onDeleteCategory: (name: string) => void;
-  sortMode: SortMode;
-  onSortChange: (mode: SortMode) => void;
 }) {
   const { theme } = useTheme();
   const isUncategorized = label === UNCATEGORIZED;
 
   return (
-    <View>
-      <Pressable
-        style={[
-          s.categoryHeader,
-          { borderBottomColor: isExpanded ? theme.border : 'transparent' },
-          isDragging && {
-            backgroundColor: theme.bgCard,
-            shadowColor: '#000',
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
-            elevation: 6,
-            opacity: 0.95,
-          },
-        ]}
-        onPress={onToggle}
-        onLongPress={onLongPress}
-      >
-        <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>
-          {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
-        </Text>
-        <View style={s.categoryHeaderRight}>
-          {!isExpanded && count > 0 && (
-            <View style={[s.categoryCountBadge, { backgroundColor: theme.red }]}>
-              <Text style={s.categoryCountText}>{count}</Text>
-            </View>
-          )}
-          {!isUncategorized && (
-            <>
-              <Pressable onPress={() => onRenameCategory(label)} hitSlop={8}>
-                <Feather name="edit-2" size={12} color={theme.textMuted} />
-              </Pressable>
-              <Pressable onPress={() => onDeleteCategory(label)} hitSlop={8}>
-                <Feather name="trash-2" size={12} color={theme.red} />
-              </Pressable>
-            </>
-          )}
-          <Feather
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={18}
-            color={theme.textSecondary}
-          />
-        </View>
-      </Pressable>
-
-      {/* Sort pills — visible when expanded */}
-      {isExpanded && (
-        <View style={[s.sortRow, { borderBottomColor: theme.border }]}>
-          {SORT_OPTIONS.map((opt) => {
-            const active = sortMode === opt.key;
-            return (
-              <Pressable
-                key={opt.key}
-                style={[
-                  s.sortPill,
-                  { borderColor: active ? theme.red : theme.border },
-                  active && { backgroundColor: theme.red + '1A' },
-                ]}
-                onPress={() => onSortChange(opt.key)}
-              >
-                <Feather name={opt.icon} size={10} color={active ? theme.red : theme.textMuted} />
-                <Text style={[s.sortPillText, { color: active ? theme.red : theme.textMuted }]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-    </View>
+    <Pressable
+      style={[
+        styles.categoryHeader,
+        { borderBottomColor: isExpanded ? theme.border : 'transparent' },
+        isDragging && {
+          backgroundColor: theme.bgCard,
+          shadowColor: '#000',
+          shadowOpacity: 0.4,
+          shadowRadius: 8,
+          elevation: 6,
+          opacity: 0.95,
+        },
+      ]}
+      onPress={onToggle}
+      onLongPress={onLongPress}
+    >
+      <Text style={[styles.categoryLabel, { color: theme.textSecondary }]}>
+        {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
+      </Text>
+      <View style={styles.categoryHeaderRight}>
+        {!isExpanded && count > 0 && (
+          <View style={[styles.categoryCountBadge, { backgroundColor: theme.red }]}>
+            <Text style={styles.categoryCountText}>{count}</Text>
+          </View>
+        )}
+        {!isUncategorized && (
+          <>
+            <Pressable onPress={() => onRenameCategory(label)} hitSlop={8}>
+              <Feather name="edit-2" size={12} color={theme.textMuted} />
+            </Pressable>
+            <Pressable onPress={() => onDeleteCategory(label)} hitSlop={8}>
+              <Feather name="trash-2" size={12} color={theme.red} />
+            </Pressable>
+          </>
+        )}
+        <Feather
+          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+          size={18}
+          color={theme.textSecondary}
+        />
+      </View>
+    </Pressable>
   );
 }
 
@@ -440,14 +396,14 @@ function SavedRidesSection({
   return (
     <View style={{ marginBottom: 0 }}>
       <Pressable
-        style={[s.categoryHeader, { borderBottomColor: open ? theme.border : 'transparent' }]}
+        style={[styles.categoryHeader, { borderBottomColor: open ? theme.border : 'transparent' }]}
         onPress={() => setOpen((v) => !v)}
       >
-        <Text style={[s.categoryLabel, { color: theme.textSecondary }]}>SAVED RIDES</Text>
-        <View style={s.categoryHeaderRight}>
+        <Text style={[styles.categoryLabel, { color: theme.textSecondary }]}>SAVED RIDES</Text>
+        <View style={styles.categoryHeaderRight}>
           {!open && rides.length > 0 && (
-            <View style={[s.categoryCountBadge, { backgroundColor: theme.red }]}>
-              <Text style={s.categoryCountText}>{rides.length}</Text>
+            <View style={[styles.categoryCountBadge, { backgroundColor: theme.red }]}>
+              <Text style={styles.categoryCountText}>{rides.length}</Text>
             </View>
           )}
           <Feather
@@ -474,35 +430,34 @@ function SavedRidesSection({
 }
 
 // ---------------------------------------------------------------------------
-// RoutesScreen
+// RouteList — shared component
 // ---------------------------------------------------------------------------
 
-export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
+interface RouteListProps {
+  showSavedRides: boolean;
+  onNavigate: (route: Route) => void;
+  headerExtra?: React.ReactNode;
+  onImport?: () => void;
+  onNewCategory?: () => void;
+  importing?: boolean;
+}
+
+export default function RouteList({ showSavedRides, onNavigate, headerExtra, onImport, onNewCategory, importing }: RouteListProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const {
-    routes, loading, setRoutes, setLoading, addRoute, removeRoute,
-    updateRouteName: updateRouteNameStore, updateRouteCategory: updateRouteCategoryStore,
+    routes, loading,
+    removeRoute,
+    updateRouteName: updateRouteNameStore,
+    updateRouteCategory: updateRouteCategoryStore,
   } = useRoutesStore();
-  const [importing, setImporting] = useState(false);
+
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categorySorts, setCategorySorts] = useState<Record<string, SortMode>>({});
+  const [sortMode, setSortMode] = useState<SortMode>('name');
   const orderLoadedRef = useRef(false);
   const autoExpandedRef = useRef(false);
-
-  useEffect(() => {
-    const userId = user?.id ?? 'local';
-    setLoading(true);
-    seedRoutes(userId)
-      .catch(() => {})
-      .finally(() => {
-        fetchUserRoutes(userId)
-          .then(setRoutes)
-          .finally(() => setLoading(false));
-      });
-  }, [user?.id]);
 
   // Load persisted category order
   useEffect(() => {
@@ -519,14 +474,16 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
 
   const query = searchQuery.trim().toLowerCase();
   const filteredRoutes = query
-    ? routes.filter((r) => r.name.toLowerCase().includes(query))
+    ? routes.filter((r) =>
+        r.name.toLowerCase().includes(query) ||
+        (r.category ?? '').toLowerCase().includes(query))
     : routes;
   const savedRides = filteredRoutes.filter((r) => r.source === 'recorded');
   const otherRoutes = filteredRoutes.filter((r) => r.source !== 'recorded');
   const grouped = groupRoutes(otherRoutes);
   const allCategories = [...grouped.keys()].filter((k) => k !== UNCATEGORIZED);
 
-  // Build ordered category list: persisted order first, new categories appended
+  // Build ordered category list
   const allGroupKeys = [...grouped.keys()];
   const orderedKeys = [
     ...categoryOrder.filter((k) => allGroupKeys.includes(k)),
@@ -557,32 +514,7 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
     setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
   }
 
-  function handleSortChange(category: string, mode: SortMode) {
-    setCategorySorts((prev) => ({ ...prev, [category]: mode }));
-  }
-
-  async function handleImport() {
-    setImporting(true);
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/gpx+xml', 'text/xml', 'application/xml', '*/*'],
-        copyToCacheDirectory: true,
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-      const file = new File(result.assets[0].uri);
-      const xml = await file.text();
-      const parsed = parseGpx(xml);
-      if (parsed.points.length < 2) {
-        Alert.alert('Invalid GPX', 'No track points found in this file.');
-        return;
-      }
-      onImportRoute(parsed.points, parsed.name);
-    } catch {
-      Alert.alert('Import failed', 'Could not read this GPX file.');
-    } finally {
-      setImporting(false);
-    }
-  }
+  // ── Action handlers ──
 
   async function handleExport(route: Route) {
     if (!route.points || route.points.length === 0) {
@@ -671,13 +603,6 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
     );
   }
 
-  function handleNewCategory() {
-    Alert.prompt('New Category', 'Enter a name for the new category', (name) => {
-      if (!name?.trim()) return;
-      Alert.alert('Category Created', `"${name.trim()}" will appear when you move a route into it. Use the folder icon on any route card to assign it.`);
-    });
-  }
-
   const handleDragEnd = useCallback(({ data }: { data: string[] }) => {
     setCategoryOrder(data);
     AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(data));
@@ -685,12 +610,14 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
 
   const renderCategoryItem = useCallback(({ item, drag, isActive }: RenderItemParams<string>) => {
     const rawRoutes = grouped.get(item) ?? [];
-    const sort = categorySorts[item] ?? 'name';
-    const categoryRoutes = sortRoutes(rawRoutes, sort);
+    const categoryRoutes = sortRoutes(rawRoutes, sortMode);
     const isExpanded = query ? true : (expandedCategories[item] ?? false);
 
+    // Hide empty categories during search
+    if (query && rawRoutes.length === 0) return null;
+
     return (
-      <View style={s.categorySection}>
+      <View style={styles.categorySection}>
         <CategoryHeader
           label={item}
           count={rawRoutes.length}
@@ -700,8 +627,6 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
           isDragging={isActive}
           onRenameCategory={handleRenameCategory}
           onDeleteCategory={handleDeleteCategory}
-          sortMode={sort}
-          onSortChange={(mode) => handleSortChange(item, mode)}
         />
         {isExpanded && categoryRoutes.map((route) => (
           <RouteCard
@@ -717,90 +642,97 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
         ))}
       </View>
     );
-  }, [grouped, expandedCategories, allCategories, categorySorts, onNavigate]);
+  }, [grouped, expandedCategories, allCategories, sortMode, onNavigate, query]);
 
   return (
-    <GestureHandlerRootView style={[s.root, { backgroundColor: theme.bg }]}>
+    <GestureHandlerRootView style={[styles.root, { backgroundColor: theme.bg }]}>
       <DraggableFlatList
         data={orderedKeys}
         keyExtractor={(item) => item}
         onDragEnd={handleDragEnd}
         renderItem={renderCategoryItem}
         ItemSeparatorComponent={() => (
-          <View style={[s.categoryDivider, { backgroundColor: theme.border }]} />
+          <View style={[styles.categoryDivider, { backgroundColor: theme.border }]} />
         )}
-        contentContainerStyle={s.content}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>
-            {/* Header */}
-            <View style={s.headerRow}>
-              <Text style={[s.heading, { color: theme.textSecondary }]}>ROUTE LIBRARY</Text>
-              <View style={s.headerActions}>
-                <Pressable
-                  style={[s.headerBtn, { borderColor: theme.border }]}
-                  onPress={handleNewCategory}
-                >
-                  <Feather name="folder-plus" size={14} color={theme.textSecondary} />
-                </Pressable>
-                <Pressable
-                  style={[s.importBtn, { backgroundColor: theme.red }, importing && s.importBtnDisabled]}
-                  onPress={handleImport}
-                  disabled={importing}
-                >
-                  {importing
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Feather name="upload" size={14} color="#fff" />
-                  }
-                  <Text style={s.importBtnText}>{importing ? 'IMPORTING…' : 'IMPORT GPX'}</Text>
-                </Pressable>
-              </View>
-            </View>
+            {headerExtra}
 
-            {/* Search bar */}
+            {/* Toolbar row: folder + import + search */}
             {!loading && routes.length > 0 && (
-              <View style={[s.searchRow, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
-                <Feather name="search" size={14} color={theme.textMuted} />
-                <TextInput
-                  style={[s.searchInput, { color: theme.textPrimary }]}
-                  placeholder="Search routes…"
-                  placeholderTextColor={theme.textMuted}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                    <Feather name="x" size={14} color={theme.textMuted} />
+              <View style={styles.toolbarRow}>
+                {onNewCategory && (
+                  <Pressable
+                    style={[styles.toolbarIconBtn, { borderColor: theme.border }]}
+                    onPress={onNewCategory}
+                  >
+                    <Feather name="folder-plus" size={14} color={theme.textSecondary} />
                   </Pressable>
                 )}
+                {onImport && (
+                  <Pressable
+                    style={[styles.toolbarImportBtn, { backgroundColor: theme.red }, importing && { opacity: 0.6 }]}
+                    onPress={onImport}
+                    disabled={importing}
+                  >
+                    {importing
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Feather name="upload" size={14} color="#fff" />
+                    }
+                    <Text style={styles.toolbarImportText}>{importing ? 'IMPORTING…' : 'IMPORT GPX'}</Text>
+                  </Pressable>
+                )}
+                <View style={[styles.toolbarSearch, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
+                  <Feather name="search" size={14} color={theme.textMuted} />
+                  <TextInput
+                    style={[styles.searchInput, { color: theme.textPrimary }]}
+                    placeholder="Search routes…"
+                    placeholderTextColor={theme.textMuted}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    returnKeyType="search"
+                  />
+                  {searchQuery.length > 0 && (
+                    <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                      <Feather name="x" size={14} color={theme.textMuted} />
+                    </Pressable>
+                  )}
+                </View>
               </View>
             )}
 
             {loading && (
-              <ActivityIndicator color={theme.textSecondary} style={{ marginTop: 40 }} />
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>Loading…</Text>
+              </View>
             )}
 
             {!loading && routes.length === 0 && (
-              <View style={s.emptyState}>
+              <View style={styles.emptyState}>
                 <Feather name="map" size={32} color={theme.border} />
-                <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No saved routes</Text>
-                <Text style={[s.emptyDetail, { color: theme.textSecondary }]}>Import a GPX file or save a recorded ride</Text>
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No saved routes</Text>
+                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>
+                  {showSavedRides
+                    ? 'Import a GPX file or save a recorded ride'
+                    : 'No routes yet. Import a GPX or record a ride.'}
+                </Text>
               </View>
             )}
 
             {/* Search returned no results */}
             {!loading && routes.length > 0 && query && filteredRoutes.length === 0 && (
-              <View style={s.emptyState}>
+              <View style={styles.emptyState}>
                 <Feather name="search" size={28} color={theme.border} />
-                <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No routes match your search</Text>
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No routes match "{searchQuery}"</Text>
               </View>
             )}
 
-            {/* Saved Rides section — collapsible */}
-            {!loading && savedRides.length > 0 && (
+            {/* Saved Rides section */}
+            {showSavedRides && !loading && savedRides.length > 0 && (
               <SavedRidesSection
                 rides={savedRides}
                 bikesById={bikesById}
@@ -811,16 +743,16 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
               />
             )}
 
-            {!loading && !query && savedRides.length === 0 && otherRoutes.length > 0 && (
-              <View style={sr.emptyRides}>
+            {showSavedRides && !loading && !query && savedRides.length === 0 && otherRoutes.length > 0 && (
+              <View style={srStyles.emptyRides}>
                 <Feather name="disc" size={20} color={theme.border} />
-                <Text style={[s.emptyDetail, { color: theme.textSecondary }]}>No saved rides yet. Head to the RECORD tab to log your first ride.</Text>
+                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>No saved rides yet. Head to the RECORD tab to log your first ride.</Text>
               </View>
             )}
 
             {/* Divider between saved rides and route categories */}
-            {!loading && savedRides.length > 0 && otherRoutes.length > 0 && (
-              <View style={[s.categoryDivider, { backgroundColor: theme.border }]} />
+            {showSavedRides && !loading && savedRides.length > 0 && otherRoutes.length > 0 && (
+              <View style={[styles.categoryDivider, { backgroundColor: theme.border }]} />
             )}
           </>
         }
@@ -833,33 +765,22 @@ export default function RoutesScreen({ onImportRoute, onNavigate }: Props) {
 // Styles
 // ---------------------------------------------------------------------------
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   root:    { flex: 1 },
   content: { padding: 20, paddingBottom: 80 },
 
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  heading: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2.1,
-  },
-  headerActions: {
+  toolbarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 16,
   },
-  headerBtn: {
+  toolbarIconBtn: {
     borderWidth: 1,
     borderRadius: 6,
     padding: 8,
   },
-
-  importBtn: {
+  toolbarImportBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -867,12 +788,26 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  importBtnDisabled: { opacity: 0.6 },
-  importBtnText: {
+  toolbarImportText: {
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
+  },
+  toolbarSearch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
   },
 
   categorySection: {
@@ -898,7 +833,7 @@ const s = StyleSheet.create({
   categoryLabel: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
   categoryCountBadge: {
     minWidth: 20,
@@ -912,44 +847,6 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-  },
-
-  sortRow: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingBottom: 10,
-    marginBottom: 8,
-    borderBottomWidth: 1,
-  },
-  sortPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  sortPillText: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-  },
-
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    padding: 0,
   },
 
   card: {
@@ -970,7 +867,7 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
     marginRight: 8,
   },
   cardHeaderActions: {
@@ -1007,7 +904,7 @@ const s = StyleSheet.create({
   actionText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   actionDivider: { width: 1, marginVertical: 8 },
 
@@ -1026,13 +923,7 @@ const s = StyleSheet.create({
   },
 });
 
-const sr = StyleSheet.create({
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
+const srStyles = StyleSheet.create({
   nameRow: {
     flex: 1,
     flexDirection: 'row',
@@ -1057,9 +948,9 @@ const sr = StyleSheet.create({
   },
   recText: {
     color: '#E53935',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   emptyRides: {
     alignItems: 'center',

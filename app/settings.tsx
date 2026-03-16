@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.8,
+    letterSpacing: 1.5,
   },
 
   scrollContent: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
     fontFamily: 'BarlowCondensed',
     marginTop: 20,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   },
   rowSubtitle: {
     fontSize: 11,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
     marginTop: 2,
   },
 
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   segRowLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   segControl: {
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   appearanceInner: {

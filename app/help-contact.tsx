@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.8,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
 
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginTop: 8,
     marginBottom: 4,
   },
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 
   // State screens
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   stateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     marginTop: 8,
   },
   stateMsg: {
@@ -370,6 +370,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 });

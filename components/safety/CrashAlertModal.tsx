@@ -189,7 +189,7 @@ const s = StyleSheet.create({
   warningLabel: {
     fontSize: 28,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     textAlign: 'center',
   },
   subLabel: {
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
   },
   countdownUnit: {
     fontSize: 14,
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   contactList: {
@@ -235,10 +235,10 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: '700',
-    letterSpacing: 2.8,
+    letterSpacing: 1.5,
   },
   hint: {
     fontSize: 11,
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
 });

@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Keyboard,
   Pressable,
   RefreshControl,
@@ -464,7 +465,8 @@ export default function DiscoverConditions() {
       <View style={s.content}>
         {conditionsLoading && !initialLoaded ? (
           <View style={s.loadingWrap}>
-            <Text style={[s.loadingText, { color: theme.textSecondary }]}>Loading conditions…</Text>
+            <ActivityIndicator size="small" color={theme.red} style={{ marginBottom: 8 }} />
+            <Text style={[s.loadingText, { color: theme.textSecondary }]}>Searching for conditions near you.</Text>
           </View>
         ) : !hasLocation && !conditionsLocation && locDenied ? (
           <View style={s.empty}>
@@ -485,7 +487,7 @@ export default function DiscoverConditions() {
         ) : filtered.length === 0 ? (
           <View style={s.emptySmall}>
             <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-              No conditions match this filter.
+              No conditions listed for this location.
             </Text>
           </View>
         ) : (
@@ -528,7 +530,7 @@ const s = StyleSheet.create({
   },
   lastUpdated: {
     fontSize: 10,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   refreshBtn: {
     flexDirection: 'row',
@@ -566,7 +568,7 @@ const s = StyleSheet.create({
   helperText: {
     fontSize: 10,
     marginTop: 6,
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   dropdown: {
     borderWidth: 1,
@@ -605,7 +607,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -618,7 +620,7 @@ const s = StyleSheet.create({
   countText: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
 
   content: { paddingHorizontal: 16, paddingBottom: 40 },
@@ -651,9 +653,9 @@ const s = StyleSheet.create({
     paddingVertical: 2,
   },
   severityText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   cardRoad: {
     fontSize: 14,
@@ -679,7 +681,7 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textAlign: 'center',
   },
   emptyBody: {

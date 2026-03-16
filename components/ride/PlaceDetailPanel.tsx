@@ -188,12 +188,12 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   subtype: {
     fontSize: 10,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
     marginTop: 2,
   },
   infoRow: {
@@ -221,6 +221,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 });

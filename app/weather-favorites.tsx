@@ -117,7 +117,7 @@ const s = StyleSheet.create({
   heading: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
   },
 
   content: {

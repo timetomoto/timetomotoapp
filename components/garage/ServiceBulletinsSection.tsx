@@ -355,8 +355,8 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   headerLeft: { flex: 1, gap: 2 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
-  checkedAt: { fontSize: 9, letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
+  checkedAt: { fontSize: 10, letterSpacing: 0.2 },
 
   checkBtn: {
     flexDirection: 'row',
@@ -366,7 +366,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
+  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
 
   idleBox: {
     flexDirection: 'row',
@@ -390,7 +390,7 @@ const s = StyleSheet.create({
     padding: 20,
     marginBottom: 12,
   },
-  emptyTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
+  emptyTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
   emptySubtitle: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
 
   tsbBtn: {
@@ -406,9 +406,9 @@ const s = StyleSheet.create({
   tsbBtnText: { fontSize: 11, fontWeight: '600' },
 
   groupLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 8,
   },
 
@@ -427,9 +427,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  badgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 1 },
-  bulletinId: { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
-  bulletinComponent: { fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
+  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  bulletinId: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
+  bulletinComponent: { fontSize: 11, fontWeight: '600', letterSpacing: 0.1 },
   bulletinBody: { fontSize: 12, lineHeight: 18 },
   expandBtn: { fontSize: 11, fontWeight: '600', marginTop: 2 },
 
@@ -440,10 +440,10 @@ const s = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
-  remedyLabel: { fontSize: 8, fontWeight: '700', letterSpacing: 1.4 },
+  remedyLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7 },
   remedyText: { fontSize: 11, lineHeight: 17 },
 
-  bulletinMeta: { fontSize: 10, letterSpacing: 0.3 },
+  bulletinMeta: { fontSize: 10, letterSpacing: 0.1 },
 
   flagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   flag: {
@@ -455,8 +455,8 @@ const s = StyleSheet.create({
   flagText: { fontSize: 10, fontWeight: '600' },
 
   attribution: {
-    fontSize: 9,
-    letterSpacing: 0.3,
+    fontSize: 10,
+    letterSpacing: 0.1,
     textAlign: 'center',
     marginTop: 12,
     marginBottom: 8,

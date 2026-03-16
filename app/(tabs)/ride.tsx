@@ -23,10 +23,10 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, bikeLabel } from '../../lib/store';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
-import { routeGeoJson, routeBounds, calcDistance } from '../../lib/gpx';
+import { routeGeoJson, calcDistance } from '../../lib/gpx';
 import { createRoute } from '../../lib/routes';
 import {
   fuelStationsGeoJson,
@@ -39,7 +39,6 @@ import {
 import type { Route } from '../../lib/routes';
 import type { TrackPoint } from '../../lib/gpx';
 import PreRideChecklist, { type RideConfig } from '../../components/safety/PreRideChecklist';
-import RoutesScreen from '../../components/ride/RoutesScreen';
 import SaveRideSheet from '../../components/ride/SaveRideSheet';
 import PlaceDetailPanel, { type PlaceDetail } from '../../components/ride/PlaceDetailPanel';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
@@ -66,7 +65,6 @@ Mapbox.setTelemetryEnabled(false);
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type SubTab   = 'MAP' | 'MY ROUTES' | 'RECORD';
 type MapStyle = 'standard' | 'terrain' | 'satellite' | 'hybrid';
 
 const MAP_STYLES: Record<MapStyle, string> = {
@@ -117,9 +115,9 @@ const wl = StyleSheet.create({
     minWidth: 160,
   },
   title: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
     marginBottom: 4,
   },
   row: {
@@ -258,15 +256,6 @@ function RecordScreen({
   // ── ACTIVE RIDE view — transparent overlay on top of the map ──
   return (
     <View style={{ flex: 1 }} pointerEvents="box-none">
-      {/* END button — bottom-right, same position as navigation END */}
-      <Pressable
-        style={[styles.endNavBtn, { backgroundColor: theme.red }]}
-        onPress={handleStop}
-      >
-        <Feather name="x" size={16} color="#fff" />
-        <Text style={styles.endNavBtnText}>END</Text>
-      </Pressable>
-
       {/* Status badges — share / check-in only (crash badge is already on the map header) */}
       <View style={styles.recordActiveCenter} pointerEvents="box-none">
         {/* Live share status */}
@@ -341,38 +330,12 @@ function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: 
 }
 
 // ---------------------------------------------------------------------------
-// Sub-nav
-// ---------------------------------------------------------------------------
-
-const SubNav = memo(function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
-  const { theme } = useTheme();
-  const tabs: SubTab[] = ['MAP', 'MY ROUTES', 'RECORD'];
-  return (
-    <View style={[styles.subNav, { backgroundColor: theme.subNavBg, borderTopColor: theme.subNavBorder }]}>
-      {tabs.map((tab) => (
-        <Pressable key={tab} style={styles.subNavItem} onPress={() => onChange(tab)}>
-          <Text style={[styles.subNavText, { color: theme.tabBarInactive }, active === tab && { color: theme.red }]}>
-            {tab}
-          </Text>
-          {active === tab && <View style={[styles.subNavUnderline, { backgroundColor: theme.red }]} />}
-        </Pressable>
-      ))}
-    </View>
-  );
-});
-
-// ---------------------------------------------------------------------------
 // Main RideScreen
 // ---------------------------------------------------------------------------
 
 export default function RideScreen() {
   const { theme } = useTheme();
-  const [subTab, setSubTab]     = useState<SubTab>('MAP');
   const [mapStyle, setMapStyle] = useState<MapStyle>('standard');
-  const rideReset = useTabResetStore((s) => s.rideReset);
-  useEffect(() => {
-    if (rideReset > 0) setSubTab('MAP');
-  }, [rideReset]);
   const { user }                = useAuthStore();
   const { addRoute, pendingNavigateRoute, setPendingNavigateRoute } = useRoutesStore();
   const { bikes, selectedBikeId, fetchBikes } = useGarageStore();
@@ -410,6 +373,7 @@ export default function RideScreen() {
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [showChecklist, setShowChecklist] = useState(false);
   const [isSavedRoutePreview, setIsSavedRoutePreview] = useState(false);
   const savedRouteStartRef = useRef<{ lat: number; lng: number } | null>(null);
   const [navRouteGeojson, setNavRouteGeojson] = useState<any>(null);
@@ -622,9 +586,9 @@ export default function RideScreen() {
     return () => clearInterval(interval);
   }, [navMode, activeRoute, destination, currentStepIndex, routePreference, lastKnownLocation, speedMph, headingDeg]);
 
-  // ── Camera: center on user when switching to RECORD tab during recording ──
+  // ── Camera: center on user when recording starts ──
   useEffect(() => {
-    if (subTab === 'RECORD' && isRecording && lastKnownLocation) {
+    if (isRecording && lastKnownLocation) {
       cameraRef.current?.setCamera({
         centerCoordinate: [lastKnownLocation.lng, lastKnownLocation.lat],
         zoomLevel: 16,
@@ -632,7 +596,7 @@ export default function RideScreen() {
         animationDuration: 600,
       });
     }
-  }, [subTab]);
+  }, [isRecording]);
 
   // ── fetchAndPreviewRoute ──
   async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }, prefOverride?: import('../../lib/navigationStore').RoutePreference) {
@@ -708,7 +672,6 @@ export default function RideScreen() {
   // Navigate to a saved route: use GPX geometry directly, no Directions API
   function handleNavigate(route: Route) {
     const pts = route.points ?? [];
-    setSubTab('MAP');
 
     if (pts.length >= 2) {
       // Has GPS points — use saved geometry directly
@@ -770,7 +733,7 @@ export default function RideScreen() {
     }
   }
 
-  // Consume pending navigate route from Discover MY ROUTES
+  // Consume pending navigate route from Discover ROUTES
   useEffect(() => {
     if (pendingNavigateRoute) {
       handleNavigate(pendingNavigateRoute);
@@ -778,16 +741,26 @@ export default function RideScreen() {
     }
   }, [pendingNavigateRoute]);
 
-  // GPX import: preview route on map + switch to MAP
-  function handleImportRoute(points: TrackPoint[], name: string) {
-    setOverlayPoints(points);
-    setSubTab('MAP');
-    const [ne, sw] = routeBounds(points);
-    cameraRef.current?.fitBounds(ne, sw, [60, 60, 100, 60], 800);
-  }
+  // Dismiss checklist when recording starts
+  useEffect(() => {
+    if (isRecording) setShowChecklist(false);
+  }, [isRecording]);
 
-  // Stop requested from RecordScreen: show save sheet
+  // Stop requested: clean up share/check-in, show save sheet
   function handleStopRequested() {
+    // End share & check-in
+    const { shareToken, shareActive, checkInNotifId, clearCheckIn, setShareToken, setShareActive } = useSafetyStore.getState();
+    if (shareToken) {
+      endShare(shareToken).catch(() => {});
+      setShareToken(null);
+      setShareActive(false);
+      stopBackgroundLocation().catch(() => {});
+    }
+    if (checkInNotifId) {
+      Notifications.cancelScheduledNotificationAsync(checkInNotifId).catch(() => {});
+    }
+    clearCheckIn();
+
     setRideElapsed(elapsedRef.current);
     setShowSaveSheet(true);
   }
@@ -801,7 +774,6 @@ export default function RideScreen() {
       if (saved) {
         addRoute(saved);
         showToast('Ride saved!');
-        setSubTab('MY ROUTES');
       }
     }
     clearRecordedPoints();
@@ -891,14 +863,14 @@ export default function RideScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: theme.bg }]}>
-      {/* ── Full-screen map (always mounted; also visible on RECORD tab while recording) ── */}
-      <View style={[styles.mapContainer, (subTab !== 'MAP' && !(subTab === 'RECORD' && isRecording)) && styles.hidden]}>
+      {/* ── Full-screen map ── */}
+      <View style={styles.mapContainer}>
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
           compassEnabled
-          compassPosition={{ top: Platform.OS === 'ios' ? 116 : 76, right: 12 }}
+          compassPosition={{ top: Platform.OS === 'ios' ? 101 : 61, right: 12 }}
           // @ts-expect-error compassViewStyle exists at runtime but missing from types
           compassViewStyle={{ opacity: 0.7 }}
           scaleBarEnabled={false}
@@ -996,7 +968,7 @@ export default function RideScreen() {
           )}
 
           {/* ── Navigation route layer (rendered above overlay) ── */}
-          {navMode !== 'idle' && navRouteGeojson && (
+          {navRouteGeojson && (
             <ShapeSource id="nav-route-src" shape={navRouteGeojson}>
               <LineLayer
                 id="nav-route-line"
@@ -1017,7 +989,7 @@ export default function RideScreen() {
         </MapView>
 
         {/* ── Recenter / locate me button (below compass) ── */}
-        {!drawerOpen && !searchSheetOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
+        {!drawerOpen && !searchSheetOpen && !showChecklist && <View style={styles.locateBtnWrap} pointerEvents="box-none">
           <Pressable
             style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             hitSlop={8}
@@ -1066,16 +1038,9 @@ export default function RideScreen() {
           onPress={() => setMonitoring(!isMonitoring)}
         >
           <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textSecondary} />
-          <View>
-            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
-              {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
-            </Text>
-            {selectedBike && (
-              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textSecondary }]}>
-                {bikeLabel(selectedBike)}
-              </Text>
-            )}
-          </View>
+          <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
+            {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
+          </Text>
         </Pressable>
 
         {/* ── Map control icon (replaces MapOverlayControls) ── */}
@@ -1089,33 +1054,48 @@ export default function RideScreen() {
         {/* Weather legend — bottom-left when weather is on */}
         {weatherOn && <WeatherLegend />}
 
-        {/* ── Stats bar: navigation stats or recording stats ── */}
+        {/* ── Stats bar: navigation stats or recording stats (hidden in free ride) ── */}
         {isNavigatingActive ? (
           <NavigationStatsBar
             speedMph={speedMph}
             eta={eta}
             remainingMiles={remainingDistanceMiles}
           />
-        ) : (
+        ) : isRecording ? (
           <StatsOverlay isRecording={isRecording} elapsedSeconds={elapsedSeconds} speedMph={speedMph} />
-        )}
+        ) : null}
 
-        {/* ── End Navigation button ── */}
-        {isNavigatingActive && (
+        {/* ── RIDE & RECORD button (idle, no nav, no recording) ── */}
+        {!isNavigatingActive && !isRecording && (
           <Pressable
-            style={[styles.endNavBtn, { backgroundColor: theme.red }]}
-            onPress={() => {
-              resetNavigation();
-              setNavRouteGeojson(null);
-              if (isRecording) handleStopRequested();
-              handleLocateMe();
-            }}
+            style={[styles.endNavBtn, { backgroundColor: '#4CAF50' }]}
+            onPress={() => setShowChecklist(true)}
           >
-            <Feather name="x" size={16} color="#fff" />
-            <Text style={styles.endNavBtnText}>END</Text>
+            <Feather name="play-circle" size={16} color="#fff" />
+            <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
           </Pressable>
         )}
 
+        {/* ── END RIDE button (navigating and/or recording) ── */}
+        {(isNavigatingActive || isRecording) && (
+          <Pressable
+            style={[styles.endNavBtn, { backgroundColor: theme.red, bottom: isNavigatingActive ? END_BUTTON_BOTTOM : END_BUTTON_BOTTOM }]}
+            onPress={() => {
+              if (isNavigatingActive) {
+                setNavRouteGeojson(null);
+                resetNavigation();
+              }
+              if (isRecording) {
+                handleStopRequested();
+              } else {
+                handleLocateMe();
+              }
+            }}
+          >
+            <Feather name="x" size={16} color="#fff" />
+            <Text style={styles.endNavBtnText}>END RIDE</Text>
+          </Pressable>
+        )}
 
         {/* Place detail panel (fuel / food) */}
         <PlaceDetailPanel
@@ -1152,11 +1132,14 @@ export default function RideScreen() {
                 fetchAndPreviewRoute(destination, p);
               }
             }}
-            onStartNavigation={(route, bikeId) => {
+            onStartNavigation={(route, bikeId, recordRide) => {
               recordingBikeIdRef.current = bikeId ?? null;
+              if (recordRide) {
+                setRecording(true);
+              }
               handleStartNavigation(route);
             }}
-            onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; resetNavigation(); setNavRouteGeojson(null); }}
+            onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; setNavRouteGeojson(null); resetNavigation(); }}
             isSavedRoute={isSavedRoutePreview}
             savedRouteStart={savedRouteStartRef.current}
             onGeometryChange={(geo) => setNavRouteGeojson(geo)}
@@ -1182,29 +1165,22 @@ export default function RideScreen() {
                   if (saved) { addRoute(saved); showToast('Ride saved!'); }
                 });
               }
-              resetNavigation();
               setNavRouteGeojson(null);
+              resetNavigation();
               handleLocateMe();
             }}
-            onDismiss={() => { resetNavigation(); setNavRouteGeojson(null); handleLocateMe(); }}
+            onDismiss={() => { setNavRouteGeojson(null); resetNavigation(); handleLocateMe(); }}
           />
         )}
       </View>
 
-      {/* ── Sub-screens ── */}
-      {subTab === 'MY ROUTES' && (
+      {/* ── Pre-ride checklist (triggered from RECORD button on map) ── */}
+      {showChecklist && !isRecording && (
         <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
-          <RoutesScreen
-            onImportRoute={handleImportRoute}
-            onNavigate={handleNavigate}
-          />
-        </SafeAreaView>
-      )}
-      {subTab === 'RECORD' && !isRecording && (
-        <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
-          {/* Header with hamburger */}
           <View style={[styles.recordHeader, { borderBottomColor: theme.border }]}>
-            <HamburgerButton onPress={() => setMenuOpen(true)} />
+            <Pressable onPress={() => setShowChecklist(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color={theme.textSecondary} />
+            </Pressable>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
@@ -1215,17 +1191,12 @@ export default function RideScreen() {
           <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
         </SafeAreaView>
       )}
-      {subTab === 'RECORD' && isRecording && (
-        /* Transparent overlay — map is visible underneath */
+      {/* ── Active recording overlay on map ── */}
+      {isRecording && (
         <SafeAreaView edges={['top', 'bottom']} style={styles.recordMapOverlay} pointerEvents="box-none">
           <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
         </SafeAreaView>
       )}
-
-      {/* ── Sub-nav ── */}
-      <SafeAreaView edges={['bottom']} style={styles.subNavWrapper}>
-        <SubNav active={subTab} onChange={setSubTab} />
-      </SafeAreaView>
 
       {/* ── Save ride sheet ── */}
       <SaveRideSheet
@@ -1277,7 +1248,6 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
 
   mapContainer: { ...StyleSheet.absoluteFillObject },
-  hidden:        { opacity: 0, pointerEvents: 'none' },
 
   // Recenter button wrapper + button (aligned below compass)
   locateBtnWrap: {
@@ -1331,26 +1301,20 @@ const styles = StyleSheet.create({
   // Crash detection toggle
   crashToggle: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 113 : 73,
-    left: 12,
+    bottom: END_BUTTON_BOTTOM,
+    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderRadius: 26,
+    paddingHorizontal: 17,
+    paddingVertical: 12,
   },
   crashToggleText: {
-    fontSize: 9,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.7,
-  },
-  crashToggleBike: {
-    fontSize: 8,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginTop: 1,
+    letterSpacing: 0.3,
   },
 
   // Map control icon (layers button)
@@ -1374,21 +1338,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 26,
+    paddingHorizontal: 17,
+    paddingVertical: 12,
   },
   endNavBtnText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.3,
   },
 
   // Stats bar
   statsBar: {
     position: 'absolute',
-    bottom: 54,
+    bottom: 29,
     left: 16,
     right: 16,
     flexDirection: 'row',
@@ -1397,29 +1361,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   statItem:  { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 0.7 },
-  statLabel: { fontSize: 10, letterSpacing: 1, marginTop: 2 },
+  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
+  statLabel: { fontSize: 10, letterSpacing: 0.5, marginTop: 2 },
   statDivider: { width: 1, marginVertical: 4 },
 
-  // Sub-nav (shifted down 5px per layout spec)
-  subNavWrapper: { position: 'absolute', bottom: -34, left: 0, right: 0 },
-  subNav: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    height: 48,
-  },
-  subNavItem:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  subNavText:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
-  subNavUnderline: {
-    position: 'absolute',
-    bottom: 0,
-    left: '20%',
-    right: '20%',
-    height: 2,
-    borderRadius: 1,
-  },
-
-  // Sub-screens
+  // Checklist overlay
   subScreen: { flex: 1 },
 
   // Record screen — transparent map overlay (when recording)
@@ -1439,7 +1385,7 @@ const styles = StyleSheet.create({
   recordTimerText: {
     fontSize: 32,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     color: '#fff',
   },
   recordActiveCenter: {
@@ -1453,7 +1399,7 @@ const styles = StyleSheet.create({
   recordElapsed: {
     fontSize: 48,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 8,
   },
   recordCircleActive: {
@@ -1468,7 +1414,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
-  recordHint: { fontSize: 13, letterSpacing: 0.7 },
+  recordHint: { fontSize: 13, letterSpacing: 0.3 },
   monitoringBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1518,7 +1464,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   // Toast

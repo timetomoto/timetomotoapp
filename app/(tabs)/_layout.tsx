@@ -18,14 +18,14 @@ export default function TabLayout() {
           backgroundColor: theme.tabBarBg,
           borderTopColor:  theme.tabBarBorder,
           borderTopWidth:  1,
-          height:          65,
-          paddingBottom:   8,
+          height:          77,
+          paddingBottom:   28,
           paddingTop:      6,
         },
         tabBarLabelStyle: {
           fontSize:      10,
           fontWeight:    '600',
-          letterSpacing: 0.7,
+          letterSpacing: 0.3,
         },
         headerShown: false,
       }}
@@ -35,13 +35,28 @@ export default function TabLayout() {
         options={{
           title: 'RIDE',
           tabBarIcon: ({ color, size }) => (
-            <MotorcycleIcon size={Math.round((size + 4) * 1.75)} color={color} />
+            <MotorcycleIcon size={Math.round((size + 4) * 1.4)} color={color} />
           ),
         }}
         listeners={() => ({
           tabPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             resetTab('ride');
+          },
+        })}
+      />
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'DISCOVER',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="compass" size={size} color={color} accessibilityLabel="Discover tab" />
+          ),
+        }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            resetTab('discover');
           },
         })}
       />
@@ -63,7 +78,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="garage"
         options={{
-          title: 'GARAGE',
+          title: 'MY GARAGE',
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} accessibilityLabel="Garage tab" />
           ),
@@ -72,21 +87,6 @@ export default function TabLayout() {
           tabPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             resetTab('garage');
-          },
-        })}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'DISCOVER',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="compass" size={size} color={color} accessibilityLabel="Discover tab" />
-          ),
-        }}
-        listeners={() => ({
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            resetTab('discover');
           },
         })}
       />

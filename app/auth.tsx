@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     marginBottom: 4,
   },
   input: {
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
   toggleText: {
     fontSize: 13,

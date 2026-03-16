@@ -698,12 +698,40 @@ export default function WeatherScreen() {
   if (isLoading && !data) {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]} edges={['top']}>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <HamburgerButton onPress={() => setMenuOpen(true)} />
+          <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={[styles.heading, { color: theme.textPrimary }]}>WEATHER</Text>
+            </View>
+          </View>
+          <View style={styles.headerRight} />
+        </View>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={theme.red} />
           <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
-            {state === 'locating' ? 'Getting location…' : 'Loading weather…'}
+            {state === 'locating' ? 'Getting your location…' : 'Loading conditions…'}
           </Text>
+          <Pressable
+            style={[styles.loadingSearchBtn, { borderColor: theme.border }]}
+            onPress={() => setShowSearch(true)}
+          >
+            <Feather name="search" size={14} color={theme.textSecondary} />
+            <Text style={[styles.loadingSearchText, { color: theme.textSecondary }]}>
+              Or search a city
+            </Text>
+          </Pressable>
         </View>
+        <LocationSearchModal
+          visible={showSearch}
+          onClose={() => setShowSearch(false)}
+          onSelect={loadByGeoResult}
+          favorites={favorites}
+          recents={recents}
+          onToggleFavorite={handleToggleFavorite}
+        />
+        <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
       </SafeAreaView>
     );
   }
@@ -851,7 +879,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   locationRow: {
@@ -862,7 +890,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 12,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
 
   // Sub-tab bar
@@ -879,7 +907,7 @@ const styles = StyleSheet.create({
   subTabText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
   subTabUnderline: {
@@ -902,11 +930,26 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 32,
   },
-  loadingText: { fontSize: 13, letterSpacing: 0.7, marginTop: 8 },
+  loadingText: { fontSize: 13, letterSpacing: 0.3, marginTop: 8 },
+  loadingSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginTop: 16,
+  },
+  loadingSearchText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
   errorTitle: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     marginTop: 16,
   },
   errorMsg: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
@@ -919,7 +962,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  retryText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 1.4 },
+  retryText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.7 },
 
   // Alert banner
   alertBanner: {
@@ -931,7 +974,7 @@ const styles = StyleSheet.create({
   },
   alertLeft:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, flex: 1 },
   alertText:  { flex: 1 },
-  alertTitle: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 1 },
+  alertTitle: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   alertMeta:  { color: 'rgba(255,255,255,0.8)', fontSize: 11, marginTop: 2 },
 
   // Current card
@@ -959,7 +1002,7 @@ const styles = StyleSheet.create({
   conditionLabel: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginTop: 6,
   },
   statsGrid: {
@@ -969,7 +1012,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   statCell:  { width: '50%', paddingVertical: 10, paddingRight: 16, gap: 4 },
-  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.4, marginTop: 4 },
+  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginTop: 4 },
   statValue: { fontSize: 15, fontWeight: '600' },
 
   // Section
@@ -977,7 +1020,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     marginBottom: 10,
   },
 
@@ -1007,7 +1050,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  dayName:    { fontSize: 13, fontWeight: '600', letterSpacing: 0.7, width: 56 },
+  dayName:    { fontSize: 13, fontWeight: '600', letterSpacing: 0.3, width: 56 },
   dayPrecip:  { color: '#5B9BD5', fontSize: 12, fontWeight: '600', width: 36, marginLeft: 12, textAlign: 'right' },
   dayTemps:   { flexDirection: 'row', marginLeft: 'auto', gap: 12 },
   dayHigh:    { fontSize: 15, fontWeight: '700' },
@@ -1046,7 +1089,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
   },
-  searchHeading: { fontSize: 14, fontWeight: '700', letterSpacing: 2.1 },
+  searchHeading: { fontSize: 14, fontWeight: '700', letterSpacing: 1.2 },
   searchInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1063,12 +1106,12 @@ const styles = StyleSheet.create({
   searchError: {
     fontSize: 12,
     marginBottom: 12,
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   searchSuggestLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 8,
     marginTop: 4,
   },

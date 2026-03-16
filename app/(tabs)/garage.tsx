@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,8 @@ import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSec
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
+import { fetchWikimediaBikePhoto } from '../../lib/bikePhoto';
+import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 
@@ -40,6 +43,31 @@ export default function GarageScreen() {
   }, [user]);
 
   const selectedBike = bikes.find((b) => b.id === selectedBikeId);
+
+  // Fetch Wikimedia default photo when no user-uploaded photo
+  const [wikiPhotos, setWikiPhotos] = useState<Record<string, string>>({});
+  const fetchingRef = useRef<Set<string>>(new Set());
+  const wikiPhoto = selectedBike ? (wikiPhotos[selectedBike.id] ?? null) : null;
+
+  useEffect(() => {
+    if (!selectedBike) return;
+    if (selectedBike.photo_url) return;
+    if (wikiPhotos[selectedBike.id]) return;
+    if (fetchingRef.current.has(selectedBike.id)) return;
+    if (!selectedBike.make || !selectedBike.model) return;
+
+    const bikeId = selectedBike.id;
+    fetchingRef.current.add(bikeId);
+
+    fetchWikimediaBikePhoto(selectedBike.make, selectedBike.model, bikeId)
+      .then((url) => {
+        if (url) setWikiPhotos((prev) => ({ ...prev, [bikeId]: url }));
+      })
+      .catch(() => {})
+      .finally(() => fetchingRef.current.delete(bikeId));
+  }, [selectedBike?.id, selectedBike?.photo_url]);
+
+  const bikePhotoUri = selectedBike?.photo_url || wikiPhoto;
 
   function handleRemoveBike() {
     if (!selectedBike) return;
@@ -65,7 +93,7 @@ export default function GarageScreen() {
         <HamburgerButton onPress={() => setMenuOpen(true)} />
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[styles.heading, { color: theme.textPrimary }]}>GARAGE</Text>
+            <Text style={[styles.heading, { color: theme.textPrimary }]}>MY GARAGE</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -141,6 +169,19 @@ export default function GarageScreen() {
           {/* Selected bike card */}
           {selectedBike && (
             <View style={[styles.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              {/* Bike profile photo */}
+              {bikePhotoUri ? (
+                <Image
+                  source={{ uri: bikePhotoUri }}
+                  style={styles.bikePhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.bikePhotoPlaceholder, { backgroundColor: theme.bgPanel }]}>
+                  <MotorcycleIcon size={48} color={theme.textMuted} />
+                </View>
+              )}
+
               <View style={[styles.bikeCardHeader, { borderBottomColor: theme.border }]}>
                 <View style={styles.bikeNameContainer}>
                   {selectedBike.nickname ? (
@@ -160,30 +201,28 @@ export default function GarageScreen() {
                       </Text>
                     </>
                   )}
-                </View>
-                <View style={styles.bikeCardActions}>
                   <View style={[styles.odoBadge, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
                     <Text style={[styles.odoValue, { color: theme.textPrimary }]}>
                       {selectedBike.odometer?.toLocaleString() ?? '—'}
                     </Text>
                     <Text style={[styles.odoLabel, { color: theme.textSecondary }]}>MI</Text>
                   </View>
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      style={[styles.removeBtn, { borderColor: theme.border }]}
-                      onPress={() => setEditingBike(selectedBike)}
-                      accessibilityLabel="Edit bike"
-                    >
-                      <Feather name="edit-2" size={16} color={theme.textSecondary} />
-                    </Pressable>
-                    <Pressable
-                      style={[styles.removeBtn, { borderColor: theme.border }]}
-                      onPress={handleRemoveBike}
-                      accessibilityLabel="Remove bike"
-                    >
-                      <Feather name="trash-2" size={16} color={theme.red} />
-                    </Pressable>
-                  </View>
+                </View>
+                <View style={styles.actionRow}>
+                  <Pressable
+                    style={[styles.removeBtn, { borderColor: theme.border }]}
+                    onPress={() => setEditingBike(selectedBike)}
+                    accessibilityLabel="Edit bike"
+                  >
+                    <Feather name="edit-2" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                  <Pressable
+                    style={[styles.removeBtn, { borderColor: theme.border }]}
+                    onPress={handleRemoveBike}
+                    accessibilityLabel="Remove bike"
+                  >
+                    <Feather name="trash-2" size={16} color={theme.red} />
+                  </Pressable>
                 </View>
               </View>
 
@@ -227,12 +266,18 @@ export default function GarageScreen() {
 
       {/* Add Bike Bottom Sheet */}
       {showAddBike && (
-        <AddBikeModal onClose={() => setShowAddBike(false)} />
+        <AddBikeModal onClose={() => {
+          setShowAddBike(false);
+          fetchBikes(user?.id ?? 'local');
+        }} />
       )}
 
       {/* Edit Bike Bottom Sheet */}
       {editingBike && (
-        <AddBikeModal bike={editingBike} onClose={() => setEditingBike(null)} />
+        <AddBikeModal bike={editingBike} defaultPhotoUrl={wikiPhoto} onClose={() => {
+          setEditingBike(null);
+          fetchBikes(user?.id ?? 'local');
+        }} />
       )}
 
       {/* Hamburger menu */}
@@ -258,7 +303,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 2.1,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -271,7 +316,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
 
   // Loading / empty
@@ -284,7 +329,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 8,
   },
   emptySubtitle: {
@@ -301,7 +346,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 
   // Scroll
@@ -327,7 +372,19 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 12,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
+  },
+
+  // Bike photo
+  bikePhoto: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+  },
+  bikePhotoPlaceholder: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Bike card
@@ -346,7 +403,7 @@ const styles = StyleSheet.create({
   bikeYear: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 2,
   },
   bikeNameContainer: {
@@ -356,33 +413,33 @@ const styles = StyleSheet.create({
   bikeName: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   bikeNickname: {
     fontSize: 18,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
     marginBottom: 3,
   },
   bikeRealName: {
     fontSize: 11,
     fontWeight: '500',
-    letterSpacing: 0.7,
-  },
-  bikeCardActions: {
-    alignItems: 'flex-end',
-    gap: 8,
+    letterSpacing: 0.3,
   },
   actionRow: {
     flexDirection: 'row',
     gap: 8,
   },
   odoBadge: {
-    alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    alignSelf: 'flex-start',
+    gap: 4,
     borderWidth: 1,
     borderRadius: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 10,
   },
   removeBtn: {
     borderWidth: 1,
@@ -395,7 +452,7 @@ const styles = StyleSheet.create({
   },
   odoLabel: {
     fontSize: 10,
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginTop: 2,
   },
 
@@ -418,7 +475,7 @@ const styles = StyleSheet.create({
   sectionTabText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
   },
 
 });

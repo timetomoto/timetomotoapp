@@ -24,7 +24,7 @@ interface Props {
   error: string | null;
   routePreference: RoutePreference;
   onChangePreference: (p: RoutePreference) => void;
-  onStartNavigation: (route: NavRoute, bikeId?: string | null) => void;
+  onStartNavigation: (route: NavRoute, bikeId?: string | null, recordRide?: boolean) => void;
   onCancel: () => void;
   isSavedRoute?: boolean;
   /** Start coords of the saved route (first trackpoint) */
@@ -93,6 +93,7 @@ export default function RoutePreviewScreen({
   const { bikes, selectedBikeId } = useGarageStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
   const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
+  const [recordRide, setRecordRide] = useState(false);
   const translateY = useRef(new Animated.Value(0)).current;
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -423,13 +424,29 @@ export default function RoutePreviewScreen({
           </View>
         )}
 
+        {/* Record ride toggle */}
+        {!loading && !error && selectedRoute && (
+          <Pressable
+            style={[styles.recordToggleRow, { borderColor: theme.border }]}
+            onPress={() => setRecordRide((v) => !v)}
+          >
+            <View style={styles.recordToggleLeft}>
+              <Feather name="play-circle" size={16} color={recordRide ? '#4CAF50' : theme.textMuted} />
+              <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Record this ride</Text>
+            </View>
+            <View style={[styles.recordToggleTrack, recordRide && styles.recordToggleTrackOn]}>
+              <View style={[styles.recordToggleThumb, recordRide && styles.recordToggleThumbOn]} />
+            </View>
+          </Pressable>
+        )}
+
         {/* Action buttons — shared */}
         {!loading && !error && (
           <View style={styles.actions}>
             {selectedRoute && (
               <Pressable
                 style={[styles.startBtn, { backgroundColor: theme.red }]}
-                onPress={() => onStartNavigation(selectedRoute, navBikeId)}
+                onPress={() => onStartNavigation(selectedRoute, navBikeId, recordRide)}
               >
                 <Feather name="navigation" size={18} color="#fff" />
                 <Text style={styles.startBtnText}>START NAVIGATION</Text>
@@ -525,7 +542,7 @@ const styles = StyleSheet.create({
   pillText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.3,
   },
   loadingContainer: {
     flex: 1,
@@ -599,7 +616,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   bikeSelector: {
     paddingHorizontal: 20,
@@ -609,7 +626,7 @@ const styles = StyleSheet.create({
   bikeSelectorLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     paddingHorizontal: 0,
     marginBottom: 8,
   },
@@ -635,5 +652,47 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: {
     fontSize: 14,
+  },
+
+  // Record ride toggle
+  recordToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  recordToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  recordToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  recordToggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#555',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  recordToggleTrackOn: {
+    backgroundColor: '#4CAF50',
+  },
+  recordToggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+  },
+  recordToggleThumbOn: {
+    alignSelf: 'flex-end',
   },
 });

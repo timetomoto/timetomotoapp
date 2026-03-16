@@ -531,15 +531,22 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
 
       {!collapsed && (
         <View>
-          {/* Loading state */}
-          {lookingUp && (
+          {/* Loading state / empty hint */}
+          {lookingUp ? (
             <View style={st.lookupBox}>
               <ActivityIndicator size="small" color={theme.red} />
               <Text style={[st.lookupText, { color: theme.textSecondary }]}>
                 Looking up specs for {bikeDesc}...
               </Text>
             </View>
-          )}
+          ) : lookupDone && specCount === 0 ? (
+            <View style={[st.hintBanner, { backgroundColor: '#FF980018', borderColor: '#FF9800' }]}>
+              <Feather name="info" size={13} color="#FF9800" />
+              <Text style={[st.hintText, { color: '#FF9800' }]}>
+                Specs not found automatically. Tap any value to enter manually or make sure your bike title matches the manufacturer's exact model name (e.g. "R 1250 GS" not "GS 1250").
+              </Text>
+            </View>
+          ) : null}
 
           {/* Spec rows — operational */}
           {OPERATIONAL_ROWS.map((def) => (
@@ -551,12 +558,7 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
-          {/* Empty hint */}
-          {lookupDone && specCount === 0 && !lookingUp && (
-            <Text style={[st.emptyHint, { color: theme.textMuted }]}>
-              Specs not found automatically. Tap any value to enter manually.
-            </Text>
-          )}
+          {/* Empty hint — removed, moved to top */}
 
           {/* Manual re-lookup button */}
           {lookupDone && !lookingUp && (
@@ -591,7 +593,7 @@ const st = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   countBadge: {
     minWidth: 20,
@@ -649,7 +651,16 @@ const st = StyleSheet.create({
 
   divider: { height: 1, marginVertical: 12 },
 
-  emptyHint: { fontSize: 12, textAlign: 'center', paddingVertical: 16 },
+  hintBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 12,
+  },
+  hintText: { flex: 1, fontSize: 12, lineHeight: 17 },
 
   relookupBtn: {
     flexDirection: 'row',

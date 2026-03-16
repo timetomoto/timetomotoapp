@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   instruction: {
     fontSize: 13,
@@ -187,6 +187,6 @@ const styles = StyleSheet.create({
   offRouteText: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
 });

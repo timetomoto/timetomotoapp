@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   closeBtn: { padding: 4 },
   searchRow: {
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   initialsText: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   contactItemText: {
     flex: 1,
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
   numberLabel: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
     textTransform: 'capitalize',
   },
   numberValue: {

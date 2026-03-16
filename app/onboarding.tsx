@@ -328,9 +328,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  stepLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4 },
+  stepLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
   skipBtn: { paddingHorizontal: 4, paddingVertical: 8, minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
-  skipText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.7 },
+  skipText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
 
   screen: {
     flex: 1,
@@ -351,7 +351,7 @@ const s = StyleSheet.create({
   logoSub: {
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -387,7 +387,7 @@ const s = StyleSheet.create({
   screenTitle: {
     fontSize: 20,
     fontWeight: '700',
-    letterSpacing: 1.4,
+    letterSpacing: 0.7,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -398,7 +398,7 @@ const s = StyleSheet.create({
     marginBottom: 32,
   },
   form: { width: '100%', gap: 12 },
-  helperText: { fontSize: 11, marginTop: -4, letterSpacing: 0.2 },
+  helperText: { fontSize: 11, marginTop: -4, letterSpacing: 0.1 },
   formBtn: {
     borderRadius: 8,
     paddingVertical: 16,
@@ -407,7 +407,7 @@ const s = StyleSheet.create({
     minHeight: 50,
   },
   formBtnDisabled: { opacity: 0.45 },
-  formBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 1.4 },
+  formBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.7 },
   savedInlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,5 +433,5 @@ const s = StyleSheet.create({
     paddingVertical: 18,
     minHeight: 56,
   },
-  nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 1.4 },
+  nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: 0.7 },
 });
