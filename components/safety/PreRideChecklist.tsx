@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -115,7 +116,11 @@ const PRE_RIDE_COL2 = [
 
 export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfig) => void }) {
   const { theme } = useTheme();
-  const { isMonitoring, setMonitoring, emergencyContacts } = useSafetyStore();
+  const {
+    isMonitoring, setMonitoring, shareActive,
+    setCrashDetectionOverride, setLocationSharingOverride,
+    emergencyContacts,
+  } = useSafetyStore();
   const { bikes, selectedBikeId, selectBike } = useGarageStore();
 
   const [gpsStatus, setGpsStatus] = useState<'loading' | 'ok' | 'warn'>('loading');
@@ -126,13 +131,83 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
   }, []);
 
   const [selectedBike, setSelectedBike]     = useState<string | null>(selectedBikeId);
-  const [shareEnabled, setShareEnabled]     = useState(false);
+  const [crashOn,      setCrashOn]          = useState(isMonitoring);
+  const [crashOverride, setCrashOverride]   = useState(false);
+  const [shareEnabled, setShareEnabled]     = useState(shareActive);
+  const [shareOverride, setShareOverride]   = useState(false);
   const [checkInOn,    setCheckInOn]        = useState(false);
   const [checkInMins,  setCheckInMins]      = useState<number>(60);
   const [showContacts, setShowContacts]     = useState(false);
 
+  function handleCrashToggle(newVal: boolean) {
+    if (newVal && !isMonitoring) {
+      // Global setting is off — prompt
+      Alert.alert(
+        'Crash Detection is Disabled',
+        'Crash Detection is turned off in your Settings. Would you like to enable it?',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          {
+            text: 'Enable in Settings',
+            onPress: () => {
+              setMonitoring(true);
+              setCrashOn(true);
+            },
+          },
+          {
+            text: 'Enable for This Ride',
+            onPress: () => {
+              setCrashOn(true);
+              setCrashOverride(true);
+            },
+          },
+        ],
+      );
+      return;
+    }
+    setCrashOn(newVal);
+    setCrashOverride(false);
+  }
+
+  function handleShareToggle(newVal: boolean) {
+    if (newVal && !shareActive) {
+      Alert.alert(
+        'Live Location Sharing is Disabled',
+        'Live Location Sharing is turned off in your Settings. Would you like to enable it?',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          {
+            text: 'Enable in Settings',
+            onPress: () => {
+              useSafetyStore.getState().setShareActive(true);
+              setShareEnabled(true);
+            },
+          },
+          {
+            text: 'Enable for This Ride',
+            onPress: () => {
+              setShareEnabled(true);
+              setShareOverride(true);
+            },
+          },
+        ],
+      );
+      return;
+    }
+    setShareEnabled(newVal);
+    setShareOverride(false);
+  }
+
   function handleStart() {
     if (selectedBike) selectBike(selectedBike);
+    // Apply session overrides
+    if (crashOn && !isMonitoring) {
+      setCrashDetectionOverride(true);
+      setMonitoring(true);
+    }
+    if (shareEnabled && !shareActive) {
+      setLocationSharingOverride(true);
+    }
     onStart({
       shareEnabled,
       checkInMinutes: checkInOn ? checkInMins : null,
@@ -225,10 +300,19 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         <CheckRow
           icon="shield"
           title="CRASH DETECTION"
-          detail={isMonitoring ? 'Armed — accelerometer monitoring at 10 Hz' : 'Off — tap to enable'}
-          status={isMonitoring ? 'ok' : 'off'}
+          detail={
+            crashOn
+              ? crashOverride
+                ? 'Armed — this ride only'
+                : 'Armed — accelerometer monitoring at 10 Hz'
+              : 'Off — tap to enable'
+          }
+          status={crashOn ? 'ok' : 'off'}
         >
-          <Toggle value={isMonitoring} onChange={setMonitoring} />
+          {crashOverride && (
+            <Text style={[s.overrideLabel, { color: theme.textMuted }]}>this ride only</Text>
+          )}
+          <Toggle value={crashOn} onChange={handleCrashToggle} />
         </CheckRow>
 
         <View style={[s.divider, { backgroundColor: theme.border }]} />
@@ -264,12 +348,17 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
           title="LIVE SHARE"
           detail={
             shareEnabled
-              ? 'Share link copied to clipboard when you start'
+              ? shareOverride
+                ? 'Sharing enabled — this ride only'
+                : 'Share link copied to clipboard when you start'
               : 'Off — contacts can follow your ride in real-time'
           }
           status={shareEnabled ? 'ok' : 'off'}
         >
-          <Toggle value={shareEnabled} onChange={setShareEnabled} />
+          {shareOverride && (
+            <Text style={[s.overrideLabel, { color: theme.textMuted }]}>this ride only</Text>
+          )}
+          <Toggle value={shareEnabled} onChange={handleShareToggle} />
         </CheckRow>
       </View>
 
@@ -315,11 +404,11 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 
       {/* ── Start button ── */}
       <Pressable
-        style={({ pressed }) => [s.startBtn, { backgroundColor: theme.red }, pressed && s.startBtnPressed]}
+        style={({ pressed }) => [s.startBtn, { backgroundColor: '#4CAF50' }, pressed && s.startBtnPressed]}
         onPress={handleStart}
       >
-        <Feather name="play-circle" size={18} color="#fff" />
-        <Text style={s.startBtnText}>START RIDE</Text>
+        <Feather name="play-circle" size={22} color="#fff" />
+        <Text style={s.startBtnText}>START & RECORD RIDE</Text>
       </Pressable>
     </ScrollView>
   );
@@ -474,5 +563,10 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  overrideLabel: {
+    fontSize: 9,
+    fontWeight: '500',
+    marginRight: 6,
   },
 });

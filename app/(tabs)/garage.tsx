@@ -20,7 +20,7 @@ import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSec
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
-import { fetchWikimediaBikePhoto } from '../../lib/bikePhoto';
+import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
@@ -49,15 +49,25 @@ export default function GarageScreen() {
   const fetchingRef = useRef<Set<string>>(new Set());
   const wikiPhoto = selectedBike ? (wikiPhotos[selectedBike.id] ?? null) : null;
 
+  const lastFetchKey = useRef<string>('');
   useEffect(() => {
     if (!selectedBike) return;
     if (selectedBike.photo_url) return;
-    if (wikiPhotos[selectedBike.id]) return;
-    if (fetchingRef.current.has(selectedBike.id)) return;
     if (!selectedBike.make || !selectedBike.model) return;
+    if (fetchingRef.current.has(selectedBike.id)) return;
+
+    const fetchKey = `${selectedBike.id}|${selectedBike.make}|${selectedBike.model}`;
+    if (fetchKey === lastFetchKey.current && wikiPhotos[selectedBike.id]) return;
 
     const bikeId = selectedBike.id;
     fetchingRef.current.add(bikeId);
+
+    // Clear stale cache if make/model changed
+    if (lastFetchKey.current && lastFetchKey.current.startsWith(bikeId) && fetchKey !== lastFetchKey.current) {
+      clearWikiPhotoCache(bikeId);
+      setWikiPhotos((prev) => { const next = { ...prev }; delete next[bikeId]; return next; });
+    }
+    lastFetchKey.current = fetchKey;
 
     fetchWikimediaBikePhoto(selectedBike.make, selectedBike.model, bikeId)
       .then((url) => {
@@ -65,7 +75,7 @@ export default function GarageScreen() {
       })
       .catch(() => {})
       .finally(() => fetchingRef.current.delete(bikeId));
-  }, [selectedBike?.id, selectedBike?.photo_url]);
+  }, [selectedBike?.id, selectedBike?.photo_url, selectedBike?.make, selectedBike?.model]);
 
   const bikePhotoUri = selectedBike?.photo_url || wikiPhoto;
 
@@ -93,7 +103,7 @@ export default function GarageScreen() {
         <HamburgerButton onPress={() => setMenuOpen(true)} />
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[styles.heading, { color: theme.textPrimary }]}>MY GARAGE</Text>
+            <Text style={[styles.heading, { color: theme.textPrimary }]}>GARAGE</Text>
           </View>
         </View>
         <View style={styles.headerRight}>

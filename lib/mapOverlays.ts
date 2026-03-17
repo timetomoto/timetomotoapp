@@ -26,32 +26,15 @@ export async function fetchFuelStations(
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.elements ?? []).map((el: any) => {
+    const results = (data.elements ?? []).map((el: any) => {
       const t = el.tags ?? {};
       const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
       const city = t['addr:city'] ?? '';
       const address = [street, city].filter(Boolean).join(', ') || t['brand'] || '';
-      // Extract fuel types from tags like fuel:diesel=yes, fuel:octane_91=yes, etc.
       const fuelTypes: string[] = [];
-      const fuelLabels: Record<string, string> = {
-        'fuel:diesel': 'Diesel',
-        'fuel:octane_87': '87',
-        'fuel:octane_89': '89',
-        'fuel:octane_91': '91',
-        'fuel:octane_93': '93',
-        'fuel:octane_95': '95',
-        'fuel:octane_98': '98',
-        'fuel:e85': 'E85',
-        'fuel:e10': 'E10',
-        'fuel:lpg': 'LPG',
-        'fuel:cng': 'CNG',
-        'fuel:electricity': 'EV Charging',
-      };
-      for (const [tag, label] of Object.entries(fuelLabels)) {
-        if (t[tag] === 'yes') fuelTypes.push(label);
-      }
       return { id: el.id, lat: el.lat, lng: el.lon, name: t.name ?? t.brand ?? t.operator ?? t['brand:wikidata'] ?? 'Gas Station', address, fuelTypes };
     });
+    return results;
   } finally {
     clearTimeout(timer);
   }
@@ -96,13 +79,14 @@ export async function fetchFoodPlaces(
     const res = await fetch(url, { signal: controller.signal });
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.elements ?? []).map((el: any) => {
+    const results = (data.elements ?? []).map((el: any) => {
       const t = el.tags ?? {};
       const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
       const city = t['addr:city'] ?? '';
       const address = [street, city].filter(Boolean).join(', ') || '';
       return { id: el.id, lat: el.lat, lng: el.lon, name: t.name ?? 'Restaurant', type: t.amenity ?? 'restaurant', address };
     });
+    return results;
   } finally {
     clearTimeout(timer);
   }

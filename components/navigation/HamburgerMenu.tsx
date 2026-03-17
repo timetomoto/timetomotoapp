@@ -162,7 +162,7 @@ export default function HamburgerMenu({ open, onClose }: Props) {
           />
           <MenuItem
             icon="tool"
-            label="MY GARAGE"
+            label="GARAGE"
             onPress={() => navigate('/(tabs)/garage')}
           />
           <MenuItem

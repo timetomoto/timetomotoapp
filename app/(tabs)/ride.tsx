@@ -87,18 +87,18 @@ const WeatherLegend = memo(function WeatherLegend() {
   const { theme } = useTheme();
   return (
     <View style={[wl.panel, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
-      <Text style={[wl.title, { color: '#fff' }]}>PRECIPITATION</Text>
+      <Text style={[wl.title, { color: theme.textPrimary }]}>PRECIPITATION</Text>
       <View style={wl.row}>
         <View style={[wl.swatch, { backgroundColor: '#1a1aff' }]} />
-        <Text style={[wl.label, { color: '#fff' }]}>Heavy</Text>
+        <Text style={[wl.label, { color: theme.textPrimary }]}>Heavy</Text>
         <View style={[wl.swatch, { backgroundColor: '#00aaff', marginLeft: 8 }]} />
-        <Text style={[wl.label, { color: '#fff' }]}>Moderate</Text>
+        <Text style={[wl.label, { color: theme.textPrimary }]}>Moderate</Text>
       </View>
       <View style={wl.row}>
         <View style={[wl.swatch, { backgroundColor: '#aaffaa' }]} />
-        <Text style={[wl.label, { color: '#fff' }]}>Light</Text>
-        <View style={[wl.swatch, { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', marginLeft: 8 }]} />
-        <Text style={[wl.label, { color: '#fff' }]}>None</Text>
+        <Text style={[wl.label, { color: theme.textPrimary }]}>Light</Text>
+        <View style={[wl.swatch, { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border, marginLeft: 8 }]} />
+        <Text style={[wl.label, { color: theme.textPrimary }]}>None</Text>
       </View>
     </View>
   );
@@ -107,7 +107,7 @@ const WeatherLegend = memo(function WeatherLegend() {
 const wl = StyleSheet.create({
   panel: {
     position: 'absolute',
-    bottom: 168,
+    bottom: 103,
     left: 16,
     borderWidth: 1,
     borderRadius: 8,
@@ -372,6 +372,7 @@ export default function RideScreen() {
   // ── Drawer / sheet state ──
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
+  const [lastSearchQuery, setLastSearchQuery] = useState('');
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
@@ -389,6 +390,13 @@ export default function RideScreen() {
   const [weatherOn,      setWeatherOn]      = useState(false);
   const [selectedPlace,  setSelectedPlace]  = useState<PlaceDetail | null>(null);
 
+  // Track last fetch center for overlay refresh on pan
+  const lastFuelCenter = useRef<{ lat: number; lng: number } | null>(null);
+  const lastFoodCenter = useRef<{ lat: number; lng: number } | null>(null);
+  const overlayRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fuelStationsOnRef = useRef(false);
+  const foodOnRef = useRef(false);
+
   // Fuel stations GeoJSON
   const fuelStationsGeoJsonData = useMemo(
     () => (fuelStations.length > 0 ? fuelStationsGeoJson(fuelStations) : null),
@@ -401,29 +409,50 @@ export default function RideScreen() {
     [foodPlaces],
   );
 
+  // Helper: get current map center
+  async function getMapCenter(): Promise<{ lat: number; lng: number }> {
+    let c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
+    try {
+      const bounds = await (mapRef.current as any)?.getVisibleBounds();
+      if (bounds && bounds[0] && bounds[1]) {
+        c = { lat: (bounds[0][1] + bounds[1][1]) / 2, lng: (bounds[0][0] + bounds[1][0]) / 2 };
+      }
+    } catch {}
+    return c;
+  }
+
+  // Haversine distance in km between two points
+  function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const s =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+  }
+
   async function handleToggleFuelStations() {
     if (fuelStationsOn) {
       setFuelStationsOn(false);
+      fuelStationsOnRef.current = false;
       setFuelStations([]);
+      lastFuelCenter.current = null;
       return;
     }
     setFuelStationsLoading(true);
     setFuelStationsOn(true);
+    fuelStationsOnRef.current = true;
     try {
-      // Use visible map center, fall back to user location or default
-      let c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
-      try {
-        const bounds = await (mapRef.current as any)?.getVisibleBounds();
-        if (bounds && bounds[0] && bounds[1]) {
-          c = { lat: (bounds[0][1] + bounds[1][1]) / 2, lng: (bounds[0][0] + bounds[1][0]) / 2 };
-        }
-      } catch {}
+      const c = await getMapCenter();
       const stations = await fetchFuelStations(c.lat, c.lng);
       setFuelStations(stations);
+      lastFuelCenter.current = c;
     } catch (err) {
       console.error('Fuel fetch error:', err);
       Alert.alert('Failed', 'Could not fetch fuel stations. Check your connection.');
       setFuelStationsOn(false);
+      fuelStationsOnRef.current = false;
     } finally {
       setFuelStationsLoading(false);
     }
@@ -432,29 +461,52 @@ export default function RideScreen() {
   async function handleToggleFood() {
     if (foodOn) {
       setFoodOn(false);
+      foodOnRef.current = false;
       setFoodPlaces([]);
+      lastFoodCenter.current = null;
       return;
     }
     setFoodLoading(true);
     setFoodOn(true);
+    foodOnRef.current = true;
     try {
-      // Use visible map center, fall back to user location or default
-      let c = lastKnownLocation ?? { lat: AUSTIN[1], lng: AUSTIN[0] };
-      try {
-        const bounds = await (mapRef.current as any)?.getVisibleBounds();
-        if (bounds && bounds[0] && bounds[1]) {
-          c = { lat: (bounds[0][1] + bounds[1][1]) / 2, lng: (bounds[0][0] + bounds[1][0]) / 2 };
-        }
-      } catch {}
+      const c = await getMapCenter();
       const places = await fetchFoodPlaces(c.lat, c.lng);
       setFoodPlaces(places);
+      lastFoodCenter.current = c;
     } catch {
       Alert.alert('Failed', 'Could not fetch food places. Check your connection.');
       setFoodOn(false);
+      foodOnRef.current = false;
     } finally {
       setFoodLoading(false);
     }
   }
+
+  // Re-fetch overlays when user pans/zooms >5km from last fetch center
+  const handleMapIdle = useCallback(async () => {
+    if (overlayRefreshTimer.current) clearTimeout(overlayRefreshTimer.current);
+    overlayRefreshTimer.current = setTimeout(async () => {
+      if (!fuelStationsOnRef.current && !foodOnRef.current) return;
+      const c = await getMapCenter();
+
+      if (fuelStationsOnRef.current && lastFuelCenter.current && distanceKm(c, lastFuelCenter.current) > 5) {
+        try {
+          const stations = await fetchFuelStations(c.lat, c.lng);
+          setFuelStations(stations);
+          lastFuelCenter.current = c;
+        } catch {}
+      }
+
+      if (foodOnRef.current && lastFoodCenter.current && distanceKm(c, lastFoodCenter.current) > 5) {
+        try {
+          const places = await fetchFoodPlaces(c.lat, c.lng);
+          setFoodPlaces(places);
+          lastFoodCenter.current = c;
+        } catch {}
+      }
+    }, 500);
+  }, []);
 
   // Map overlays: imported/navigating route + live track
   const [overlayPoints, setOverlayPoints] = useState<TrackPoint[] | null>(null);
@@ -473,6 +525,8 @@ export default function RideScreen() {
 
   const mapRef       = useRef<Mapbox.MapView>(null);
   const cameraRef    = useRef<Mapbox.Camera>(null);
+  const userIsPanning = useRef(false);
+  const panResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingBikeIdRef = useRef<string | null>(null);
   const elapsedRef   = useRef(0);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -526,6 +580,10 @@ export default function RideScreen() {
         const distToDest = haversineMeters(pos.lat, pos.lng, destination.lat, destination.lng);
         if (distToDest < 30) {
           setNavMode('completed');
+          // Only clear overrides if not still recording — recording has its own cleanup
+          if (!useSafetyStore.getState().isRecording) {
+            useSafetyStore.getState().clearSessionOverrides();
+          }
           clearInterval(interval);
           return;
         }
@@ -575,21 +633,23 @@ export default function RideScreen() {
         }
       }
 
-      // Update camera for heading-up navigation
-      const zoom = speedMph > 50 ? 13 : speedMph > 20 ? 15 : 17;
-      cameraRef.current?.setCamera({
-        centerCoordinate: [pos.lng, pos.lat],
-        zoomLevel: zoom,
-        heading: headingDeg,
-        animationDuration: 800,
-      });
+      // Update camera for heading-up navigation (skip if user is panning)
+      if (!userIsPanning.current) {
+        const zoom = speedMph > 50 ? 13 : speedMph > 20 ? 15 : 17;
+        cameraRef.current?.setCamera({
+          centerCoordinate: [pos.lng, pos.lat],
+          zoomLevel: zoom,
+          heading: headingDeg,
+          animationDuration: 800,
+        });
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [navMode, activeRoute, destination, currentStepIndex, routePreference, lastKnownLocation, speedMph, headingDeg]);
 
   // ── Camera: center on user when recording starts ──
   useEffect(() => {
-    if (isRecording && lastKnownLocation) {
+    if (isRecording && lastKnownLocation && !userIsPanning.current) {
       cameraRef.current?.setCamera({
         centerCoordinate: [lastKnownLocation.lng, lastKnownLocation.lat],
         zoomLevel: 16,
@@ -780,6 +840,7 @@ export default function RideScreen() {
     clearRecordedPoints();
     setRecording(false);
     setShowSaveSheet(false);
+    useSafetyStore.getState().clearSessionOverrides();
   }
 
   // Discard recorded ride
@@ -787,10 +848,13 @@ export default function RideScreen() {
     clearRecordedPoints();
     setRecording(false);
     setShowSaveSheet(false);
+    useSafetyStore.getState().clearSessionOverrides();
   }
 
   // Locate me: animate camera to user's current location
   async function handleLocateMe() {
+    userIsPanning.current = false;
+    if (panResetTimer.current) clearTimeout(panResetTimer.current);
     // Try last known location first (instant)
     if (lastKnownLocation) {
       cameraRef.current?.setCamera({
@@ -875,9 +939,14 @@ export default function RideScreen() {
           // @ts-expect-error compassViewStyle exists at runtime but missing from types
           compassViewStyle={{ opacity: 0.7 }}
           scaleBarEnabled={false}
-          attributionEnabled
-          attributionPosition={{ bottom: 8, right: 8 }}
+          attributionEnabled={false}
           logoEnabled={false}
+          onMapIdle={handleMapIdle}
+          onTouchStart={() => { userIsPanning.current = true; }}
+          onRegionDidChange={() => {
+            if (panResetTimer.current) clearTimeout(panResetTimer.current);
+            panResetTimer.current = setTimeout(() => { userIsPanning.current = false; }, 5000);
+          }}
         >
           <Camera
             ref={cameraRef}
@@ -912,7 +981,7 @@ export default function RideScreen() {
                 const dist = lastKnownLocation
                   ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
                   : undefined;
-                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', fuelTypes: props.fuelTypes || '', distanceMiles: dist });
+                setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', distanceMiles: dist });
               }}
             >
               <CircleLayer
@@ -944,7 +1013,7 @@ export default function RideScreen() {
               <CircleLayer
                 id="food-places-dots"
                 style={{
-                  circleColor: '#E53935',
+                  circleColor: '#FF6B35',
                   circleRadius: 6,
                   circleStrokeColor: '#000',
                   circleStrokeWidth: 1.5,
@@ -1075,7 +1144,7 @@ export default function RideScreen() {
             style={[styles.endNavBtn, { backgroundColor: '#4CAF50' }]}
             onPress={() => setShowChecklist(true)}
           >
-            <Feather name="play-circle" size={16} color="#fff" />
+            <Feather name="play-circle" size={22} color="#fff" />
             <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
           </Pressable>
         )}
@@ -1096,7 +1165,7 @@ export default function RideScreen() {
               }
             }}
           >
-            <Feather name="x" size={16} color="#fff" />
+            <Feather name="x" size={18} color="#fff" />
             <Text style={styles.endNavBtnText}>END RIDE</Text>
           </Pressable>
         )}
@@ -1136,14 +1205,32 @@ export default function RideScreen() {
                 fetchAndPreviewRoute(destination, p);
               }
             }}
-            onStartNavigation={(route, bikeId, recordRide) => {
+            onStartNavigation={async (route, bikeId, recordRide, shareLocation) => {
               recordingBikeIdRef.current = bikeId ?? null;
               if (recordRide) {
                 setRecording(true);
               }
+              // Start live sharing if requested from preview
+              if (shareLocation && user) {
+                try {
+                  const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+                  const token = await startShare(user.id, loc.lat, loc.lng);
+                  useSafetyStore.getState().setShareToken(token);
+                  useSafetyStore.getState().setShareActive(true);
+                  await Clipboard.setStringAsync(shareUrl(token));
+                  await startBackgroundLocation();
+                } catch {}
+              }
               handleStartNavigation(route);
             }}
             onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; setNavRouteGeojson(null); resetNavigation(); }}
+            onTryDifferentRoute={() => {
+              setIsSavedRoutePreview(false);
+              savedRouteStartRef.current = null;
+              setNavRouteGeojson(null);
+              resetNavigation();
+              setSearchSheetOpen(true);
+            }}
             isSavedRoute={isSavedRoutePreview}
             savedRouteStart={savedRouteStartRef.current}
             onGeometryChange={(geo) => setNavRouteGeojson(geo)}
@@ -1235,7 +1322,10 @@ export default function RideScreen() {
       <SearchSheet
         visible={searchSheetOpen}
         onClose={() => setSearchSheetOpen(false)}
+        initialQuery={lastSearchQuery}
+        userLocation={lastKnownLocation}
         onSelectDestination={(dest) => {
+          setLastSearchQuery(dest.name);
           setSearchSheetOpen(false);
           fetchAndPreviewRoute(dest);
         }}

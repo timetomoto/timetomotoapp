@@ -92,6 +92,17 @@ const CACHE_VERSION = 2;
 const wikiPhotoCache: Record<string, string> = {};
 
 /**
+ * Clear cached Wikimedia photo for a bike (call when make/model changes).
+ */
+export async function clearWikiPhotoCache(bikeId: string): Promise<void> {
+  delete wikiPhotoCache[bikeId];
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    await AsyncStorage.removeItem(`wiki_photo_${bikeId}`);
+  } catch { /* ignore */ }
+}
+
+/**
  * Fetch a default bike photo from Wikipedia using make + model search.
  * Returns a thumbnail URL or null. Results are cached in memory per bikeId
  * and persisted to AsyncStorage for 30 days.

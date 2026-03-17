@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -21,11 +22,13 @@ export default function TabLayout() {
           height:          77,
           paddingBottom:   28,
           paddingTop:      6,
+          paddingHorizontal: 10,
         },
         tabBarLabelStyle: {
           fontSize:      10,
           fontWeight:    '600',
           letterSpacing: 0.3,
+          marginTop:     4,
         },
         headerShown: false,
       }}
@@ -34,8 +37,9 @@ export default function TabLayout() {
         name="ride"
         options={{
           title: 'RIDE',
+          tabBarItemStyle: { marginLeft: 10 },
           tabBarIcon: ({ color, size }) => (
-            <MotorcycleIcon size={Math.round((size + 4) * 1.4)} color={color} />
+            <View style={{ marginTop: 3 }}><MotorcycleIcon size={Math.round((size + 4) * 1.4 * 1.15)} color={color} /></View>
           ),
         }}
         listeners={() => ({
@@ -78,7 +82,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="garage"
         options={{
-          title: 'MY GARAGE',
+          title: 'GARAGE',
+          tabBarItemStyle: { marginRight: 10 },
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} accessibilityLabel="Garage tab" />
           ),

@@ -387,10 +387,10 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <Pressable
             style={[styles.row, { borderBottomColor: theme.border }]}
-            onPress={() => router.push('/weather-favorites')}
+            onPress={() => router.push('/favorite-locations')}
           >
             <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Manage Favorite Locations</Text>
+              <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Favorite Locations</Text>
               <Text style={[styles.rowSubtitle, { color: theme.textMuted }]}>Save cities for quick access</Text>
             </View>
             <Feather name="chevron-right" size={16} color={theme.textMuted} />

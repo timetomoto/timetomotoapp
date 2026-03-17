@@ -11,7 +11,6 @@ export interface PlaceDetail {
   lng: number;
   kind: 'fuel' | 'food';
   subtype?: string;
-  fuelTypes?: string;
   distanceMiles?: number;
 }
 
@@ -62,7 +61,8 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
   }
 
   const icon = place?.kind === 'fuel' ? 'droplet' : 'coffee';
-  const accentColor = place?.kind === 'fuel' ? '#FFD600' : theme.red;
+  const accentColor = place?.kind === 'fuel' ? '#FFD600' : '#FF6B35';
+  const infoIconColor = place?.kind === 'food' ? '#FF6B35' : theme.textMuted;
 
   return (
     <Animated.View
@@ -104,25 +104,15 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
       {/* Address */}
       {!!place?.address && (
         <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
-          <Feather name="map-pin" size={14} color={theme.textMuted} />
+          <Feather name="map-pin" size={14} color={infoIconColor} />
           <Text style={[styles.infoText, { color: theme.textSecondary }]}>{place.address}</Text>
-        </View>
-      )}
-
-      {/* Fuel types */}
-      {place?.kind === 'fuel' && (
-        <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
-          <Feather name="droplet" size={14} color={theme.textMuted} />
-          <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-            {place.fuelTypes ? place.fuelTypes : 'Fuel types not listed'}
-          </Text>
         </View>
       )}
 
       {/* Distance */}
       {place?.distanceMiles !== undefined && (
         <View style={[styles.infoRow, { borderBottomColor: theme.border }]}>
-          <Feather name="navigation" size={14} color={theme.textMuted} />
+          <Feather name="navigation" size={14} color={infoIconColor} />
           <Text style={[styles.infoText, { color: theme.textSecondary }]}>
             {place.distanceMiles < 0.1
               ? 'Less than 0.1 mi away'

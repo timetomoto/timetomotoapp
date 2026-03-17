@@ -103,19 +103,26 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
-  // Load cached result on mount / bike change
+  // Load cached result on mount / bike change; invalidate if make/model/year changed
+  const bikeDesc = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
   useEffect(() => {
     const key = cacheKey(bike.id);
     AsyncStorage.getItem(key).then((v) => {
       if (v) {
         const cached: CachedResult = JSON.parse(v);
+        // If cached data was for a different make/model/year, clear it
+        if (cached.bikeKey !== bikeDesc) {
+          AsyncStorage.removeItem(key);
+          setResult(null);
+          return;
+        }
         setResult(cached);
       } else {
         setResult(null);
       }
     });
     setError(null);
-  }, [bike.id]);
+  }, [bike.id, bike.make, bike.model, bike.year]);
 
   async function handleLookup() {
     setLoading(true);
@@ -123,7 +130,7 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
     try {
       const data = await fetchServiceIntervals(bike);
       const cached: CachedResult = {
-        bikeKey: bike.id,
+        bikeKey: bikeDesc,
         ...data,
         fetchedAt: new Date().toISOString(),
       };

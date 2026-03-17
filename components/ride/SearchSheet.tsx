@@ -37,6 +37,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onSelectDestination: (dest: Destination) => void;
+  initialQuery?: string;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 const RECENTS_KEY = 'ttm_nav_recents';
@@ -73,7 +75,7 @@ async function saveRecent(dest: Destination): Promise<void> {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function SearchSheet({ visible, onClose, onSelectDestination }: Props) {
+export default function SearchSheet({ visible, onClose, onSelectDestination, initialQuery, userLocation }: Props) {
   const { theme } = useTheme();
   const translateY = useRef(new Animated.Value(800)).current;
   const [query, setQuery] = useState('');
@@ -90,6 +92,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
   useEffect(() => {
     if (visible) {
       setPanelMounted(true);
+      if (initialQuery) setQuery(initialQuery);
       loadRecents().then(setRecents);
       loadFavorites(userId).then(setFavorites);
       Animated.spring(translateY, {
@@ -127,7 +130,10 @@ export default function SearchSheet({ visible, onClose, onSelectDestination }: P
     debounceTimer.current = setTimeout(async () => {
       try {
         const encoded = encodeURIComponent(query.trim());
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=place,address,postcode&limit=6`;
+        const proximityParam = userLocation
+          ? `&proximity=${userLocation.lng},${userLocation.lat}`
+          : '';
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=address,poi,place,postcode&limit=7${proximityParam}`;
         const res = await fetch(url);
         const json = await res.json();
         setResults(json.features ?? []);

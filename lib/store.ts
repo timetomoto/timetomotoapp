@@ -38,6 +38,10 @@ interface SafetyState {
   // GPS track recording
   recordedPoints: TrackPoint[];
 
+  // Session-only overrides (not persisted)
+  crashDetectionOverride: boolean;
+  locationSharingOverride: boolean;
+
   // Actions
   setMonitoring: (v: boolean) => void;
   setRecording: (v: boolean) => void;
@@ -50,6 +54,9 @@ interface SafetyState {
   clearCheckIn: () => void;
   addRecordedPoint: (p: TrackPoint) => void;
   clearRecordedPoints: () => void;
+  setCrashDetectionOverride: (v: boolean) => void;
+  setLocationSharingOverride: (v: boolean) => void;
+  clearSessionOverrides: () => void;
   loadContacts: (userId: string) => Promise<void>;
   saveContacts: (userId: string, contacts: EmergencyContact[]) => Promise<string | null>;
 }
@@ -66,6 +73,8 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   checkInActive: false,
   checkInNotifId: null,
   recordedPoints: [],
+  crashDetectionOverride: false,
+  locationSharingOverride: false,
 
   setMonitoring:    (isMonitoring) => set({ isMonitoring }),
   setRecording:     (isRecording)  => set({ isRecording }),
@@ -75,6 +84,15 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   setContacts:    (emergencyContacts) => set({ emergencyContacts }),
   setShareToken:  (shareToken)  => set({ shareToken }),
   setShareActive: (shareActive) => set({ shareActive }),
+  setCrashDetectionOverride: (crashDetectionOverride) => set({ crashDetectionOverride }),
+  setLocationSharingOverride: (locationSharingOverride) => set({ locationSharingOverride }),
+  clearSessionOverrides: () => set((s) => ({
+    // Revert global toggles that were only enabled for this ride
+    isMonitoring: s.crashDetectionOverride ? false : s.isMonitoring,
+    shareActive: s.locationSharingOverride ? false : s.shareActive,
+    crashDetectionOverride: false,
+    locationSharingOverride: false,
+  })),
 
   setCheckIn: (deadline, notifId) =>
     set({ checkInDeadline: deadline, checkInActive: true, checkInNotifId: notifId }),

@@ -1,8 +1,8 @@
-import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore, useGarageStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useSafetyStore, bikeLabel } from '../../lib/store';
 import { fetchDirections } from '../../lib/directions';
 import type { NavDestination, NavRoute, RoutePreference } from '../../lib/navigationStore';
 import {
@@ -24,8 +24,9 @@ interface Props {
   error: string | null;
   routePreference: RoutePreference;
   onChangePreference: (p: RoutePreference) => void;
-  onStartNavigation: (route: NavRoute, bikeId?: string | null, recordRide?: boolean) => void;
+  onStartNavigation: (route: NavRoute, bikeId?: string | null, recordRide?: boolean, shareLocation?: boolean) => void;
   onCancel: () => void;
+  onTryDifferentRoute?: () => void;
   isSavedRoute?: boolean;
   /** Start coords of the saved route (first trackpoint) */
   savedRouteStart?: { lat: number; lng: number } | null;
@@ -83,6 +84,7 @@ export default function RoutePreviewScreen({
   onChangePreference,
   onStartNavigation,
   onCancel,
+  onTryDifferentRoute,
   isSavedRoute = false,
   savedRouteStart,
   onGeometryChange,
@@ -91,9 +93,64 @@ export default function RoutePreviewScreen({
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
   const { bikes, selectedBikeId } = useGarageStore();
+  const {
+    isMonitoring, setMonitoring, shareActive,
+    setCrashDetectionOverride, setLocationSharingOverride,
+  } = useSafetyStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
   const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
   const [recordRide, setRecordRide] = useState(false);
+  const [crashOn, setCrashOn] = useState(isMonitoring);
+  const [crashOverride, setCrashOverride] = useState(false);
+  const [locationOn, setLocationOn] = useState(shareActive);
+  const [locationOverride, setLocationOverride] = useState(false);
+
+  function handleCrashToggle() {
+    if (!crashOn && !isMonitoring) {
+      Alert.alert(
+        'Crash Detection is Disabled',
+        'Crash Detection is turned off in your Settings. Would you like to enable it?',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Enable in Settings', onPress: () => { setMonitoring(true); setCrashOn(true); } },
+          { text: 'Enable for This Ride', onPress: () => { setCrashOn(true); setCrashOverride(true); } },
+        ],
+      );
+      return;
+    }
+    setCrashOn((v) => !v);
+    setCrashOverride(false);
+  }
+
+  function handleLocationToggle() {
+    if (!locationOn && !shareActive) {
+      Alert.alert(
+        'Live Location Sharing is Disabled',
+        'Live Location Sharing is turned off in your Settings. Would you like to enable it?',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Enable in Settings', onPress: () => { useSafetyStore.getState().setShareActive(true); setLocationOn(true); } },
+          { text: 'Enable for This Ride', onPress: () => { setLocationOn(true); setLocationOverride(true); } },
+        ],
+      );
+      return;
+    }
+    setLocationOn((v) => !v);
+    setLocationOverride(false);
+  }
+
+  function handleStartNav() {
+    if (!selectedRoute) return;
+    // Apply session overrides before starting
+    if (crashOn && !isMonitoring) {
+      setCrashDetectionOverride(true);
+      setMonitoring(true);
+    }
+    if (locationOn && !shareActive) {
+      setLocationSharingOverride(true);
+    }
+    onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
+  }
   const translateY = useRef(new Animated.Value(0)).current;
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -341,7 +398,7 @@ export default function RoutePreviewScreen({
             <Text style={[styles.errorText, { color: theme.textSecondary }]}>{error}</Text>
             <Pressable
               style={[styles.tryAgainBtn, { borderColor: theme.border }]}
-              onPress={() => onChangePreference(routePreference)}
+              onPress={() => onTryDifferentRoute ? onTryDifferentRoute() : onChangePreference(routePreference)}
             >
               <Text style={[styles.tryAgainText, { color: theme.textSecondary }]}>
                 Try Different Route
@@ -424,20 +481,54 @@ export default function RoutePreviewScreen({
           </View>
         )}
 
-        {/* Record ride toggle */}
+        {/* Ride option toggles */}
         {!loading && !error && selectedRoute && (
-          <Pressable
-            style={[styles.recordToggleRow, { borderColor: theme.border }]}
-            onPress={() => setRecordRide((v) => !v)}
-          >
-            <View style={styles.recordToggleLeft}>
-              <Feather name="play-circle" size={16} color={recordRide ? '#4CAF50' : theme.textMuted} />
-              <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Record this ride</Text>
-            </View>
-            <View style={[styles.recordToggleTrack, recordRide && styles.recordToggleTrackOn]}>
-              <View style={[styles.recordToggleThumb, recordRide && styles.recordToggleThumbOn]} />
-            </View>
-          </Pressable>
+          <View style={styles.toggleGroup}>
+            <Pressable
+              style={[styles.recordToggleRow, { borderColor: theme.border }]}
+              onPress={() => setRecordRide((v) => !v)}
+            >
+              <View style={styles.recordToggleLeft}>
+                <Feather name="play-circle" size={16} color={recordRide ? '#4CAF50' : theme.textMuted} />
+                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Record this ride</Text>
+              </View>
+              <View style={[styles.recordToggleTrack, recordRide && styles.recordToggleTrackOn]}>
+                <View style={[styles.recordToggleThumb, recordRide && styles.recordToggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.recordToggleRow, { borderColor: theme.border }]}
+              onPress={handleCrashToggle}
+            >
+              <View style={styles.recordToggleLeft}>
+                <Feather name="shield" size={16} color={crashOn ? theme.red : theme.textMuted} />
+                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Crash detection</Text>
+                {crashOverride && (
+                  <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
+                )}
+              </View>
+              <View style={[styles.recordToggleTrack, crashOn && { backgroundColor: theme.red }]}>
+                <View style={[styles.recordToggleThumb, crashOn && styles.recordToggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={[styles.recordToggleRow, { borderColor: theme.border }]}
+              onPress={handleLocationToggle}
+            >
+              <View style={styles.recordToggleLeft}>
+                <Feather name="map-pin" size={16} color={locationOn ? theme.red : theme.textMuted} />
+                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Share my location</Text>
+                {locationOverride && (
+                  <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
+                )}
+              </View>
+              <View style={[styles.recordToggleTrack, locationOn && { backgroundColor: theme.red }]}>
+                <View style={[styles.recordToggleThumb, locationOn && styles.recordToggleThumbOn]} />
+              </View>
+            </Pressable>
+          </View>
         )}
 
         {/* Action buttons — shared */}
@@ -446,7 +537,7 @@ export default function RoutePreviewScreen({
             {selectedRoute && (
               <Pressable
                 style={[styles.startBtn, { backgroundColor: theme.red }]}
-                onPress={() => onStartNavigation(selectedRoute, navBikeId, recordRide)}
+                onPress={handleStartNav}
               >
                 <Feather name="navigation" size={18} color="#fff" />
                 <Text style={styles.startBtnText}>START NAVIGATION</Text>
@@ -654,7 +745,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // Record ride toggle
+  // Ride option toggles
+  toggleGroup: {
+    gap: 8,
+    marginTop: 4,
+  },
+  overrideLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   recordToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

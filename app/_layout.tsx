@@ -248,6 +248,7 @@ function RootLayoutInner() {
         <Stack.Screen name="emergency-contacts" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="weather-favorites" />
+        <Stack.Screen name="favorite-locations" />
         <Stack.Screen name="help-contact" />
       </Stack>
       <CrashAlertModal />
