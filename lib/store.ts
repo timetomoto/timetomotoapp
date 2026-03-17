@@ -5,7 +5,7 @@ import type { RideWindowResult } from './rideWindow';
 import type { TrackPoint } from './gpx';
 import type { Route } from './routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { darkTheme, lightTheme, Theme } from './theme';
+import { darkTheme, sandTheme, lightTheme, Theme } from './theme';
 
 // ---------------------------------------------------------------------------
 // Safety / crash-detection store
@@ -356,7 +356,7 @@ export const useRoutesStore = create<RoutesState>((set) => ({
 // Theme store
 // ---------------------------------------------------------------------------
 
-type ThemeMode = 'dark' | 'light' | 'system';
+type ThemeMode = 'dark' | 'light' | 'sand' | 'system';
 
 type ThemeStore = {
   mode: ThemeMode;
@@ -371,15 +371,15 @@ export const useThemeStore = create<ThemeStore>()((set, get) => ({
   theme: lightTheme,
   setMode: async (mode, systemScheme = null) => {
     await AsyncStorage.setItem('ttm_theme_mode', mode);
-    const resolved = mode === 'system'
-      ? (systemScheme === 'dark' ? darkTheme : lightTheme)
+    const resolved = mode === 'sand' ? sandTheme
+      : mode === 'system' ? (systemScheme === 'dark' ? darkTheme : lightTheme)
       : mode === 'light' ? lightTheme : darkTheme;
     set({ mode, theme: resolved });
   },
   resolveTheme: (systemScheme) => {
     const { mode } = get();
-    const resolved = mode === 'system'
-      ? (systemScheme === 'dark' ? darkTheme : lightTheme)
+    const resolved = mode === 'sand' ? sandTheme
+      : mode === 'system' ? (systemScheme === 'dark' ? darkTheme : lightTheme)
       : mode === 'light' ? lightTheme : darkTheme;
     set({ theme: resolved });
   },

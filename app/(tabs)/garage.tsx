@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -112,7 +112,7 @@ export default function GarageScreen() {
         </View>
         <View style={styles.headerRight}>
           <Pressable
-            style={[styles.addBtn, { backgroundColor: theme.red }]}
+            style={[styles.addBtn, { backgroundColor: theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setShowAddBike(true);
@@ -182,13 +182,14 @@ export default function GarageScreen() {
 
           {/* Selected bike card */}
           {selectedBike && (
-            <View style={[styles.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[styles.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
               {/* Bike profile photo */}
               {bikePhotoUri ? (
                 <Image
                   source={{ uri: bikePhotoUri }}
                   style={styles.bikePhoto}
-                  resizeMode="cover"
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
                 />
               ) : (
                 <View style={[styles.bikePhotoPlaceholder, { backgroundColor: theme.bgPanel }]}>
@@ -241,7 +242,7 @@ export default function GarageScreen() {
               </View>
 
               {/* Section tabs */}
-              <View style={[styles.sectionRow, { borderBottomColor: theme.border }]}>
+              <View style={[styles.sectionRow, { borderBottomColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
                 {(['MAINTENANCE', 'MODS', 'SERVICE'] as const).map((s, i, arr) => (
                   <Pressable
                     key={s}

@@ -118,7 +118,7 @@ export default function RoutePreviewScreen({
   const [weatherSeverity, setWeatherSeverity] = useState<'clear' | 'minor' | 'moderate' | 'severe'>('clear');
   const [weatherLoading, setWeatherLoading] = useState(false);
 
-  function handleCrashToggle() {
+  const handleCrashToggle = useCallback(() => {
     if (!crashOn && !isMonitoring) {
       Alert.alert(
         'Crash Detection is Disabled',
@@ -133,9 +133,9 @@ export default function RoutePreviewScreen({
     }
     setCrashOn((v) => !v);
     setCrashOverride(false);
-  }
+  }, [crashOn, isMonitoring, setMonitoring]);
 
-  function handleLocationToggle() {
+  const handleLocationToggle = useCallback(() => {
     if (!locationOn && !shareActive) {
       Alert.alert(
         'Live Location Sharing is Disabled',
@@ -150,19 +150,7 @@ export default function RoutePreviewScreen({
     }
     setLocationOn((v) => !v);
     setLocationOverride(false);
-  }
-
-  function handleStartNav() {
-    if (!selectedRoute) return;
-    if (crashOn && !isMonitoring) {
-      setCrashDetectionOverride(true);
-      setMonitoring(true);
-    }
-    if (locationOn && !shareActive) {
-      setLocationSharingOverride(true);
-    }
-    onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
-  }
+  }, [locationOn, shareActive]);
 
   // ── Saved route pill state ──
   const [selectedPill, setSelectedPill] = useState<SavedRoutePill>('this_route');
@@ -174,13 +162,32 @@ export default function RoutePreviewScreen({
     ? (selectedPill === 'this_route' ? savedRoute : (cacheRef.current[selectedPill] ?? savedRoute))
     : (routes[selectedRouteIdx] ?? null);
 
-  const [isFavorite, setIsFavorite] = useState(false);
+  const handleStartNav = useCallback(() => {
+    if (!selectedRoute) return;
+    if (crashOn && !isMonitoring) {
+      setCrashDetectionOverride(true);
+      setMonitoring(true);
+    }
+    if (locationOn && !shareActive) {
+      setLocationSharingOverride(true);
+    }
+    onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
+  }, [selectedRoute, crashOn, isMonitoring, locationOn, shareActive, navBikeId, recordRide, setCrashDetectionOverride, setMonitoring, setLocationSharingOverride, onStartNavigation]);
 
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favList, setFavList] = useState<FavoriteLocation[]>([]);
+
+  // Load favorites once on mount
   useEffect(() => {
     loadFavorites(userId).then((favs) => {
-      setIsFavorite(favs.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+      setFavList(favs);
     });
-  }, [destination.name, destination.lat, destination.lng, userId]);
+  }, [userId]);
+
+  // Derive isFavorite from local list whenever destination or list changes
+  useEffect(() => {
+    setIsFavorite(favList.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+  }, [favList, destination.name, destination.lat, destination.lng]);
 
   // Fetch route weather summary
   useEffect(() => {
@@ -234,7 +241,7 @@ export default function RoutePreviewScreen({
   const toggleFavorite = useCallback(async () => {
     const fav: FavoriteLocation = { name: destination.name, lat: destination.lat, lng: destination.lng };
     const updated = await toggleFavoriteApi(fav, userId);
-    setIsFavorite(updated.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+    setFavList(updated);
   }, [destination.name, destination.lat, destination.lng, userId]);
 
   const fetchAlternative = useCallback(async (pill: 'fastest' | 'no_hwy' | 'no_tolls') => {
@@ -266,6 +273,8 @@ export default function RoutePreviewScreen({
     if (pill === 'this_route') { setSelectedPill('this_route'); if (savedRoute) onGeometryChange?.(savedRoute.geometry); }
     else fetchAlternative(pill);
   }, [selectedPill, savedRoute, fetchAlternative, onGeometryChange]);
+
+  const handleRecordToggle = useCallback(() => setRecordRide((v) => !v), []);
 
   const displayMeta = pillLoading ? '— mi · — min' : selectedRoute ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds) : '';
 
@@ -425,7 +434,7 @@ export default function RoutePreviewScreen({
           {/* Ride option toggles */}
           {!loading && !error && selectedRoute && (
             <View style={st.toggleGroup}>
-              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={() => setRecordRide((v) => !v)}>
+              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleRecordToggle}>
                 <View style={st.toggleLeft}>
                   <Feather name="play-circle" size={16} color={recordRide ? theme.toggleTrackOn : theme.textMuted} />
                   <Text style={[st.toggleText, { color: theme.textPrimary }]}>Record this ride</Text>
@@ -439,7 +448,6 @@ export default function RoutePreviewScreen({
                 <View style={st.toggleLeft}>
                   <Feather name="shield" size={16} color={crashOn ? theme.toggleTrackOn : theme.textMuted} />
                   <Text style={[st.toggleText, { color: theme.textPrimary }]}>Crash detection</Text>
-                  {crashOverride && <Text style={[st.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>}
                 </View>
                 <View style={[st.toggleTrack, { backgroundColor: crashOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
                   <View style={[st.toggleThumb, { backgroundColor: crashOn ? theme.toggleThumbOn : theme.toggleThumbOff }, crashOn && st.toggleThumbOn_]} />
@@ -450,7 +458,6 @@ export default function RoutePreviewScreen({
                 <View style={st.toggleLeft}>
                   <Feather name="map-pin" size={16} color={locationOn ? theme.toggleTrackOn : theme.textMuted} />
                   <Text style={[st.toggleText, { color: theme.textPrimary }]}>Share my location</Text>
-                  {locationOverride && <Text style={[st.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>}
                 </View>
                 <View style={[st.toggleTrack, { backgroundColor: locationOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
                   <View style={[st.toggleThumb, { backgroundColor: locationOn ? theme.toggleThumbOn : theme.toggleThumbOff }, locationOn && st.toggleThumbOn_]} />
@@ -464,7 +471,7 @@ export default function RoutePreviewScreen({
         {!loading && !error && (
           <View style={[st.footer, { backgroundColor: theme.bgPanel, borderTopColor: theme.border, paddingBottom: insets.bottom + 16 }]}>
             {selectedRoute && (
-              <Pressable style={[st.startBtn, { backgroundColor: recordRide ? theme.green : theme.red }]} onPress={handleStartNav}>
+              <Pressable style={[st.startBtn, { backgroundColor: recordRide ? theme.green : theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]} onPress={handleStartNav}>
                 <Feather name={recordRide ? 'play-circle' : 'navigation'} size={18} color={theme.white} />
                 <Text style={st.startBtnText}>{recordRide ? 'START & RECORD' : 'START NAVIGATION'}</Text>
               </Pressable>
@@ -552,7 +559,6 @@ const st = StyleSheet.create({
   bikePillText: { fontSize: 13, fontWeight: '600' },
 
   toggleGroup: { gap: 6, marginTop: 12 },
-  overrideLabel: { fontSize: 10, fontWeight: '500', marginLeft: 4 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

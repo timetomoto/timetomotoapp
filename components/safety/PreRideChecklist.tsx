@@ -320,9 +320,6 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
           }
           status={crashOn ? 'ok' : 'off'}
         >
-          {crashOverride && (
-            <Text style={[s.overrideLabel, { color: theme.textMuted }]}>this ride only</Text>
-          )}
           <Toggle value={crashOn} onChange={handleCrashToggle} />
         </CheckRow>
 
@@ -464,7 +461,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 
       {/* ── Start button ── */}
       <Pressable
-        style={({ pressed }) => [s.startBtn, { backgroundColor: theme.green }, pressed && s.startBtnPressed]}
+        style={({ pressed }) => [s.startBtn, { backgroundColor: theme.green }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }, pressed && s.startBtnPressed]}
         onPress={handleStart}
       >
         <Feather name="play-circle" size={22} color={theme.white} />

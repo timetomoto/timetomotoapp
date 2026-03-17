@@ -352,7 +352,7 @@ export default function FavoriteLocationsScreen() {
         {/* Add location button (shown in list view) */}
         {!adding && (
           <Pressable
-            style={[s.addBtn, { backgroundColor: theme.red }]}
+            style={[s.addBtn, { backgroundColor: theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}
             onPress={openAddView}
           >
             <Text style={s.addBtnText}>+ ADD LOCATION</Text>

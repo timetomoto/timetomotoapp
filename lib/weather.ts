@@ -4,7 +4,7 @@
 
 const API_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
 const BASE = 'https://api.tomorrow.io/v4';
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,7 +58,7 @@ export interface WeatherData {
 // In-memory cache
 // ---------------------------------------------------------------------------
 
-let cache: { data: WeatherData; key: string } | null = null;
+let cache: { data: WeatherData; key: string; ts: number } | null = null;
 
 function cacheKey(lat: number, lng: number) {
   return `${lat.toFixed(2)},${lng.toFixed(2)}`;
@@ -193,7 +193,7 @@ export async function fetchWeather(
   force = false,
 ): Promise<WeatherData> {
   const key = cacheKey(lat, lng);
-  if (!force && cache && cache.key === key && Date.now() - cache.data.fetchedAt < CACHE_TTL) {
+  if (!force && cache && cache.key === key && Date.now() - cache.ts < CACHE_TTL) {
     return cache.data;
   }
 
@@ -204,7 +204,7 @@ export async function fetchWeather(
   ]);
 
   const data: WeatherData = { current, hourly, daily, alerts, fetchedAt: Date.now() };
-  cache = { data, key };
+  cache = { data, key, ts: Date.now() };
   return data;
 }
 
@@ -227,7 +227,7 @@ export async function fetchWeatherByLocation(
   const lng: number = json.location?.lon ?? 0;
 
   const key = cacheKey(lat, lng);
-  if (!force && cache && cache.key === key && Date.now() - cache.data.fetchedAt < CACHE_TTL) {
+  if (!force && cache && cache.key === key && Date.now() - cache.ts < CACHE_TTL) {
     return { data: cache.data, lat, lng };
   }
 
@@ -238,6 +238,6 @@ export async function fetchWeatherByLocation(
   ]);
 
   const data: WeatherData = { current, hourly, daily, alerts, fetchedAt: Date.now() };
-  cache = { data, key };
+  cache = { data, key, ts: Date.now() };
   return { data, lat, lng };
 }

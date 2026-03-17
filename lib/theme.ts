@@ -32,6 +32,11 @@ export interface Theme {
   toggleThumbOff: string;
   toggleThumbOn: string;
   white: string;
+  // Chrome metallic borders (only meaningful for chrome theme, defaults for others)
+  cardBorderTop?: string;
+  cardBorderBottom?: string;
+  btnBorderTop?: string;
+  btnBorderBottom?: string;
 }
 
 export const darkTheme: Theme = {
@@ -68,6 +73,47 @@ export const darkTheme: Theme = {
   toggleThumbOff:  '#8A8A8A',
   toggleThumbOn:   '#FFFFFF',
   white:           '#FFFFFF',
+};
+
+export const sandTheme: Theme = {
+  bg:              '#F5ECD7',
+  bgPanel:         '#EDE0C4',
+  bgCard:          '#E5D4AE',
+  border:          '#C8B48A',
+  textPrimary:     '#1A0F00',
+  textSecondary:   '#3D2B10',
+  textMuted:       '#6B4F2E',
+  red:             '#E53935',
+  green:           '#4CAF50',
+  teal:            '#00897B',
+  yellow:          '#F59E0B',
+  orange:          '#EA580C',
+  purple:          '#7C3AED',
+  tabBarBg:        '#EDE0C4',
+  tabBarBorder:    '#C8B48A',
+  tabBarActive:    '#9B5E00',
+  tabBarInactive:  '#6B4F2E',
+  subNavBg:        '#EDE0C4',
+  subNavBorder:    '#C8B48A',
+  inputBg:         '#EDE0C4',
+  inputBorder:     '#C8B48A',
+  inputText:       '#2C1F0E',
+  inputPlaceholder:'#8B7355',
+  pillBg:          '#EDE0C4',
+  pillBorder:      '#C8B48A',
+  pillText:        '#3D2B10',
+  cardDivider:     '#C8B48A',
+  mapOverlayBg:    'rgba(245,236,215,0.85)',
+  toggleTrackOff:  '#C8B48A',
+  toggleTrackOn:   '#4CAF50',
+  toggleThumbOff:  '#FFFFFF',
+  toggleThumbOn:   '#FFFFFF',
+  white:           '#FFFFFF',
+  // Sand beveled edges
+  cardBorderTop:   '#EDE0C4',
+  cardBorderBottom:'#B8A07A',
+  btnBorderTop:    '#EF5350',
+  btnBorderBottom: '#B71C1C',
 };
 
 export const lightTheme: Theme = {

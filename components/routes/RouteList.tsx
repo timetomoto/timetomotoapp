@@ -176,7 +176,7 @@ function RouteCard({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <Text style={[styles.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
         <View style={styles.cardHeaderActions}>
@@ -255,7 +255,7 @@ function SavedRideCard({
   const dateStr = fmtDate(route.recorded_at ?? route.created_at);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <View style={srStyles.nameRow}>
           <View style={srStyles.recBadge}>
@@ -685,6 +685,9 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
           <View style={[styles.categoryDivider, { backgroundColor: theme.border }]} />
         )}
         contentContainerStyle={styles.content}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <>

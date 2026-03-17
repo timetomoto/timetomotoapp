@@ -200,11 +200,11 @@ export default function SettingsScreen() {
 
         {/* APPEARANCE */}
         <SectionHeader label="APPEARANCE" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
           <View style={styles.appearanceInner}>
             <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>THEME</Text>
             <View style={[styles.segControl, { borderColor: theme.border, marginTop: 10 }]}>
-              {(['dark', 'light', 'system'] as const).map((m, i, arr) => {
+              {(['light', 'dark', 'sand', 'system'] as const).map((m, i, arr) => {
                 const isActive = mode === m;
                 const isLast = i === arr.length - 1;
                 return (
@@ -234,7 +234,7 @@ export default function SettingsScreen() {
         {isDark ? (
           <>
             <SectionHeader label="SAFETY" />
-            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
               <View>
                 <ToggleRow
                   label="Crash Detection"
@@ -269,7 +269,7 @@ export default function SettingsScreen() {
             </View>
 
             <SectionHeader label="NOTIFICATIONS" />
-            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
               <ToggleRow
                 label="Ride start alerts"
                 value={false}
@@ -293,7 +293,7 @@ export default function SettingsScreen() {
         ) : (
           <>
             <SectionHeader label="NOTIFICATIONS" />
-            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
               <ToggleRow
                 label="Ride start alerts"
                 value={false}
@@ -315,7 +315,7 @@ export default function SettingsScreen() {
             </View>
 
             <SectionHeader label="SAFETY" />
-            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
               <View>
                 <ToggleRow
                   label="Crash Detection"
@@ -353,7 +353,7 @@ export default function SettingsScreen() {
 
         {/* UNITS */}
         <SectionHeader label="UNITS" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
           <SegmentedRow
             label="DISTANCE"
             options={[
@@ -385,7 +385,7 @@ export default function SettingsScreen() {
 
         {/* WEATHER */}
         <SectionHeader label="WEATHER" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
           <Pressable
             style={[styles.row, { borderBottomColor: theme.border }]}
             onPress={() => router.push('/favorite-locations')}
@@ -400,7 +400,7 @@ export default function SettingsScreen() {
 
         {/* OFFLINE MAPS */}
         <SectionHeader label="OFFLINE MAPS" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
           <PlainRow
             label="Manage Offline Maps"
             subtitle="Coming Soon"

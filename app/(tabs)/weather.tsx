@@ -210,6 +210,8 @@ function LocationSearchModal({
     { lat: 45.5051, lng: -122.6750, label: 'Portland, OR' },
   ];
 
+  const handleClearQuery = useCallback(() => setQuery(''), []);
+
   const showQuickPicks = query.trim().length === 0 && results.length === 0;
 
   function isFavorite(label: string) {
@@ -259,7 +261,7 @@ function LocationSearchModal({
               autoCapitalize="words"
             />
             {query.length > 0 && (
-              <Pressable onPress={() => setQuery('')}>
+              <Pressable onPress={handleClearQuery}>
                 <Feather name="x-circle" size={16} color={theme.textSecondary} />
               </Pressable>
             )}
@@ -583,7 +585,7 @@ export default function WeatherScreen() {
   const isCurrentFav = !!locationLabel && favorites.some((f) => f.name === locationLabel);
 
   // Toggle favorite for current displayed location
-  async function toggleCurrentFavorite() {
+  const toggleCurrentFavorite = useCallback(async () => {
     if (!locationLabel || !coordsRef.current) return;
     const loc: FavoriteLocation = {
       name: locationLabel,
@@ -592,13 +594,13 @@ export default function WeatherScreen() {
     };
     const updated = await toggleFavoriteApi(toShared(loc), userId);
     setFavorites(updated.map(fromShared));
-  }
+  }, [locationLabel, userId]);
 
   // Toggle favorite from search modal
-  async function handleToggleFavorite(loc: FavoriteLocation) {
+  const handleToggleFavorite = useCallback(async (loc: FavoriteLocation) => {
     const updated = await toggleFavoriteApi(toShared(loc), userId);
     setFavorites(updated.map(fromShared));
-  }
+  }, [userId]);
 
   // Load by GPS coords
   async function loadByGPS(force = false) {
@@ -725,6 +727,14 @@ export default function WeatherScreen() {
     setRefreshing(false);
   }, []);
 
+  const handleOpenSearch = useCallback(() => setShowSearch(true), []);
+  const handleCloseSearch = useCallback(() => setShowSearch(false), []);
+  const handleOpenMenu = useCallback(() => setMenuOpen(true), []);
+  const handleCloseMenu = useCallback(() => setMenuOpen(false), []);
+  const handleTabCurrent = useCallback(() => setActiveTab('current'), []);
+  const handleTabRideWindow = useCallback(() => setActiveTab('ride-window'), []);
+  const handleGPSRefresh = useCallback(() => loadByGPS(true), []);
+
   const visibleAlerts = data?.alerts.filter((a) => !dismissedAlerts.has(a.id)) ?? [];
 
   // ---------------------------------------------------------------------------
@@ -738,7 +748,7 @@ export default function WeatherScreen() {
       <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]} edges={['top']}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <HamburgerButton onPress={() => setMenuOpen(true)} />
+          <HamburgerButton onPress={handleOpenMenu} />
           <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <Text style={[styles.heading, { color: theme.textPrimary }]}>WEATHER</Text>
@@ -753,7 +763,7 @@ export default function WeatherScreen() {
           </Text>
           <Pressable
             style={[styles.loadingSearchBtn, { borderColor: theme.border }]}
-            onPress={() => setShowSearch(true)}
+            onPress={handleOpenSearch}
           >
             <Feather name="search" size={14} color={theme.textSecondary} />
             <Text style={[styles.loadingSearchText, { color: theme.textSecondary }]}>
@@ -763,13 +773,13 @@ export default function WeatherScreen() {
         </View>
         <LocationSearchModal
           visible={showSearch}
-          onClose={() => setShowSearch(false)}
+          onClose={handleCloseSearch}
           onSelect={loadByGeoResult}
           favorites={favorites}
           recents={recents}
           onToggleFavorite={handleToggleFavorite}
         />
-        <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+        <HamburgerMenu open={menuOpen} onClose={handleCloseMenu} />
       </SafeAreaView>
     );
   }
@@ -781,19 +791,19 @@ export default function WeatherScreen() {
           <Feather name="cloud-off" size={48} color={theme.textSecondary} />
           <Text style={[styles.errorTitle, { color: theme.textPrimary }]}>WEATHER UNAVAILABLE</Text>
           <Text style={[styles.errorMsg, { color: theme.textSecondary }]}>{errorMsg}</Text>
-          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: theme.red }]} onPress={() => loadByGPS(true)}>
+          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: theme.red }]} onPress={handleGPSRefresh}>
             <Text style={styles.retryText}>USE MY LOCATION</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.retryBtn, { backgroundColor: theme.bgCard, marginTop: 8 }]}
-            onPress={() => setShowSearch(true)}
+            onPress={handleOpenSearch}
           >
             <Text style={[styles.retryText, { color: theme.textPrimary }]}>SEARCH A CITY</Text>
           </TouchableOpacity>
         </View>
         <LocationSearchModal
           visible={showSearch}
-          onClose={() => setShowSearch(false)}
+          onClose={handleCloseSearch}
           onSelect={loadByGeoResult}
           favorites={favorites}
           recents={recents}
@@ -807,14 +817,14 @@ export default function WeatherScreen() {
     <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <HamburgerButton onPress={() => setMenuOpen(true)} />
+        <HamburgerButton onPress={handleOpenMenu} />
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none" >
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={[styles.heading, { color: theme.textPrimary }]}>WEATHER</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => loadByGPS(true)} style={styles.headerBtn}>
+          <TouchableOpacity onPress={handleGPSRefresh} style={styles.headerBtn}>
             <Feather name="navigation" size={18} color={theme.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -822,13 +832,13 @@ export default function WeatherScreen() {
 
       {/* Sub-tab bar */}
       <View style={[styles.subTabBar, { backgroundColor: theme.subNavBg, borderBottomColor: theme.subNavBorder }]}>
-        <Pressable style={styles.subTab} onPress={() => setActiveTab('current')}>
+        <Pressable style={styles.subTab} onPress={handleTabCurrent}>
           <Text style={[styles.subTabText, { color: theme.pillText }, activeTab === 'current' && { color: theme.red }]}>
             CURRENT
           </Text>
           {activeTab === 'current' && <View style={[styles.subTabUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
-        <Pressable style={styles.subTab} onPress={() => setActiveTab('ride-window')}>
+        <Pressable style={styles.subTab} onPress={handleTabRideWindow}>
           <Text style={[styles.subTabText, { color: theme.pillText }, activeTab === 'ride-window' && { color: theme.red }]}>
             RIDE WINDOW
           </Text>
@@ -855,7 +865,7 @@ export default function WeatherScreen() {
           {!!locationLabel && (
             <TouchableOpacity
               style={[styles.locationRow, { borderColor: theme.border }]}
-              onPress={() => setShowSearch(true)}
+              onPress={handleOpenSearch}
             >
               <Feather name="map-pin" size={12} color={theme.red} />
               <Text style={[styles.locationText, { color: theme.textSecondary }]}>{locationLabel}</Text>
@@ -884,14 +894,14 @@ export default function WeatherScreen() {
 
       <LocationSearchModal
         visible={showSearch}
-        onClose={() => setShowSearch(false)}
+        onClose={handleCloseSearch}
         onSelect={loadByGeoResult}
         favorites={favorites}
         recents={recents}
         onToggleFavorite={handleToggleFavorite}
       />
 
-      <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <HamburgerMenu open={menuOpen} onClose={handleCloseMenu} />
     </SafeAreaView>
   );
 }
