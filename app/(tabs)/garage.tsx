@@ -54,27 +54,31 @@ export default function GarageScreen() {
     if (!selectedBike) return;
     if (selectedBike.photo_url) return;
     if (!selectedBike.make || !selectedBike.model) return;
-    if (fetchingRef.current.has(selectedBike.id)) return;
 
     const fetchKey = `${selectedBike.id}|${selectedBike.make}|${selectedBike.model}`;
+    const makeModelChanged = lastFetchKey.current && lastFetchKey.current.startsWith(selectedBike.id) && fetchKey !== lastFetchKey.current;
+
+    // Skip if already fetched for this exact make/model
     if (fetchKey === lastFetchKey.current && wikiPhotos[selectedBike.id]) return;
+    // Skip if already fetching the same key
+    if (fetchingRef.current.has(fetchKey)) return;
 
     const bikeId = selectedBike.id;
-    fetchingRef.current.add(bikeId);
 
     // Clear stale cache if make/model changed
-    if (lastFetchKey.current && lastFetchKey.current.startsWith(bikeId) && fetchKey !== lastFetchKey.current) {
+    if (makeModelChanged) {
       clearWikiPhotoCache(bikeId);
       setWikiPhotos((prev) => { const next = { ...prev }; delete next[bikeId]; return next; });
     }
     lastFetchKey.current = fetchKey;
+    fetchingRef.current.add(fetchKey);
 
     fetchWikimediaBikePhoto(selectedBike.make, selectedBike.model, bikeId)
       .then((url) => {
         if (url) setWikiPhotos((prev) => ({ ...prev, [bikeId]: url }));
       })
       .catch(() => {})
-      .finally(() => fetchingRef.current.delete(bikeId));
+      .finally(() => fetchingRef.current.delete(fetchKey));
   }, [selectedBike?.id, selectedBike?.photo_url, selectedBike?.make, selectedBike?.model]);
 
   const bikePhotoUri = selectedBike?.photo_url || wikiPhoto;

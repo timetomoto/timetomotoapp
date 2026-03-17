@@ -22,7 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useGarageStore, type Bike, type BikeType } from '../../lib/store';
-import { pickAndUploadBikePhoto, saveBikePhotoUrl } from '../../lib/bikePhoto';
+import { pickAndUploadBikePhoto, saveBikePhotoUrl, clearWikiPhotoCache } from '../../lib/bikePhoto';
 import MotorcycleIcon from '../icons/MotorcycleIcon';
 import { useTheme } from '../../lib/useTheme';
 
@@ -335,6 +335,12 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
     };
 
     if (isEdit && editBike) {
+      // If make/model changed and no user-uploaded photo, clear stale wiki photo cache
+      const makeModelChanged = fields.make !== editBike.make || fields.model !== editBike.model;
+      if (makeModelChanged && !photoUrl) {
+        clearWikiPhotoCache(editBike.id);
+      }
+
       // Edit existing bike
       if (editBike.user_id === 'local') {
         const stored = await AsyncStorage.getItem('ttm_bikes_local');

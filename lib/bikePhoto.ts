@@ -86,7 +86,7 @@ export async function saveBikePhotoUrl(bikeId: string, photoUrl: string): Promis
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
 // Cache version — bump to invalidate all cached results after logic changes
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 
 // In-memory cache keyed by bikeId
 const wikiPhotoCache: Record<string, string> = {};
@@ -164,12 +164,15 @@ async function getThumbnail(title: string): Promise<string | null> {
 
 async function fetchFromWiki(make: string, model: string): Promise<string | null> {
   try {
-    // Strategy 1 — direct title lookup (most accurate)
-    // Try "Make Model" first, e.g. "Honda CRF250L"
+    // Strategy 1 — direct Wikipedia title lookup (most accurate)
     const directThumb = await getThumbnail(`${make} ${model}`);
     if (directThumb) return directThumb;
 
-    // Strategy 2 — search, but only accept results that contain the model name
+    // Strategy 2 — Wikimedia Commons search (has newer/more specific photos)
+    const commonsUrl = await fetchFromCommons(make, model);
+    if (commonsUrl) return commonsUrl;
+
+    // Strategy 3 — Wikipedia search, accept results that match the bike
     const searchQuery = encodeURIComponent(`${make} ${model} motorcycle`);
     const searchRes = await fetch(
       `${WIKI_API}?action=query&list=search&srsearch=${searchQuery}` +
@@ -179,19 +182,60 @@ async function fetchFromWiki(make: string, model: string): Promise<string | null
     const searchData = await searchRes.json();
     const results = searchData?.query?.search ?? [];
 
-    // Find the first result whose title contains the model (or a key part of it)
     const modelLower = model.toLowerCase();
-    // Extract the main model identifier (first word/number, e.g. "CRF250L" from "CRF250L Rally")
+    const fullName = `${make} ${model}`.toLowerCase();
     const modelKey = model.split(/\s+/)[0].toLowerCase();
 
     for (const result of results) {
       const titleLower = (result.title as string).toLowerCase();
-      if (titleLower.includes(modelLower) || titleLower.includes(modelKey)) {
+      const titleMatch = titleLower.includes(modelLower) || titleLower.includes(modelKey);
+      const titleModelPart = titleLower.replace(make.toLowerCase(), '').trim();
+      const reverseMatch = titleModelPart.length > 2 && (fullName.includes(titleModelPart) || modelLower.includes(titleModelPart));
+      if (titleMatch || reverseMatch) {
         const thumb = await getThumbnail(result.title);
         if (thumb) return thumb;
       }
     }
 
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
+
+/** Search Wikimedia Commons for a bike photo (often has newer, more specific images). */
+async function fetchFromCommons(make: string, model: string): Promise<string | null> {
+  try {
+    const query = encodeURIComponent(`${make} ${model}`);
+    const res = await fetch(
+      `${COMMONS_API}?action=query&list=search&srsearch=${query}` +
+      `&srnamespace=6&format=json&origin=*&srlimit=3`,
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const results = data?.query?.search ?? [];
+
+    const modelLower = model.toLowerCase();
+    const modelKey = model.split(/\s+/)[0].toLowerCase();
+
+    for (const result of results) {
+      const titleLower = (result.title as string).toLowerCase();
+      if (!titleLower.includes(modelKey) && !titleLower.includes(make.toLowerCase())) continue;
+      // Only accept image files
+      if (!titleLower.match(/\.(jpg|jpeg|png)$/)) continue;
+
+      const infoRes = await fetch(
+        `${COMMONS_API}?action=query&titles=${encodeURIComponent(result.title)}` +
+        `&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`,
+      );
+      if (!infoRes.ok) continue;
+      const infoData = await infoRes.json();
+      const page = Object.values(infoData?.query?.pages ?? {})[0] as any;
+      const thumbUrl = page?.imageinfo?.[0]?.thumburl;
+      if (thumbUrl) return thumbUrl;
+    }
     return null;
   } catch {
     return null;
