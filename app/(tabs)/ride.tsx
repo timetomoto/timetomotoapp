@@ -1174,7 +1174,7 @@ export default function RideScreen() {
           <HamburgerButton onPress={() => setMenuOpen(true)} />
           <>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 45 }}>
                 <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
               </View>
             </View>
@@ -1415,7 +1415,7 @@ export default function RideScreen() {
               <Feather name="x" size={22} color={theme.textSecondary} />
             </Pressable>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 45 }}>
                 <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
               </View>
             </View>
