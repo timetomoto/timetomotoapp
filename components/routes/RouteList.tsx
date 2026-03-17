@@ -5,6 +5,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -86,6 +87,29 @@ function groupRoutes(routes: Route[]): Map<string, Route[]> {
   return map;
 }
 
+async function shareRoute(route: Route) {
+  try {
+    if (route.points.length > 0) {
+      const xml = serializeGpx(route.name, route.points);
+      const safeName = route.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const outFile = new File(Paths.cache, `${safeName}.gpx`);
+      outFile.write(xml);
+      await Sharing.shareAsync(outFile.uri, {
+        mimeType: 'application/gpx+xml',
+        dialogTitle: `Share ${route.name}`,
+        UTI: 'com.topografix.gpx',
+      });
+    } else {
+      await Share.share({
+        title: route.name,
+        message: `Check out this route on Time to Moto: ${route.name} — ${fmtMiles(route.distance_miles)} mi.`,
+      });
+    }
+  } catch {
+    // User cancelled or share failed
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Route card
 // ---------------------------------------------------------------------------
@@ -161,6 +185,9 @@ function RouteCard({
           </Pressable>
           <Pressable onPress={showCategorySheet} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="folder" size={14} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable onPress={() => shareRoute(route)} hitSlop={8} style={styles.cardHeaderBtn}>
+            <Feather name="share-2" size={14} color={theme.textSecondary} />
           </Pressable>
           <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="trash-2" size={15} color={theme.textSecondary} />
@@ -240,6 +267,9 @@ function SavedRideCard({
         <View style={styles.cardHeaderActions}>
           <Pressable onPress={onRename} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="edit-2" size={14} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable onPress={() => shareRoute(route)} hitSlop={8} style={styles.cardHeaderBtn}>
+            <Feather name="share-2" size={14} color={theme.textSecondary} />
           </Pressable>
           <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="trash-2" size={15} color={theme.textSecondary} />

@@ -74,8 +74,8 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        thumbColor={value ? theme.red : theme.textMuted}
-        trackColor={{ false: theme.border, true: theme.red + '66' }}
+        thumbColor={value ? theme.toggleThumbOn : theme.toggleThumbOff}
+        trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
       />
     </View>
   );
@@ -137,7 +137,7 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
         onChangeText={setConfirmPassword}
       />
       {!!error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
-      {success && <Text style={styles.successText}>Password updated!</Text>}
+      {success && <Text style={[styles.successText, { color: theme.green }]}>Password updated!</Text>}
       <View style={styles.inlineFormBtns}>
         <Pressable style={[styles.cancelBtn, { borderColor: theme.border }]} onPress={onDone}>
           <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>CANCEL</Text>
@@ -250,7 +250,7 @@ export default function AccountScreen() {
             keyboardType="phone-pad"
           />
           {!!profileError && <Text style={[styles.errorText, { color: theme.red }]}>{profileError}</Text>}
-          {profileSaved && <Text style={styles.successText}>Profile saved!</Text>}
+          {profileSaved && <Text style={[styles.successText, { color: theme.green }]}>Profile saved!</Text>}
           <Pressable
             style={[styles.saveBtn, { backgroundColor: theme.red }]}
             onPress={handleSaveProfile}
@@ -420,5 +420,5 @@ const styles = StyleSheet.create({
   },
 
   errorText: { fontSize: 13, textAlign: 'center' },
-  successText: { color: '#4CAF50', fontSize: 13, textAlign: 'center' },
+  successText: { fontSize: 13, textAlign: 'center' },
 });

@@ -261,8 +261,8 @@ function RecordScreen({
       <View style={styles.recordActiveCenter} pointerEvents="box-none">
         {/* Live share status */}
         {shareActive && (
-          <View style={[styles.statusRow, { backgroundColor: 'rgba(0,0,0,0.65)', borderColor: '#4CAF5044' }]}>
-            <View style={styles.statusDot} />
+          <View style={[styles.statusRow, { backgroundColor: 'rgba(0,0,0,0.65)', borderColor: theme.green + '44' }]}>
+            <View style={[styles.statusDot, { backgroundColor: theme.green }]} />
             <Text style={[styles.statusText, { color: '#ccc' }]}>LIVE — location link copied to clipboard</Text>
             <Pressable onPress={async () => {
               if (shareToken) await Clipboard.setStringAsync(shareUrl(shareToken));
@@ -283,7 +283,7 @@ function RecordScreen({
             <Text style={[styles.statusText, { color: '#ccc' }, checkInSecsLeft < 300 && { color: theme.red }]}>
               Check in: {formatCountdown(checkInSecsLeft)} remaining
             </Text>
-            <Pressable style={styles.checkInBtn} onPress={handleCheckIn}>
+            <Pressable style={[styles.checkInBtn, { backgroundColor: theme.green }]} onPress={handleCheckIn}>
               <Text style={styles.checkInBtnText}>CHECK IN</Text>
             </Pressable>
           </View>
@@ -935,7 +935,7 @@ export default function RideScreen() {
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
           compassEnabled
-          compassPosition={{ top: Platform.OS === 'ios' ? 101 : 61, right: 12 }}
+          compassPosition={{ top: Platform.OS === 'ios' ? 114 : 74, right: 12 }}
           // @ts-expect-error compassViewStyle exists at runtime but missing from types
           compassViewStyle={{ opacity: 0.7 }}
           scaleBarEnabled={false}
@@ -1099,17 +1099,17 @@ export default function RideScreen() {
         <Pressable
           style={[
             styles.crashToggle,
-            { backgroundColor: isMonitoring ? 'rgba(76,175,80,0.15)' : theme.mapOverlayBg, borderColor: isMonitoring ? '#4CAF50' : theme.border },
+            { backgroundColor: isMonitoring ? theme.green + '26' : theme.mapOverlayBg, borderColor: isMonitoring ? theme.green : theme.border },
           ]}
           onPress={() => setMonitoring(!isMonitoring)}
         >
-          <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textSecondary} />
+          <Feather name="shield" size={16} color={isMonitoring ? theme.green : theme.textSecondary} />
           <View>
-            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
+            <Text style={[styles.crashToggleText, { color: isMonitoring ? theme.green : theme.textSecondary }]}>
               {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
             </Text>
             {selectedBike && (
-              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textSecondary }]}>
+              <Text style={[styles.crashToggleBike, { color: isMonitoring ? theme.green + '99' : theme.textSecondary }]}>
                 {bikeLabel(selectedBike).length > 13 ? bikeLabel(selectedBike).slice(0, 13) + '…' : bikeLabel(selectedBike)}
               </Text>
             )}
@@ -1141,7 +1141,7 @@ export default function RideScreen() {
         {/* ── RIDE & RECORD button (idle, no nav, no recording) ── */}
         {!isNavigatingActive && !isRecording && (
           <Pressable
-            style={[styles.endNavBtn, { backgroundColor: '#4CAF50' }]}
+            style={[styles.endNavBtn, { backgroundColor: theme.green }]}
             onPress={() => setShowChecklist(true)}
           >
             <Feather name="play-circle" size={22} color="#fff" />
@@ -1180,7 +1180,7 @@ export default function RideScreen() {
         {/* Toast notification */}
         {!!toastMsg && (
           <View style={[styles.toast, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-            <Feather name="check-circle" size={14} color="#4CAF50" />
+            <Feather name="check-circle" size={14} color={theme.green} />
             <Text style={[styles.toastText, { color: theme.textPrimary }]}>{toastMsg}</Text>
           </View>
         )}
@@ -1548,14 +1548,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50',
   },
   statusText: {
     flex: 1,
     fontSize: 12,
   },
   checkInBtn: {
-    backgroundColor: '#4CAF50',
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,

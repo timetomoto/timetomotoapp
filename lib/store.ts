@@ -267,7 +267,7 @@ export const useGarageStore = create<GarageState>((set, get) => ({
     }
     const { data, error } = await supabase
       .from('bikes')
-      .select('*')
+      .select('id, user_id, year, make, model, nickname, odometer, tank_gallons, avg_mpg, fuelCapacity, fuelCapacityUnit, bike_type, specs, photo_url, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {

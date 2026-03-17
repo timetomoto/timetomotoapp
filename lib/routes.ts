@@ -57,7 +57,7 @@ export async function fetchUserRoutes(userId: string): Promise<Route[]> {
   try {
     const { data, error } = await supabase
       .from('saved_routes')
-      .select('*')
+      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, source, recorded_at, bike_id, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

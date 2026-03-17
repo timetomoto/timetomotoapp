@@ -161,7 +161,7 @@ export async function loadMaintenance(bikeId: string, userId?: string): Promise<
   // Fetch from Supabase and update cache
   const { data } = await supabase
     .from('maintenance_logs')
-    .select('*')
+    .select('id, bike_id, user_id, title, maintenance_type, date, mileage, cost, notes, created_at, updated_at')
     .eq('bike_id', bikeId)
     .eq('user_id', userId)
     .order('date', { ascending: false });
@@ -248,7 +248,7 @@ export async function loadModifications(bikeId: string, userId?: string): Promis
 
   const { data } = await supabase
     .from('mod_logs')
-    .select('*')
+    .select('id, bike_id, user_id, title, brand, category, date_installed, cost, notes, created_at, updated_at')
     .eq('bike_id', bikeId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
@@ -334,7 +334,7 @@ export async function loadDocuments(bikeId: string, userId?: string): Promise<Ga
 
   const { data } = await supabase
     .from('documents')
-    .select('*')
+    .select('id, bike_id, user_id, title, document_type, file_url, date_added, notes, created_at, updated_at')
     .eq('bike_id', bikeId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });

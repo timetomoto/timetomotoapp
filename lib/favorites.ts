@@ -55,7 +55,7 @@ export async function loadFavorites(userId?: string | null): Promise<FavoriteLoc
   try {
     const { data, error } = await supabase
       .from('favorite_locations')
-      .select('*')
+      .select('id, user_id, name, latitude, longitude, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

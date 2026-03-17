@@ -47,8 +47,8 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        thumbColor={value ? theme.red : theme.textMuted}
-        trackColor={{ false: theme.border, true: theme.red + '66' }}
+        thumbColor={value ? theme.toggleThumbOn : theme.toggleThumbOff}
+        trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
       />
     </View>
   );
@@ -277,9 +277,12 @@ export default function SettingsScreen() {
             <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
               <ToggleRow
                 label="Ride start alerts"
-                value={notifRideStart}
-                onValueChange={(v) => { setNotifRideStart(v); toggleNotif('ttm_notif_ride_start', v); }}
+                value={false}
+                onValueChange={() => {}}
               />
+              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
+              </Text>
               <ToggleRow
                 label="Weather alerts"
                 value={notifWeather}
@@ -298,9 +301,12 @@ export default function SettingsScreen() {
             <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
               <ToggleRow
                 label="Ride start alerts"
-                value={notifRideStart}
-                onValueChange={(v) => { setNotifRideStart(v); toggleNotif('ttm_notif_ride_start', v); }}
+                value={false}
+                onValueChange={() => {}}
               />
+              <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
+              </Text>
               <ToggleRow
                 label="Weather alerts"
                 value={notifWeather}
@@ -489,6 +495,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.2,
     marginTop: 2,
+  },
+  helperText: {
+    fontSize: 11,
+    paddingHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 4,
   },
 
   segRow: {

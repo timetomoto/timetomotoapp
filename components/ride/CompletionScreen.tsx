@@ -47,8 +47,8 @@ export default function CompletionScreen({
     <View style={styles.overlay}>
       <View style={[styles.card, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
         {/* Icon */}
-        <View style={[styles.iconCircle, { backgroundColor: '#4CAF50' + '22', borderColor: '#4CAF50' }]}>
-          <Feather name="check-circle" size={40} color="#4CAF50" />
+        <View style={[styles.iconCircle, { backgroundColor: theme.green + '22', borderColor: theme.green }]}>
+          <Feather name="check-circle" size={40} color={theme.green} />
         </View>
 
         {/* Title */}

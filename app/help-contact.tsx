@@ -142,7 +142,7 @@ export default function HelpContactScreen() {
           <View style={styles.backBtn} />
         </View>
         <View style={styles.centered}>
-          <Feather name="check-circle" size={56} color="#4CAF50" />
+          <Feather name="check-circle" size={56} color={theme.green} />
           <Text style={[styles.stateTitle, { color: theme.textPrimary }]}>MESSAGE SENT</Text>
           <Text style={[styles.stateMsg, { color: theme.textSecondary }]}>
             Thanks for reaching out! We'll get back to you at {email} within 1-2 business days.

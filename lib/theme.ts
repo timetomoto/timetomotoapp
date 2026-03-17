@@ -7,6 +7,7 @@ export interface Theme {
   textSecondary: string;
   textMuted: string;
   red: string;
+  green: string;
   teal: string;
   yellow: string;
   orange: string;
@@ -26,6 +27,10 @@ export interface Theme {
   pillText: string;
   cardDivider: string;
   mapOverlayBg: string;
+  toggleTrackOff: string;
+  toggleTrackOn: string;
+  toggleThumbOff: string;
+  toggleThumbOn: string;
 }
 
 export const darkTheme: Theme = {
@@ -37,6 +42,7 @@ export const darkTheme: Theme = {
   textSecondary:   '#E8E4DC',
   textMuted:       '#999999',
   red:             '#E53935',
+  green:           '#4CAF50',
   teal:            '#4ECDC4',
   yellow:          '#F7B731',
   orange:          '#FF6B35',
@@ -56,6 +62,10 @@ export const darkTheme: Theme = {
   pillText:        '#9E9E9E',
   cardDivider:     '#444444',
   mapOverlayBg:    '#000000AA',
+  toggleTrackOff:  '#3A3A3A',
+  toggleTrackOn:   '#4CAF50',
+  toggleThumbOff:  '#8A8A8A',
+  toggleThumbOn:   '#FFFFFF',
 };
 
 export const lightTheme: Theme = {
@@ -67,6 +77,7 @@ export const lightTheme: Theme = {
   textSecondary:   '#222222',
   textMuted:       '#777777',
   red:             '#C62828',
+  green:           '#4CAF50',
   teal:            '#00897B',
   yellow:          '#F59E0B',
   orange:          '#EA580C',
@@ -86,4 +97,8 @@ export const lightTheme: Theme = {
   pillText:        '#111111',
   cardDivider:     '#E0E0E0',
   mapOverlayBg:    'rgba(255,255,255,0.85)',
+  toggleTrackOff:  '#D1D1D1',
+  toggleTrackOn:   '#4CAF50',
+  toggleThumbOff:  '#FFFFFF',
+  toggleThumbOn:   '#FFFFFF',
 };

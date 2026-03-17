@@ -146,7 +146,7 @@ export default function CrashAlertModal() {
 
           {/* I'm OK button */}
           <Pressable
-            style={({ pressed }) => [s.okBtn, pressed && s.okBtnPressed]}
+            style={({ pressed }) => [s.okBtn, { backgroundColor: theme.green }, pressed && s.okBtnPressed]}
             onPress={handleImOK}
           >
             <Text style={s.okBtnText}>I'M OK</Text>
@@ -223,7 +223,6 @@ const s = StyleSheet.create({
   },
   okBtn: {
     marginTop: 8,
-    backgroundColor: '#4CAF50',
     borderRadius: 12,
     paddingVertical: 22,
     paddingHorizontal: 48,

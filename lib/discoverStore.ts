@@ -606,10 +606,6 @@ interface DiscoverStore {
   fetchNews: () => Promise<void>;
   setNewsFilter: (cat: NewsCategory) => void;
 
-  // Routes
-  activeRouteFilter: string;
-  setRouteFilter: (filter: string) => void;
-
   // Conditions
   conditions: RoadCondition[];
   conditionsLoading: boolean;
@@ -671,10 +667,6 @@ export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
   },
 
   setNewsFilter: (activeNewsFilter) => set({ activeNewsFilter }),
-
-  // Routes
-  activeRouteFilter: 'all',
-  setRouteFilter: (activeRouteFilter) => set({ activeRouteFilter }),
 
   // Conditions
   conditions: [],

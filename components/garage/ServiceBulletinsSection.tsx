@@ -260,7 +260,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
       {/* ── No results ── */}
       {isEmpty && !isLoading && (
         <View style={[s.emptyBox, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <Feather name="check-circle" size={20} color="#4CAF50" />
+          <Feather name="check-circle" size={20} color={theme.green} />
           <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No recalls or complaints found</Text>
           <Text style={[s.emptySubtitle, { color: theme.textSecondary }]}>
             NHTSA has no records for{' '}

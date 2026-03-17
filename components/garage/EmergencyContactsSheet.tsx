@@ -191,7 +191,7 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
             )}
 
             {!!error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
-            {saved && <Text style={styles.savedText}>Contacts saved!</Text>}
+            {saved && <Text style={[styles.savedText, { color: theme.green }]}>Contacts saved!</Text>}
 
             <Pressable
               style={({ pressed }) => [
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   },
 
   errorText: { fontSize: 13, marginBottom: 12, textAlign: 'center' },
-  savedText:  { color: '#4CAF50', fontSize: 13, marginBottom: 12, textAlign: 'center' },
+  savedText:  { fontSize: 13, marginBottom: 12, textAlign: 'center' },
 
   saveBtn: {
     borderRadius: 6,

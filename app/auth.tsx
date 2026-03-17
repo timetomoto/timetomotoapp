@@ -109,7 +109,7 @@ export default function AuthScreen() {
         )}
 
         {error && <Text style={[styles.errorText, { color: theme.red }]}>{error}</Text>}
-        {successMsg && <Text style={styles.successText}>{successMsg}</Text>}
+        {successMsg && <Text style={[styles.successText, { color: theme.green }]}>{successMsg}</Text>}
 
         <Pressable
           style={({ pressed }) => [styles.btn, { backgroundColor: theme.red }, pressed && styles.btnPressed]}
@@ -185,7 +185,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   successText: {
-    color: '#4CAF50',
     fontSize: 13,
   },
   btn: {

@@ -489,11 +489,11 @@ export default function RoutePreviewScreen({
               onPress={() => setRecordRide((v) => !v)}
             >
               <View style={styles.recordToggleLeft}>
-                <Feather name="play-circle" size={16} color={recordRide ? '#4CAF50' : theme.textMuted} />
+                <Feather name="play-circle" size={16} color={recordRide ? theme.toggleTrackOn : theme.textMuted} />
                 <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Record this ride</Text>
               </View>
-              <View style={[styles.recordToggleTrack, recordRide && styles.recordToggleTrackOn]}>
-                <View style={[styles.recordToggleThumb, recordRide && styles.recordToggleThumbOn]} />
+              <View style={[styles.recordToggleTrack, { backgroundColor: recordRide ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                <View style={[styles.recordToggleThumb, { backgroundColor: recordRide ? theme.toggleThumbOn : theme.toggleThumbOff }, recordRide && styles.recordToggleThumbOn]} />
               </View>
             </Pressable>
 
@@ -502,14 +502,14 @@ export default function RoutePreviewScreen({
               onPress={handleCrashToggle}
             >
               <View style={styles.recordToggleLeft}>
-                <Feather name="shield" size={16} color={crashOn ? theme.red : theme.textMuted} />
+                <Feather name="shield" size={16} color={crashOn ? theme.toggleTrackOn : theme.textMuted} />
                 <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Crash detection</Text>
                 {crashOverride && (
                   <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
                 )}
               </View>
-              <View style={[styles.recordToggleTrack, crashOn && { backgroundColor: theme.red }]}>
-                <View style={[styles.recordToggleThumb, crashOn && styles.recordToggleThumbOn]} />
+              <View style={[styles.recordToggleTrack, { backgroundColor: crashOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                <View style={[styles.recordToggleThumb, { backgroundColor: crashOn ? theme.toggleThumbOn : theme.toggleThumbOff }, crashOn && styles.recordToggleThumbOn]} />
               </View>
             </Pressable>
 
@@ -518,14 +518,14 @@ export default function RoutePreviewScreen({
               onPress={handleLocationToggle}
             >
               <View style={styles.recordToggleLeft}>
-                <Feather name="map-pin" size={16} color={locationOn ? theme.red : theme.textMuted} />
+                <Feather name="map-pin" size={16} color={locationOn ? theme.toggleTrackOn : theme.textMuted} />
                 <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Share my location</Text>
                 {locationOverride && (
                   <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
                 )}
               </View>
-              <View style={[styles.recordToggleTrack, locationOn && { backgroundColor: theme.red }]}>
-                <View style={[styles.recordToggleThumb, locationOn && styles.recordToggleThumbOn]} />
+              <View style={[styles.recordToggleTrack, { backgroundColor: locationOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                <View style={[styles.recordToggleThumb, { backgroundColor: locationOn ? theme.toggleThumbOn : theme.toggleThumbOff }, locationOn && styles.recordToggleThumbOn]} />
               </View>
             </Pressable>
           </View>
@@ -779,18 +779,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#555',
     justifyContent: 'center',
     paddingHorizontal: 2,
-  },
-  recordToggleTrackOn: {
-    backgroundColor: '#4CAF50',
   },
   recordToggleThumb: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#fff',
   },
   recordToggleThumbOn: {
     alignSelf: 'flex-end',

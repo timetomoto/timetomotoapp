@@ -22,6 +22,7 @@ export interface RideConfig {
   shareEnabled: boolean;
   checkInMinutes: number | null;
   bikeId?: string;
+  notifyContactIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +56,7 @@ function CheckRow({
   children?: React.ReactNode;
 }) {
   const { theme } = useTheme();
-  const statusColor = status === 'ok' ? '#4CAF50' : status === 'warn' ? '#FF9800' : theme.textSecondary;
+  const statusColor = status === 'ok' ? theme.green : status === 'warn' ? '#FF9800' : theme.textSecondary;
   const statusIcon  = status === 'ok' ? 'check-circle' : status === 'warn' ? 'alert-circle' : status === 'loading' ? null : 'circle';
 
   return (
@@ -90,10 +91,10 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   const { theme } = useTheme();
   return (
     <Pressable
-      style={[s.toggle, { backgroundColor: theme.border }, value && { backgroundColor: theme.red }]}
+      style={[s.toggle, { backgroundColor: theme.toggleTrackOff }, value && { backgroundColor: theme.toggleTrackOn }]}
       onPress={() => onChange(!value)}
     >
-      <View style={[s.toggleThumb, { backgroundColor: theme.textSecondary }, value && { alignSelf: 'flex-end', backgroundColor: '#fff' }]} />
+      <View style={[s.toggleThumb, { backgroundColor: theme.toggleThumbOff }, value && { alignSelf: 'flex-end', backgroundColor: theme.toggleThumbOn }]} />
     </Pressable>
   );
 }
@@ -138,6 +139,14 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
   const [checkInOn,    setCheckInOn]        = useState(false);
   const [checkInMins,  setCheckInMins]      = useState<number>(60);
   const [showContacts, setShowContacts]     = useState(false);
+  const [notifyContactIds, setNotifyContactIds] = useState<string[]>(
+    emergencyContacts.map((c) => c.phone),
+  );
+
+  // Keep notifyContactIds in sync when contacts change (e.g. after editing)
+  useEffect(() => {
+    setNotifyContactIds(emergencyContacts.map((c) => c.phone));
+  }, [emergencyContacts.length]);
 
   function handleCrashToggle(newVal: boolean) {
     if (newVal && !isMonitoring) {
@@ -212,6 +221,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
       shareEnabled,
       checkInMinutes: checkInOn ? checkInMins : null,
       bikeId: selectedBike ?? undefined,
+      notifyContactIds,
     });
   }
 
@@ -286,7 +296,8 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         </View>
       </View>
 
-      {/* ── Required checks ── */}
+      {/* ── RIDE SETTINGS ── */}
+      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>RIDE SETTINGS</Text>
       <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <CheckRow
           icon="map-pin"
@@ -318,32 +329,6 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         <View style={[s.divider, { backgroundColor: theme.border }]} />
 
         <CheckRow
-          icon="users"
-          title="EMERGENCY CONTACTS"
-          detail={
-            contactsOk
-              ? `${emergencyContacts.length} contact${emergencyContacts.length > 1 ? 's' : ''} saved — tap to edit`
-              : 'No contacts added — tap to add'
-          }
-          status={contactsOk ? 'ok' : 'warn'}
-        >
-          <Pressable
-            style={[s.contactsBtn, { backgroundColor: contactsOk ? theme.bgPanel : theme.red, borderColor: contactsOk ? theme.border : 'transparent' }]}
-            onPress={() => setShowContacts(true)}
-          >
-            <Feather name={contactsOk ? 'edit-2' : 'plus'} size={13} color={contactsOk ? theme.textSecondary : '#fff'} />
-            <Text style={[s.contactsBtnText, { color: contactsOk ? theme.textSecondary : '#fff' }]}>
-              {contactsOk ? 'EDIT' : 'ADD'}
-            </Text>
-          </Pressable>
-        </CheckRow>
-      </View>
-
-      {showContacts && <EmergencyContactsSheet onClose={() => setShowContacts(false)} />}
-
-      {/* ── Optional: Live share ── */}
-      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <CheckRow
           icon="share-2"
           title="LIVE SHARE"
           detail={
@@ -355,15 +340,11 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
           }
           status={shareEnabled ? 'ok' : 'off'}
         >
-          {shareOverride && (
-            <Text style={[s.overrideLabel, { color: theme.textMuted }]}>this ride only</Text>
-          )}
           <Toggle value={shareEnabled} onChange={handleShareToggle} />
         </CheckRow>
-      </View>
 
-      {/* ── Optional: Check-in timer ── */}
-      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
+
         <CheckRow
           icon="clock"
           title="CHECK-IN TIMER"
@@ -402,9 +383,88 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         )}
       </View>
 
+      {/* ── EMERGENCY CONTACTS ── */}
+      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>EMERGENCY CONTACTS</Text>
+      {(() => {
+        const alertsActive = crashOn || shareEnabled || checkInOn;
+        return (
+          <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, !alertsActive && { opacity: 0.4 }]}>
+            <CheckRow
+              icon="users"
+              title="WHO TO NOTIFY"
+              detail={
+                !alertsActive
+                  ? 'Enable an alert setting above to notify contacts'
+                  : contactsOk
+                    ? (() => {
+                        const selected = emergencyContacts.filter((c) => notifyContactIds.includes(c.phone));
+                        if (selected.length === 0) return 'No contacts selected for this ride';
+                        const names = selected.map((c) => c.name.split(' ')[0]);
+                        if (names.length <= 2) return `Notifying: ${names.join(', ')}`;
+                        return `Notifying: ${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
+                      })()
+                    : 'No emergency contacts added. Add contacts in Settings.'
+              }
+              status={!alertsActive ? 'off' : contactsOk ? 'ok' : 'warn'}
+            >
+              <Pressable
+                style={[s.contactsBtn, { backgroundColor: contactsOk ? theme.bgPanel : theme.red, borderColor: contactsOk ? theme.border : 'transparent' }]}
+                onPress={() => alertsActive && setShowContacts(true)}
+                disabled={!alertsActive}
+              >
+                <Feather name={contactsOk ? 'edit-2' : 'plus'} size={13} color={contactsOk ? theme.textSecondary : '#fff'} />
+                <Text style={[s.contactsBtnText, { color: contactsOk ? theme.textSecondary : '#fff' }]}>
+                  {contactsOk ? 'EDIT' : 'ADD'}
+                </Text>
+              </Pressable>
+            </CheckRow>
+
+            {/* Contact selector pills */}
+            {contactsOk && alertsActive && (
+              <View style={s.contactPills}>
+                <Text style={[s.contactPillsLabel, { color: theme.textMuted }]}>Notifying:</Text>
+                {emergencyContacts.map((contact) => {
+                  const selected = notifyContactIds.includes(contact.phone);
+                  return (
+                    <Pressable
+                      key={contact.phone}
+                      style={[
+                        s.contactPill,
+                        {
+                          backgroundColor: selected ? theme.green : 'transparent',
+                          borderColor: selected ? theme.green : theme.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setNotifyContactIds((prev) =>
+                          selected
+                            ? prev.filter((id) => id !== contact.phone)
+                            : [...prev, contact.phone],
+                        );
+                      }}
+                    >
+                      <Feather
+                        name={selected ? 'check' : 'circle'}
+                        size={11}
+                        color={selected ? '#fff' : theme.textMuted}
+                      />
+                      <Text style={[s.contactPillText, { color: selected ? '#fff' : theme.textMuted }]}>
+                        {contact.name.split(' ')[0]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      })()}
+
+      {showContacts && <EmergencyContactsSheet onClose={() => setShowContacts(false)} />}
+
       {/* ── Start button ── */}
       <Pressable
-        style={({ pressed }) => [s.startBtn, { backgroundColor: '#4CAF50' }, pressed && s.startBtnPressed]}
+        style={({ pressed }) => [s.startBtn, { backgroundColor: theme.green }, pressed && s.startBtnPressed]}
         onPress={handleStart}
       >
         <Feather name="play-circle" size={22} color="#fff" />
@@ -510,16 +570,16 @@ const s = StyleSheet.create({
   rowRight: { marginLeft: 10 },
 
   toggle: {
-    width: 40,
-    height: 29,
-    borderRadius: 14,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
   },
   toggleThumb: {
-    width: 23,
-    height: 23,
-    borderRadius: 11,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignSelf: 'flex-start',
   },
 
@@ -563,6 +623,33 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  contactPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    marginTop: -4,
+  },
+  contactPillsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginRight: 2,
+  },
+  contactPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  contactPillText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   overrideLabel: {
     fontSize: 9,

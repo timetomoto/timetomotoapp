@@ -281,7 +281,6 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
     setUploadingPhoto(true);
     try {
       const url = await pickAndUploadBikePhoto(user.id, bikeId);
-      console.log('[BIKE PHOTO] upload url:', url);
       if (url) {
         setPhotoUrl(url);
         // If editing existing bike, save immediately
