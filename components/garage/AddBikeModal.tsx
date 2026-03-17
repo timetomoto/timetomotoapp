@@ -33,11 +33,10 @@ import { useTheme } from '../../lib/useTheme';
 const BIKE_TYPES: { key: BikeType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { key: 'adventure', label: 'ADV', icon: 'compass' },
   { key: 'dual_sport', label: 'DUAL SPORT', icon: 'navigation-2' },
-  { key: 'cruiser', label: 'CRUISER', icon: 'sunset' },
-  { key: 'scooter', label: 'SCOOTER', icon: 'zap' },
+  { key: 'cruiser', label: 'CRUISER', icon: 'wind' },
+  { key: 'chopper', label: 'CHOPPER', icon: 'scissors' },
   { key: 'sport', label: 'SPORT', icon: 'fast-forward' },
   { key: 'touring', label: 'TOURING', icon: 'map' },
-  { key: 'classic', label: 'CLASSIC', icon: 'clock' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -181,7 +180,7 @@ function BikeTypeSelector({ value, onChange }: { value: BikeType | null; onChang
           >
             <Feather
               name={type.icon}
-              size={26}
+              size={18}
               color={selected ? theme.red : theme.textPrimary}
             />
             <Text style={[
@@ -692,24 +691,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 10,
+    rowGap: 7,
   },
   typeCard: {
-    width: '48.5%',
+    width: '31.5%',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
   typeCardCentered: {
     marginHorizontal: '25.75%',
   },
   typeLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.3,
-    marginTop: 6,
+    marginTop: 4,
   },
   errorText: {
     fontSize: 13,

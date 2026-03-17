@@ -197,7 +197,7 @@ export function bikeLabel(bike: { nickname?: string | null; year?: number | null
 // Garage store
 // ---------------------------------------------------------------------------
 
-export type BikeType = 'adventure' | 'dual_sport' | 'cruiser' | 'scooter' | 'sport' | 'touring' | 'classic';
+export type BikeType = 'adventure' | 'dual_sport' | 'cruiser' | 'chopper' | 'sport' | 'touring';
 
 export type BikeSpecs = {
   tirePressureFrontPsi?: number;
