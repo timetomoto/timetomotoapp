@@ -251,9 +251,9 @@ export default function HelpContactScreen() {
             disabled={submitting}
           >
             {submitting
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color={theme.white} />
               : <>
-                  <Feather name="send" size={16} color="#fff" />
+                  <Feather name="send" size={16} color={theme.white} />
                   <Text style={styles.submitBtnText}>SEND MESSAGE</Text>
                 </>
             }

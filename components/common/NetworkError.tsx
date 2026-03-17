@@ -20,7 +20,7 @@ export default function NetworkError({ onRetry, message }: Props) {
         accessibilityLabel="Retry loading"
         accessibilityRole="button"
       >
-        <Feather name="refresh-cw" size={14} color="#fff" />
+        <Feather name="refresh-cw" size={14} color={theme.white} />
         <Text style={s.btnText}>TRY AGAIN</Text>
       </Pressable>
     </View>

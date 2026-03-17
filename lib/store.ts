@@ -216,6 +216,7 @@ export type BikeSpecs = {
   wetWeightLbs?: number;
   specsSource?: 'api' | 'gemini' | 'manual';
   specsLookedUp?: boolean;
+  specsLookedUpAt?: string;
 };
 
 export interface Bike {

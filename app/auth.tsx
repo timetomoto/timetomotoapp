@@ -117,7 +117,7 @@ export default function AuthScreen() {
           disabled={loading}
         >
           {loading
-            ? <ActivityIndicator color="#fff" />
+            ? <ActivityIndicator color={theme.white} />
             : <Text style={styles.btnText}>
                 {mode === 'signin' ? 'SIGN IN' : mode === 'signup' ? 'SIGN UP' : 'SEND RESET EMAIL'}
               </Text>

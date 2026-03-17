@@ -31,6 +31,7 @@ export interface Theme {
   toggleTrackOn: string;
   toggleThumbOff: string;
   toggleThumbOn: string;
+  white: string;
 }
 
 export const darkTheme: Theme = {
@@ -66,6 +67,7 @@ export const darkTheme: Theme = {
   toggleTrackOn:   '#4CAF50',
   toggleThumbOff:  '#8A8A8A',
   toggleThumbOn:   '#FFFFFF',
+  white:           '#FFFFFF',
 };
 
 export const lightTheme: Theme = {
@@ -101,4 +103,5 @@ export const lightTheme: Theme = {
   toggleTrackOn:   '#4CAF50',
   toggleThumbOff:  '#FFFFFF',
   toggleThumbOn:   '#FFFFFF',
+  white:           '#FFFFFF',
 };

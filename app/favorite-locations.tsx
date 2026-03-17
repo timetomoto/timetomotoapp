@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   Alert,
   Animated,
   Easing,
   Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,12 +19,14 @@ import { useRouter } from 'expo-router';
 import Mapbox, { Camera, MapView, PointAnnotation } from '@rnmapbox/maps';
 import { useTheme } from '@/lib/useTheme';
 import { useAuthStore } from '@/lib/store';
-import { darkTheme } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
 import { geocodeLocation } from '@/lib/discoverStore';
 import {
   loadFavorites,
   addFavorite,
   removeFavorite,
+  updateFavoriteNickname,
+  setAsHome,
   type FavoriteLocation,
 } from '@/lib/favorites';
 
@@ -41,6 +45,7 @@ export default function FavoriteLocationsScreen() {
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ name: string; lat: number; lng: number }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [nickname, setNickname] = useState('');
   const [saving, setSaving] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<TextInput>(null);
@@ -58,6 +63,7 @@ export default function FavoriteLocationsScreen() {
     setSearchText('');
     setSearchResults([]);
     setSelectedLocation(null);
+    setNickname('');
     Animated.timing(addViewAnim, {
       toValue: 1,
       duration: 280,
@@ -103,7 +109,7 @@ export default function FavoriteLocationsScreen() {
     Keyboard.dismiss();
     cameraRef.current?.setCamera({
       centerCoordinate: [result.lng, result.lat],
-      zoomLevel: 12,
+      zoomLevel: 15,
       animationMode: 'flyTo',
       animationDuration: 600,
     });
@@ -113,7 +119,11 @@ export default function FavoriteLocationsScreen() {
     if (!selectedLocation || saving) return;
     setSaving(true);
     try {
-      const updated = await addFavorite(selectedLocation, userId);
+      const favToAdd: FavoriteLocation = {
+        ...selectedLocation,
+        nickname: nickname.trim() || null,
+      };
+      const updated = await addFavorite(favToAdd, userId);
       setFavorites(updated);
       closeAddView();
     } catch {
@@ -125,7 +135,7 @@ export default function FavoriteLocationsScreen() {
 
   function handleDelete(fav: FavoriteLocation) {
     Alert.alert(
-      `Remove ${fav.name} from favorites?`,
+      `Remove ${fav.nickname || fav.name} from favorites?`,
       undefined,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -141,10 +151,64 @@ export default function FavoriteLocationsScreen() {
     );
   }
 
-  const isDark = theme.bg === darkTheme.bg;
-  const mapStyle = isDark
-    ? 'mapbox://styles/mapbox/dark-v11'
-    : 'mapbox://styles/mapbox/light-v11';
+  function handleLongPress(fav: FavoriteLocation) {
+    const options = ['Edit Nickname', fav.is_home ? 'Remove Home' : 'Set as Home', 'Delete', 'Cancel'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 3,
+          destructiveButtonIndex: 2,
+          title: fav.nickname || fav.name,
+        },
+        (idx) => {
+          if (idx === 0) handleEditNickname(fav);
+          else if (idx === 1) handleToggleHome(fav);
+          else if (idx === 2) handleDelete(fav);
+        },
+      );
+    } else {
+      Alert.alert(
+        fav.nickname || fav.name,
+        undefined,
+        [
+          { text: 'Edit Nickname', onPress: () => handleEditNickname(fav) },
+          { text: fav.is_home ? 'Remove Home' : 'Set as Home', onPress: () => handleToggleHome(fav) },
+          { text: 'Delete', style: 'destructive', onPress: () => handleDelete(fav) },
+          { text: 'Cancel', style: 'cancel' },
+        ],
+      );
+    }
+  }
+
+  function handleEditNickname(fav: FavoriteLocation) {
+    Alert.prompt(
+      'Edit Nickname',
+      `Set a nickname for ${fav.name}`,
+      async (text) => {
+        const updated = await updateFavoriteNickname(fav, text?.trim() || null, userId);
+        setFavorites(updated);
+      },
+      'plain-text',
+      fav.nickname ?? '',
+    );
+  }
+
+  async function handleToggleHome(fav: FavoriteLocation) {
+    if (fav.is_home) {
+      // Remove home — just clear is_home locally + in DB
+      const cached = favorites.map((f) => ({ ...f, is_home: false }));
+      setFavorites(cached);
+      if (userId && userId !== 'local') {
+        try { await supabase.from('favorite_locations').update({ is_home: false }).eq('user_id', userId); } catch {}
+      }
+    } else {
+      const updated = await setAsHome(fav, userId);
+      setFavorites(updated);
+    }
+  }
+
+  const mapStyle = 'mapbox://styles/mapbox/outdoors-v12';
 
   // Animated values
   const mapHeight = addViewAnim.interpolate({
@@ -226,7 +290,7 @@ export default function FavoriteLocationsScreen() {
                     centerCoordinate: selectedLocation
                       ? [selectedLocation.lng, selectedLocation.lat]
                       : DEFAULT_CENTER,
-                    zoomLevel: selectedLocation ? 12 : 5,
+                    zoomLevel: selectedLocation ? 15 : 14,
                   }}
                 />
                 {selectedLocation && (
@@ -249,6 +313,20 @@ export default function FavoriteLocationsScreen() {
                 <Text style={[s.selectedName, { color: theme.textPrimary }]} numberOfLines={2}>
                   {selectedLocation.name}
                 </Text>
+              </View>
+            )}
+
+            {/* Nickname input */}
+            {selectedLocation && (
+              <View style={[s.nicknameWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                <TextInput
+                  style={[s.nicknameInput, { color: theme.textPrimary }]}
+                  placeholder="Nickname (optional, e.g. Home, Work)"
+                  placeholderTextColor={theme.textMuted}
+                  value={nickname}
+                  onChangeText={setNickname}
+                  returnKeyType="done"
+                />
               </View>
             )}
 
@@ -287,33 +365,49 @@ export default function FavoriteLocationsScreen() {
             <View style={s.emptyState}>
               <Feather name="map-pin" size={32} color={theme.border} />
               <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>
-                No favorite locations yet
+                No favorites yet.
               </Text>
               <Text style={[s.emptySubtitle, { color: theme.textSecondary }]}>
-                Tap Add Location to get started.
+                Save locations you ride to often for quick access.
               </Text>
             </View>
           ) : (
             <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-              {favorites.map((fav, i) => {
+              {[...favorites].sort((a, b) => (b.is_home ? 1 : 0) - (a.is_home ? 1 : 0)).map((fav, i) => {
                 const isLast = i === favorites.length - 1;
                 return (
-                  <View
+                  <Pressable
                     key={`${fav.name}-${fav.lat}-${fav.lng}`}
                     style={[
                       s.favRow,
                       { borderBottomColor: theme.border },
                       isLast && { borderBottomWidth: 0 },
                     ]}
+                    onLongPress={() => handleLongPress(fav)}
                   >
-                    <Feather name="map-pin" size={16} color={theme.red} style={{ marginRight: 12 }} />
-                    <Text style={[s.favName, { color: theme.textPrimary }]} numberOfLines={1}>
-                      {fav.name}
-                    </Text>
-                    <Pressable onPress={() => handleDelete(fav)} hitSlop={8}>
-                      <Feather name="trash-2" size={16} color={theme.textSecondary} />
+                    <Feather name="map-pin" size={16} color={theme.red} />
+                    <View style={s.favInfo}>
+                      <Text style={[s.favName, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {fav.nickname || fav.name}
+                      </Text>
+                      {fav.nickname ? (
+                        <Text style={[s.favAddress, { color: theme.textMuted }]} numberOfLines={1}>
+                          {fav.name}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {fav.is_home && (
+                      <View style={[s.homeBadge, { backgroundColor: theme.green + '22' }]}>
+                        <Text style={[s.homeBadgeText, { color: theme.green }]}>Home</Text>
+                      </View>
+                    )}
+                    <Pressable onPress={() => handleLongPress(fav)} hitSlop={8} style={s.iconBtn}>
+                      <Feather name="edit-2" size={14} color={theme.textSecondary} />
                     </Pressable>
-                  </View>
+                    <Pressable onPress={() => handleDelete(fav)} hitSlop={8} style={s.iconBtn}>
+                      <Feather name="trash-2" size={14} color={theme.textSecondary} />
+                    </Pressable>
+                  </Pressable>
                 );
               })}
             </View>
@@ -358,7 +452,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
   },
 
   // Search
@@ -435,7 +529,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
   },
   cancelBtn: {
     alignItems: 'center',
@@ -445,6 +539,19 @@ const s = StyleSheet.create({
   cancelBtnText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+
+  // Nickname input
+  nicknameWrap: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  nicknameInput: {
+    fontSize: 14,
+    padding: 0,
   },
 
   // Favorites list
@@ -459,11 +566,31 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
+    gap: 10,
+  },
+  favInfo: {
+    flex: 1,
   },
   favName: {
-    flex: 1,
     fontSize: 14,
     fontWeight: '600',
+  },
+  favAddress: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  homeBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  homeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  iconBtn: {
+    padding: 4,
   },
 
   // Empty state

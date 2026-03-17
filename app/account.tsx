@@ -148,7 +148,7 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
           disabled={saving}
         >
           {saving
-            ? <ActivityIndicator color="#fff" size="small" />
+            ? <ActivityIndicator color={theme.white} size="small" />
             : <Text style={styles.saveBtnText}>SAVE</Text>
           }
         </Pressable>
@@ -257,7 +257,7 @@ export default function AccountScreen() {
             disabled={profileSaving}
           >
             {profileSaving
-              ? <ActivityIndicator color="#fff" size="small" />
+              ? <ActivityIndicator color={theme.white} size="small" />
               : <Text style={styles.saveBtnText}>SAVE PROFILE</Text>
             }
           </Pressable>

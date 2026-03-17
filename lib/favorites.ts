@@ -10,30 +10,38 @@ export interface FavoriteLocation {
   name: string;
   lat: number;
   lng: number;
+  nickname?: string | null;
+  is_home?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // AsyncStorage cache key
 // ---------------------------------------------------------------------------
 
-const CACHE_KEY = 'ttm_favorite_locations';
+const CACHE_KEY_PREFIX = 'ttm_favorite_locations';
+
+function cacheKey(userId?: string | null): string {
+  return userId && userId !== 'local'
+    ? `${CACHE_KEY_PREFIX}_${userId}`
+    : CACHE_KEY_PREFIX;
+}
 
 // ---------------------------------------------------------------------------
 // Local cache helpers
 // ---------------------------------------------------------------------------
 
-async function loadCache(): Promise<FavoriteLocation[]> {
+async function loadCache(userId?: string | null): Promise<FavoriteLocation[]> {
   try {
-    const raw = await AsyncStorage.getItem(CACHE_KEY);
+    const raw = await AsyncStorage.getItem(cacheKey(userId));
     return raw ? (JSON.parse(raw) as FavoriteLocation[]) : [];
   } catch {
     return [];
   }
 }
 
-async function saveCache(favs: FavoriteLocation[]): Promise<void> {
+async function saveCache(favs: FavoriteLocation[], userId?: string | null): Promise<void> {
   try {
-    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(favs));
+    await AsyncStorage.setItem(cacheKey(userId), JSON.stringify(favs));
   } catch {
     // non-fatal
   }
@@ -49,13 +57,13 @@ async function saveCache(favs: FavoriteLocation[]): Promise<void> {
  */
 export async function loadFavorites(userId?: string | null): Promise<FavoriteLocation[]> {
   if (!userId || userId === 'local') {
-    return loadCache();
+    return loadCache(userId);
   }
 
   try {
     const { data, error } = await supabase
       .from('favorite_locations')
-      .select('id, user_id, name, latitude, longitude, created_at')
+      .select('id, user_id, name, latitude, longitude, nickname, is_home, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -66,14 +74,16 @@ export async function loadFavorites(userId?: string | null): Promise<FavoriteLoc
       name: row.name,
       lat: Number(row.latitude),
       lng: Number(row.longitude),
+      nickname: row.nickname ?? null,
+      is_home: row.is_home ?? false,
     }));
 
     // Update local cache
-    await saveCache(favs);
+    await saveCache(favs, userId);
     return favs;
   } catch {
     // Offline — use cache
-    return loadCache();
+    return loadCache(userId);
   }
 }
 
@@ -84,7 +94,7 @@ export async function addFavorite(
   fav: FavoriteLocation,
   userId?: string | null,
 ): Promise<FavoriteLocation[]> {
-  const cached = await loadCache();
+  const cached = await loadCache(userId);
 
   // Dedupe by name + coords
   const exists = cached.some(
@@ -93,7 +103,7 @@ export async function addFavorite(
   if (exists) return cached;
 
   const updated = [fav, ...cached];
-  await saveCache(updated);
+  await saveCache(updated, userId);
 
   if (userId && userId !== 'local') {
     try {
@@ -104,6 +114,8 @@ export async function addFavorite(
           name: fav.name,
           latitude: fav.lat,
           longitude: fav.lng,
+          nickname: fav.nickname ?? null,
+          is_home: fav.is_home ?? false,
         })
         .select()
         .single();
@@ -111,7 +123,7 @@ export async function addFavorite(
       if (data) {
         // Update cache entry with server id
         updated[0] = { ...updated[0], id: data.id };
-        await saveCache(updated);
+        await saveCache(updated, userId);
       }
     } catch {
       // Supabase write failed — local cache is still updated
@@ -128,11 +140,11 @@ export async function removeFavorite(
   fav: FavoriteLocation,
   userId?: string | null,
 ): Promise<FavoriteLocation[]> {
-  const cached = await loadCache();
+  const cached = await loadCache(userId);
   const updated = cached.filter(
     (f) => !(f.name === fav.name && f.lat === fav.lat && f.lng === fav.lng),
   );
-  await saveCache(updated);
+  await saveCache(updated, userId);
 
   if (userId && userId !== 'local') {
     try {
@@ -164,7 +176,7 @@ export async function toggleFavorite(
   fav: FavoriteLocation,
   userId?: string | null,
 ): Promise<FavoriteLocation[]> {
-  const cached = await loadCache();
+  const cached = await loadCache(userId);
   const exists = cached.some(
     (f) => f.name === fav.name && f.lat === fav.lat && f.lng === fav.lng,
   );
@@ -176,6 +188,71 @@ export async function toggleFavorite(
     return removeFavorite(match ?? fav, userId);
   }
   return addFavorite(fav, userId);
+}
+
+/**
+ * Update a favorite's nickname.
+ */
+export async function updateFavoriteNickname(
+  fav: FavoriteLocation,
+  nickname: string | null,
+  userId?: string | null,
+): Promise<FavoriteLocation[]> {
+  const cached = await loadCache(userId);
+  const updated = cached.map((f) =>
+    f.id === fav.id || (f.name === fav.name && f.lat === fav.lat && f.lng === fav.lng)
+      ? { ...f, nickname }
+      : f,
+  );
+  await saveCache(updated, userId);
+
+  if (userId && userId !== 'local' && fav.id) {
+    try {
+      await supabase.from('favorite_locations').update({ nickname }).eq('id', fav.id);
+    } catch { /* best-effort */ }
+  }
+
+  return updated;
+}
+
+/**
+ * Set a favorite as home. Clears is_home on all others first.
+ */
+export async function setAsHome(
+  fav: FavoriteLocation,
+  userId?: string | null,
+): Promise<FavoriteLocation[]> {
+  const cached = await loadCache(userId);
+  const isMatch = (f: FavoriteLocation) =>
+    (fav.id && f.id === fav.id) || (f.name === fav.name && f.lat === fav.lat && f.lng === fav.lng);
+  const updated = cached.map((f) => ({
+    ...f,
+    is_home: isMatch(f),
+  }));
+  await saveCache(updated, userId);
+
+  if (userId && userId !== 'local') {
+    try {
+      // Clear all homes for this user first
+      await supabase.from('favorite_locations').update({ is_home: false }).eq('user_id', userId);
+      // Set the new home by id, or fall back to name+coords match
+      if (fav.id) {
+        await supabase.from('favorite_locations').update({ is_home: true }).eq('id', fav.id);
+      } else {
+        await supabase.from('favorite_locations').update({ is_home: true })
+          .eq('user_id', userId).eq('name', fav.name).eq('latitude', fav.lat).eq('longitude', fav.lng);
+      }
+    } catch { /* best-effort */ }
+  }
+
+  return updated;
+}
+
+/**
+ * Get the home favorite from a list (instant).
+ */
+export function getHomeFavorite(favs: FavoriteLocation[]): FavoriteLocation | null {
+  return favs.find((f) => f.is_home) ?? null;
 }
 
 /**

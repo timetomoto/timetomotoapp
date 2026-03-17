@@ -412,8 +412,8 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
                 onPress={() => alertsActive && setShowContacts(true)}
                 disabled={!alertsActive}
               >
-                <Feather name={contactsOk ? 'edit-2' : 'plus'} size={13} color={contactsOk ? theme.textSecondary : '#fff'} />
-                <Text style={[s.contactsBtnText, { color: contactsOk ? theme.textSecondary : '#fff' }]}>
+                <Feather name={contactsOk ? 'edit-2' : 'plus'} size={13} color={contactsOk ? theme.textSecondary : theme.white} />
+                <Text style={[s.contactsBtnText, { color: contactsOk ? theme.textSecondary : theme.white }]}>
                   {contactsOk ? 'EDIT' : 'ADD'}
                 </Text>
               </Pressable>
@@ -446,9 +446,9 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
                       <Feather
                         name={selected ? 'check' : 'circle'}
                         size={11}
-                        color={selected ? '#fff' : theme.textMuted}
+                        color={selected ? theme.white : theme.textMuted}
                       />
-                      <Text style={[s.contactPillText, { color: selected ? '#fff' : theme.textMuted }]}>
+                      <Text style={[s.contactPillText, { color: selected ? theme.white : theme.textMuted }]}>
                         {contact.name.split(' ')[0]}
                       </Text>
                     </Pressable>
@@ -467,7 +467,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         style={({ pressed }) => [s.startBtn, { backgroundColor: theme.green }, pressed && s.startBtnPressed]}
         onPress={handleStart}
       >
-        <Feather name="play-circle" size={22} color="#fff" />
+        <Feather name="play-circle" size={22} color={theme.white} />
         <Text style={s.startBtnText}>START & RECORD RIDE</Text>
       </Pressable>
     </ScrollView>

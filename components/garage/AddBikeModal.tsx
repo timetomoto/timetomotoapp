@@ -546,7 +546,7 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
               disabled={saving}
             >
               {saving
-                ? <ActivityIndicator color="#fff" />
+                ? <ActivityIndicator color={theme.white} />
                 : <Text style={styles.saveBtnText}>{isEdit ? 'SAVE CHANGES' : 'SAVE BIKE'}</Text>
               }
             </Pressable>

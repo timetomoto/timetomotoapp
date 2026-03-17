@@ -126,7 +126,7 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp }: Pr
         style={({ pressed }) => [styles.navBtn, { backgroundColor: theme.red }, pressed && { opacity: 0.8 }]}
         onPress={handleNavigate}
       >
-        <Feather name="navigation-2" size={16} color="#fff" />
+        <Feather name="navigation-2" size={16} color={theme.white} />
         <Text style={styles.navBtnText}>NAVIGATE</Text>
       </Pressable>
     </Animated.View>

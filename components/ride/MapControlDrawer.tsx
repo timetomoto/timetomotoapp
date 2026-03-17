@@ -193,7 +193,7 @@ export default function MapControlDrawer({
               value={weatherOn}
               onValueChange={onToggleWeather}
               trackColor={{ false: '#9E9E9E', true: '#5B9BD5' }}
-              thumbColor="#fff"
+              thumbColor={theme.white}
             />
           </View>
         </View>
@@ -221,7 +221,7 @@ export default function MapControlDrawer({
               value={fuelOn}
               onValueChange={onToggleFuel}
               trackColor={{ false: '#9E9E9E', true: '#FFD600' }}
-              thumbColor="#fff"
+              thumbColor={theme.white}
               disabled={fuelLoading}
             />
           </View>
@@ -250,7 +250,7 @@ export default function MapControlDrawer({
               value={foodOn}
               onValueChange={onToggleFood}
               trackColor={{ false: '#9E9E9E', true: '#FF6B35' }}
-              thumbColor="#fff"
+              thumbColor={theme.white}
               disabled={foodLoading}
             />
           </View>

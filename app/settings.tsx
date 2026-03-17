@@ -90,7 +90,7 @@ function SegmentedRow<T extends string>({
                 onChange(opt.key);
               }}
             >
-              <Text style={[styles.segmentText, { color: isActive ? '#FFFFFF' : theme.textMuted }]}>
+              <Text style={[styles.segmentText, { color: isActive ? theme.white : theme.textMuted }]}>
                 {opt.label}
               </Text>
             </Pressable>
@@ -145,20 +145,16 @@ export default function SettingsScreen() {
   const [tempUnit, setTempUnit] = useState<'fahrenheit' | 'celsius'>('fahrenheit');
   const [capacityUnit, setCapacityUnit] = useState<'gallons' | 'liters'>('gallons');
 
-  // ── Weather ──
-  const [weatherDefaultFav, setWeatherDefaultFav] = useState(false);
-
   // Load persisted prefs
   useEffect(() => {
     (async () => {
-      const [rideStart, weather, emergency, dist, temp, capacity, wdfav] = await Promise.all([
+      const [rideStart, weather, emergency, dist, temp, capacity] = await Promise.all([
         AsyncStorage.getItem('ttm_notif_ride_start'),
         AsyncStorage.getItem('ttm_notif_weather'),
         AsyncStorage.getItem('ttm_notif_emergency'),
         AsyncStorage.getItem('ttm_units_distance'),
         AsyncStorage.getItem('ttm_units_temp'),
         AsyncStorage.getItem('ttm_units_capacity'),
-        AsyncStorage.getItem('ttm_weather_default_fav'),
       ]);
       if (rideStart !== null) setNotifRideStart(rideStart === 'true');
       if (weather !== null) setNotifWeather(weather === 'true');
@@ -166,7 +162,6 @@ export default function SettingsScreen() {
       if (dist === 'miles' || dist === 'kilometers') setDistanceUnit(dist);
       if (temp === 'fahrenheit' || temp === 'celsius') setTempUnit(temp);
       if (capacity === 'gallons' || capacity === 'liters') setCapacityUnit(capacity);
-      if (wdfav !== null) setWeatherDefaultFav(wdfav === 'true');
     })();
   }, []);
 
@@ -225,7 +220,7 @@ export default function SettingsScreen() {
                       setMode(m);
                     }}
                   >
-                    <Text style={[styles.segmentText, { color: isActive ? '#FFFFFF' : theme.textMuted }]}>
+                    <Text style={[styles.segmentText, { color: isActive ? theme.white : theme.textMuted }]}>
                       {m.toUpperCase()}
                     </Text>
                   </Pressable>
@@ -401,14 +396,6 @@ export default function SettingsScreen() {
             </View>
             <Feather name="chevron-right" size={16} color={theme.textMuted} />
           </Pressable>
-          <ToggleRow
-            label="Use First Favorite as Default"
-            value={weatherDefaultFav}
-            onValueChange={(v) => {
-              setWeatherDefaultFav(v);
-              AsyncStorage.setItem('ttm_weather_default_fav', String(v));
-            }}
-          />
         </View>
 
         {/* OFFLINE MAPS */}

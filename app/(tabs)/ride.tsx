@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated as RNAnimated,
   Platform,
   Pressable,
   StyleSheet,
@@ -14,6 +15,7 @@ import Mapbox, {
   LineLayer,
   LocationPuck,
   MapView,
+  PointAnnotation,
   RasterLayer,
   RasterSource,
   ShapeSource,
@@ -46,13 +48,16 @@ import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import TimetomotoLogo from '../../components/common/TimetomotoLogo';
 import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT, END_BUTTON_BOTTOM, END_BUTTON_RIGHT } from '../../lib/headerLayout';
 import { darkTheme } from '../../lib/theme';
+import { addFavorite } from '../../lib/favorites';
 import { useTheme } from '../../lib/useTheme';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMeters } from '../../lib/directions';
 import MapControlDrawer from '../../components/ride/MapControlDrawer';
 import SearchSheet from '../../components/ride/SearchSheet';
+import TripPlannerSheet from '../../components/ride/TripPlannerSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
+import RouteWeatherStrip from '../../components/ride/RouteWeatherStrip';
 import NavigationStatsBar from '../../components/ride/NavigationStatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
@@ -372,6 +377,7 @@ export default function RideScreen() {
   // ── Drawer / sheet state ──
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
+  const [tripPlannerOpen, setTripPlannerOpen] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -379,6 +385,41 @@ export default function RideScreen() {
   const [isSavedRoutePreview, setIsSavedRoutePreview] = useState(false);
   const savedRouteStartRef = useRef<{ lat: number; lng: number } | null>(null);
   const [navRouteGeojson, setNavRouteGeojson] = useState<any>(null);
+
+  // ── Dropped pin ──
+  const [droppedPin, setDroppedPin] = useState<{ lat: number; lng: number } | null>(null);
+  const [droppedPinAddress, setDroppedPinAddress] = useState<string | null>(null);
+  const pinScaleAnim = useRef(new RNAnimated.Value(0)).current;
+
+  function handleDropPin(coords: { latitude: number; longitude: number }) {
+    const { latitude: lat, longitude: lng } = coords;
+    setDroppedPin({ lat, lng });
+    setDroppedPinAddress(null);
+    pinScaleAnim.setValue(0);
+    RNAnimated.spring(pinScaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
+
+    // Reverse geocode
+    Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
+      .then(([place]) => {
+        if (place) {
+          const parts = [place.name, place.street, place.city, place.region].filter(Boolean);
+          setDroppedPinAddress(parts.slice(0, 3).join(', '));
+        }
+      })
+      .catch(() => {});
+  }
+
+  function dismissDroppedPin() {
+    setDroppedPin(null);
+    setDroppedPinAddress(null);
+  }
+
+  function handleNavigateToPin() {
+    if (!droppedPin) return;
+    const dest = { name: droppedPinAddress || `${droppedPin.lat.toFixed(4)}, ${droppedPin.lng.toFixed(4)}`, lat: droppedPin.lat, lng: droppedPin.lng };
+    dismissDroppedPin();
+    fetchAndPreviewRoute(dest);
+  }
 
   // ── Overlay toggles ──
   const [fuelStationsOn, setFuelStationsOn] = useState(false);
@@ -525,6 +566,7 @@ export default function RideScreen() {
 
   const mapRef       = useRef<Mapbox.MapView>(null);
   const cameraRef    = useRef<Mapbox.Camera>(null);
+  const [mapStyleReady, setMapStyleReady] = useState(false);
   const userIsPanning = useRef(false);
   const panResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingBikeIdRef = useRef<string | null>(null);
@@ -661,6 +703,8 @@ export default function RideScreen() {
 
   // ── fetchAndPreviewRoute ──
   async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }, prefOverride?: import('../../lib/navigationStore').RoutePreference) {
+    // Reset preference to fastest for each new route
+    if (!prefOverride) setRoutePreference('fastest');
     setDestination(dest);
     setNavMode('preview');
     setIsSavedRoutePreview(false);
@@ -671,7 +715,7 @@ export default function RideScreen() {
         ? { lat: lastKnownLocation.lat, lng: lastKnownLocation.lng }
         : { lat: AUSTIN[1], lng: AUSTIN[0] };
       const routes = await fetchDirections(
-        origin.lng, origin.lat, dest.lng, dest.lat, prefOverride ?? routePreference,
+        origin.lng, origin.lat, dest.lng, dest.lat, prefOverride ?? 'fastest',
       );
       if (routes.length > 0) {
         setActiveRoute(routes[0]);
@@ -941,12 +985,20 @@ export default function RideScreen() {
           scaleBarEnabled={false}
           attributionEnabled={false}
           logoEnabled={false}
-          onMapIdle={handleMapIdle}
-          onTouchStart={() => { userIsPanning.current = true; }}
-          onRegionDidChange={() => {
+          onDidFinishLoadingStyle={() => setMapStyleReady(true)}
+          onWillStartLoadingMap={() => setMapStyleReady(false)}
+          onMapIdle={() => {
             if (panResetTimer.current) clearTimeout(panResetTimer.current);
             panResetTimer.current = setTimeout(() => { userIsPanning.current = false; }, 5000);
+            if (mapStyleReady) handleMapIdle();
           }}
+          onTouchStart={() => { userIsPanning.current = true; }}
+          onLongPress={(e) => {
+            const geom = e.geometry as any;
+            const coords = geom?.coordinates;
+            if (coords) handleDropPin({ latitude: coords[1], longitude: coords[0] });
+          }}
+          onPress={() => { if (droppedPin) dismissDroppedPin(); }}
         >
           <Camera
             ref={cameraRef}
@@ -1023,25 +1075,29 @@ export default function RideScreen() {
           )}
 
           {/* ── Saved / imported route overlay ── */}
-          <ShapeSource id="overlay-route" shape={overlayGeoJson}>
-            <LineLayer
-              id="overlay-route-line"
-              style={{
-                lineColor: theme.red,
-                lineWidth: 3,
-                lineDasharray: [2, 1.5],
-                lineOpacity: 0.9,
-              }}
-              />
-          </ShapeSource>
+          {mapStyleReady && (
+            <ShapeSource id="overlay-route" shape={overlayGeoJson}>
+              <LineLayer
+                id="overlay-route-line"
+                style={{
+                  lineColor: theme.red,
+                  lineWidth: 3,
+                  lineDasharray: [2, 1.5],
+                  lineOpacity: 0.9,
+                }}
+                />
+            </ShapeSource>
+          )}
 
           {/* ── Navigation route layer (rendered above overlay) ── */}
-          <ShapeSource id="nav-route-src" shape={navRouteGeojson ?? EMPTY_LINE}>
-            <LineLayer
-              id="nav-route-line"
-              style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
-            />
-          </ShapeSource>
+          {mapStyleReady && (
+            <ShapeSource id="nav-route-src" shape={navRouteGeojson ?? EMPTY_LINE}>
+              <LineLayer
+                id="nav-route-line"
+                style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
+              />
+            </ShapeSource>
+          )}
 
           {/* ── Live GPS track ── */}
           {liveTrackGeoJson && (
@@ -1052,10 +1108,25 @@ export default function RideScreen() {
               />
             </ShapeSource>
           )}
+
+          {/* ── Dropped pin ── */}
+          {droppedPin && (
+            <PointAnnotation
+              id="dropped-pin"
+              coordinate={[droppedPin.lng, droppedPin.lat]}
+            >
+              <RNAnimated.View style={{ transform: [{ scale: pinScaleAnim }] }}>
+                <View style={styles.droppedPinOuter}>
+                  <View style={styles.droppedPinInner} />
+                </View>
+                <View style={styles.droppedPinTail} />
+              </RNAnimated.View>
+            </PointAnnotation>
+          )}
         </MapView>
 
         {/* ── Recenter / locate me button (below compass) ── */}
-        {!drawerOpen && !searchSheetOpen && !showChecklist && <View style={styles.locateBtnWrap} pointerEvents="box-none">
+        {!drawerOpen && !searchSheetOpen && !showChecklist && !tripPlannerOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
           <Pressable
             style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             hitSlop={8}
@@ -1076,6 +1147,13 @@ export default function RideScreen() {
           />
         )}
 
+        {/* ── Route weather strip (during navigation) ── */}
+        {isNavigatingActive && activeRoute && (
+          <View style={styles.navWeatherWrap}>
+            <RouteWeatherStrip coordinates={activeRoute.geometry.coordinates} compact />
+          </View>
+        )}
+
         {/* ── Top header bar ── */}
         <View style={styles.mapHeader}>
           <HamburgerButton onPress={() => setMenuOpen(true)} />
@@ -1087,6 +1165,12 @@ export default function RideScreen() {
             </View>
             <View style={{ flex: 1 }} />
           </>
+          <Pressable
+            style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+            onPress={() => setTripPlannerOpen(true)}
+          >
+            <Feather name="map" size={20} color={theme.textPrimary} />
+          </Pressable>
           <Pressable
             style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             onPress={() => setSearchSheetOpen(true)}
@@ -1144,7 +1228,7 @@ export default function RideScreen() {
             style={[styles.endNavBtn, { backgroundColor: theme.green }]}
             onPress={() => setShowChecklist(true)}
           >
-            <Feather name="play-circle" size={22} color="#fff" />
+            <Feather name="play-circle" size={22} color={theme.white} />
             <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
           </Pressable>
         )}
@@ -1165,7 +1249,7 @@ export default function RideScreen() {
               }
             }}
           >
-            <Feather name="x" size={18} color="#fff" />
+            <Feather name="x" size={18} color={theme.white} />
             <Text style={styles.endNavBtnText}>END RIDE</Text>
           </Pressable>
         )}
@@ -1176,6 +1260,49 @@ export default function RideScreen() {
           onClose={() => setSelectedPlace(null)}
           onNavigateInApp={(dest) => fetchAndPreviewRoute(dest)}
         />
+
+        {/* ── Dropped pin callout ── */}
+        {droppedPin && (
+          <View style={[styles.pinCallout, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+            <View style={styles.pinCalloutHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.pinCalloutTitle, { color: theme.textPrimary }]} numberOfLines={2}>
+                  {droppedPinAddress || `${droppedPin.lat.toFixed(5)}, ${droppedPin.lng.toFixed(5)}`}
+                </Text>
+                {droppedPinAddress && (
+                  <Text style={[styles.pinCalloutCoords, { color: theme.textMuted }]}>
+                    {droppedPin.lat.toFixed(5)}, {droppedPin.lng.toFixed(5)}
+                  </Text>
+                )}
+              </View>
+              <Pressable onPress={dismissDroppedPin} hitSlop={8} style={styles.pinCalloutClose}>
+                <Feather name="x" size={20} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+            <View style={styles.pinCalloutActions}>
+              <Pressable
+                style={[styles.pinCalloutBtn, { backgroundColor: theme.red }]}
+                onPress={handleNavigateToPin}
+              >
+                <Feather name="navigation" size={14} color={theme.white} />
+                <Text style={styles.pinCalloutBtnText}>NAVIGATE HERE</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.pinCalloutBtnOutline, { borderColor: theme.border }]}
+                onPress={async () => {
+                  if (!droppedPin) return;
+                  const name = droppedPinAddress || `${droppedPin.lat.toFixed(4)}, ${droppedPin.lng.toFixed(4)}`;
+                  await addFavorite({ name, lat: droppedPin.lat, lng: droppedPin.lng }, user?.id ?? 'local');
+                  dismissDroppedPin();
+                  showToast('Saved to Favorites');
+                }}
+              >
+                <Feather name="heart" size={14} color={theme.textSecondary} />
+                <Text style={[styles.pinCalloutOutlineText, { color: theme.textSecondary }]}>SAVE AS FAVORITE</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* Toast notification */}
         {!!toastMsg && (
@@ -1328,6 +1455,48 @@ export default function RideScreen() {
           setLastSearchQuery(dest.name);
           setSearchSheetOpen(false);
           fetchAndPreviewRoute(dest);
+        }}
+      />
+
+      {/* ── Trip Planner ── */}
+      <TripPlannerSheet
+        visible={tripPlannerOpen}
+        onClose={() => setTripPlannerOpen(false)}
+        userLocation={lastKnownLocation}
+        onPlanRoute={(origin, dest, wps) => {
+          setTripPlannerOpen(false);
+          setRoutePreference('fastest');
+          setDestination(dest);
+          setNavMode('preview');
+          setIsSavedRoutePreview(false);
+          setRouteLoading(true);
+          setRouteError(null);
+          const waypoints = wps.map((w) => ({ lng: w.lng, lat: w.lat }));
+          fetchDirections(origin.lng, origin.lat, dest.lng, dest.lat, routePreference, waypoints)
+            .then((routes) => {
+              if (routes.length > 0) {
+                setActiveRoute(routes[0]);
+                setAlternateRoutes(routes.slice(1));
+                setNavRouteGeojson(routes[0].geometry);
+                const coords = routes[0].geometry.coordinates;
+                if (coords.length >= 2) {
+                  const lats = coords.map((c) => c[1]);
+                  const lngs = coords.map((c) => c[0]);
+                  cameraRef.current?.fitBounds(
+                    [Math.max(...lngs), Math.max(...lats)],
+                    [Math.min(...lngs), Math.min(...lats)],
+                    [80, 80, 220, 80],
+                    800,
+                  );
+                }
+              }
+            })
+            .catch((e: any) => {
+              setRouteError(e?.message ?? 'Could not fetch route');
+              setActiveRoute(null);
+              setAlternateRoutes([]);
+            })
+            .finally(() => setRouteLoading(false));
         }}
       />
     </View>
@@ -1581,5 +1750,106 @@ const styles = StyleSheet.create({
   toastText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // Navigation weather strip
+  navWeatherWrap: {
+    position: 'absolute',
+    top: 130,
+    left: 0,
+    right: 0,
+    zIndex: 9985,
+  },
+
+  // Dropped pin
+  droppedPinOuter: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E53935',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  droppedPinInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+  droppedPinTail: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#E53935',
+    alignSelf: 'center',
+    marginTop: -2,
+  },
+
+  // Pin callout
+  pinCallout: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    right: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    zIndex: 9990,
+    elevation: 15,
+  },
+  pinCalloutHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14,
+  },
+  pinCalloutTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  pinCalloutCoords: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  pinCalloutClose: {
+    padding: 2,
+  },
+  pinCalloutActions: {
+    gap: 8,
+  },
+  pinCalloutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+  },
+  pinCalloutBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  pinCalloutBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  pinCalloutOutlineText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

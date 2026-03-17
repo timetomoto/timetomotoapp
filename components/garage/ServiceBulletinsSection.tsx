@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -180,6 +180,16 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
   const isEmpty    = result != null && result.recalls.length === 0 && result.complaints.length === 0;
   const totalCount = result ? result.recalls.length + result.complaints.length : 0;
 
+  // Auto-check on first expand if no cached data
+  const hasTriggered = useRef(false);
+  useEffect(() => {
+    if (collapsed || isLoading || hasTriggered.current) return;
+    if (!result && make && model) {
+      hasTriggered.current = true;
+      handleCheck();
+    }
+  }, [collapsed]);
+
   async function handleCheck() {
     await fetchBulletins(year, make, model);
   }
@@ -233,7 +243,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
             onPress={result ? handleRefresh : handleCheck}
             hitSlop={6}
           >
-            <Feather name={result ? 'refresh-cw' : 'shield'} size={12} color="#fff" />
+            <Feather name={result ? 'refresh-cw' : 'shield'} size={12} color={theme.white} />
             <Text style={s.checkBtnText}>{result ? 'REFRESH' : 'CHECK NOW'}</Text>
           </Pressable>
         )}
@@ -355,7 +365,7 @@ const s = StyleSheet.create({
     marginBottom: 12,
   },
   headerLeft: { flex: 1, gap: 2 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   checkedAt: { fontSize: 10, letterSpacing: 0.2 },
 
   checkBtn: {
@@ -366,7 +376,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  checkBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 
   idleBox: {
     flexDirection: 'row',
@@ -390,7 +400,7 @@ const s = StyleSheet.create({
     padding: 20,
     marginBottom: 12,
   },
-  emptyTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
+  emptyTitle: { fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
   emptySubtitle: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
 
   tsbBtn: {
@@ -408,7 +418,7 @@ const s = StyleSheet.create({
   groupLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 1,
     marginBottom: 8,
   },
 
@@ -427,7 +437,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  badgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   bulletinId: { fontSize: 10, fontWeight: '600', letterSpacing: 0.2 },
   bulletinComponent: { fontSize: 11, fontWeight: '600', letterSpacing: 0.1 },
   bulletinBody: { fontSize: 12, lineHeight: 18 },
@@ -440,7 +450,7 @@ const s = StyleSheet.create({
     gap: 4,
     marginTop: 2,
   },
-  remedyLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7 },
+  remedyLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
   remedyText: { fontSize: 11, lineHeight: 17 },
 
   bulletinMeta: { fontSize: 10, letterSpacing: 0.1 },

@@ -59,7 +59,7 @@ export default function DatePickerField({ value, onChange, label }: Props) {
               mode="date"
               display="spinner"
               onChange={handleChange}
-              themeVariant="dark"
+              themeVariant={theme.bg === '#0D0D0D' ? 'dark' : 'light'}
             />
           </View>
         ) : (

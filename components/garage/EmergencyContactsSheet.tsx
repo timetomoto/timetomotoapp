@@ -204,7 +204,7 @@ export default function EmergencyContactsSheet({ onClose }: Props) {
               disabled={saving}
             >
               {saving
-                ? <ActivityIndicator color="#fff" />
+                ? <ActivityIndicator color={theme.white} />
                 : <Text style={styles.saveBtnText}>SAVE CONTACTS</Text>
               }
             </Pressable>

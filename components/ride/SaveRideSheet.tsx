@@ -122,9 +122,9 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
             disabled={saving}
           >
             {saving
-              ? <ActivityIndicator color="#fff" />
+              ? <ActivityIndicator color={theme.white} />
               : <>
-                  <Feather name="save" size={18} color="#fff" />
+                  <Feather name="save" size={18} color={theme.white} />
                   <Text style={s.saveBtnText}>SAVE TO ROUTES</Text>
                 </>
             }
@@ -179,13 +179,13 @@ const s = StyleSheet.create({
   },
   statItem:  { flex: 1, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 18, fontWeight: '700' },
-  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  statLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1 },
   statDivider: { width: 1, marginVertical: 4 },
 
   inputLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 1,
     marginBottom: -8,
   },
   input: {
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
   },
   discardBtn: {
     alignItems: 'center',

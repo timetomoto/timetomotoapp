@@ -394,10 +394,10 @@ export default function RideWindowPlanner() {
         disabled={planning}
       >
         {planning
-          ? <ActivityIndicator color="#fff" />
+          ? <ActivityIndicator color={theme.white} />
           : (
             <>
-              <Feather name="compass" size={16} color="#fff" />
+              <Feather name="compass" size={16} color={theme.white} />
               <Text style={s.planBtnText}>PLAN WINDOW</Text>
             </>
           )

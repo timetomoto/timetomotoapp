@@ -137,7 +137,7 @@ function Screen2() {
         >
           {saved ? (
             <View style={s.savedInlineRow}>
-              <Feather name="check" size={16} color="#fff" />
+              <Feather name="check" size={16} color={theme.white} />
               <Text style={s.formBtnText}>Bike Saved</Text>
             </View>
           ) : (
@@ -211,7 +211,7 @@ function Screen3() {
         >
           {saved ? (
             <View style={s.savedInlineRow}>
-              <Feather name="check" size={16} color="#fff" />
+              <Feather name="check" size={16} color={theme.white} />
               <Text style={s.formBtnText}>Contact Added</Text>
             </View>
           ) : (
@@ -307,7 +307,7 @@ export default function OnboardingScreen() {
           <Text style={s.nextBtnText}>
             {isLast ? "LET'S RIDE" : 'NEXT'}
           </Text>
-          <Feather name={isLast ? 'check' : 'arrow-right'} size={18} color="#fff" />
+          <Feather name={isLast ? 'check' : 'arrow-right'} size={18} color={theme.white} />
         </Pressable>
       </View>
     </SafeAreaView>

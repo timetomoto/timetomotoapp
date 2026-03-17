@@ -227,7 +227,7 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
             style={[st.addBtn, { backgroundColor: theme.red }]}
             onPress={() => { setEditing(null); setShowForm(true); }}
           >
-            <Feather name="plus" size={14} color="#fff" />
+            <Feather name="plus" size={14} color={theme.white} />
           </Pressable>
         </View>
       </View>
@@ -249,7 +249,7 @@ export default function ModificationsSection({ bikeId, userId }: { bikeId: strin
       {records.length === 0 && (
         <View style={st.emptyState}>
           <Feather name="settings" size={28} color={theme.border} />
-          <Text style={[st.emptyText, { color: theme.textSecondary }]}>Add upgrades and custom parts.</Text>
+          <Text style={[st.emptyText, { color: theme.textSecondary }]}>No modifications yet.{'\n'}Log upgrades, aftermarket parts, and custom work.</Text>
         </View>
       )}
 
@@ -292,8 +292,8 @@ const fm = StyleSheet.create({
   sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40, maxHeight: '90%' },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  heading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.7 },
-  label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginTop: 16, marginBottom: 6 },
+  heading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  label: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 16, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
   textArea: { minHeight: 72, textAlignVertical: 'top' },
   pickerBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -301,13 +301,13 @@ const fm = StyleSheet.create({
   pickerItem: { paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1 },
   pickerItemText: { fontSize: 14 },
   saveBtn: { borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 24 },
-  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.7 },
+  saveBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
 });
 
 const st = StyleSheet.create({
   root: { padding: 16 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn: { padding: 4 },
   addBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },

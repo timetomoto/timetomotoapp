@@ -38,6 +38,7 @@ import {
   loadFavorites,
   toggleFavorite as toggleFavoriteApi,
   removeFavorite as removeFavoriteApi,
+  getHomeFavorite,
   type FavoriteLocation as SharedFavorite,
 } from '../../lib/favorites';
 
@@ -395,7 +396,7 @@ function AlertBanner({ alert, onDismiss }: { alert: WeatherAlert; onDismiss: () 
   return (
     <View style={[styles.alertBanner, { backgroundColor: theme.red }]}>
       <View style={styles.alertLeft}>
-        <Feather name="alert-triangle" size={16} color="#fff" style={{ marginTop: 1 }} />
+        <Feather name="alert-triangle" size={16} color={theme.white} style={{ marginTop: 1 }} />
         <View style={styles.alertText}>
           <Text style={styles.alertTitle}>{alert.title.toUpperCase()}</Text>
           {!!alert.affectedArea && <Text style={styles.alertMeta}>{alert.affectedArea}</Text>}
@@ -565,9 +566,8 @@ export default function WeatherScreen() {
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
   const [recents, setRecents]     = useState<FavoriteLocation[]>([]);
 
-  // Load favorites from Supabase (with local cache fallback) + recents on mount
+  // Load recents on mount
   useEffect(() => {
-    loadFavorites(userId).then((shared) => setFavorites(shared.map(fromShared)));
     loadRecents().then(setRecents);
   }, [userId]);
 
@@ -677,7 +677,37 @@ export default function WeatherScreen() {
     }
   }
 
-  useEffect(() => { loadByGPS(); }, []);
+  useEffect(() => {
+    // Load favorites, check for home, use as default weather location
+    loadFavorites(userId).then((favs) => {
+      setFavorites(favs.map(fromShared));
+      const home = getHomeFavorite(favs);
+      if (home) {
+        coordsRef.current = { lat: home.lat, lng: home.lng };
+        // Show nickname/name immediately, then refine with reverse geocode
+        setLocationLabel(home.nickname || home.name);
+        setState('fetching');
+
+        // Reverse geocode for clean city name
+        Location.reverseGeocodeAsync({ latitude: home.lat, longitude: home.lng })
+          .then(([place]) => {
+            if (place) {
+              const city = place.city || place.subregion || place.region || '';
+              const region = place.region || '';
+              const label = city && region ? `${city}, ${region}` : city || region;
+              if (label) setLocationLabel(label);
+            }
+          })
+          .catch(() => {});
+
+        fetchWeather(home.lat, home.lng, true)
+          .then((w) => { setData(w); setState('done'); })
+          .catch(() => loadByGPS());
+      } else {
+        loadByGPS();
+      }
+    }).catch(() => loadByGPS());
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

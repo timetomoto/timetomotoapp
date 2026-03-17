@@ -385,7 +385,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -420,7 +420,7 @@ const s = StyleSheet.create({
   cardMeta: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   cardTitle: {

@@ -33,6 +33,7 @@ export async function fetchDirections(
   destLng: number,
   destLat: number,
   preference: RoutePreference = 'fastest',
+  waypoints?: { lng: number; lat: number }[],
 ): Promise<NavRoute[]> {
   const profile = preference === 'offroad' ? 'cycling' : 'driving';
 
@@ -41,7 +42,7 @@ export async function fetchDirections(
     geometries: 'geojson',
     steps: 'true',
     overview: 'full',
-    alternatives: 'true',
+    alternatives: waypoints && waypoints.length > 0 ? 'false' : 'true',
     language: 'en',
   });
 
@@ -52,7 +53,17 @@ export async function fetchDirections(
     params.set('exclude', 'toll');
   }
 
-  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${originLng},${originLat};${destLng},${destLat}?${params.toString()}`;
+  // Build coordinate string with optional waypoints
+  const coordParts = [`${originLng},${originLat}`];
+  if (waypoints) {
+    for (const wp of waypoints) {
+      coordParts.push(`${wp.lng},${wp.lat}`);
+    }
+  }
+  coordParts.push(`${destLng},${destLat}`);
+  const coordString = coordParts.join(';');
+
+  const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordString}?${params.toString()}`;
 
   const res = await fetch(url);
   if (!res.ok) {

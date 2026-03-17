@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -57,21 +57,31 @@ If the model name is ambiguous use the closest known variant and note it in assu
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
   });
 
-  // Try endpoints in order until one succeeds
+  // Try endpoints in order until one succeeds (fast non-thinking models first)
   const endpoints = [
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
-    'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent',
   ];
   let lastError = 'No models available';
 
   for (const endpoint of endpoints) {
-    const resp = await fetch(
-      `${endpoint}?key=${GEMINI_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
-    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    let resp: Response;
+    try {
+      resp = await fetch(
+        `${endpoint}?key=${GEMINI_KEY}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal },
+      );
+    } catch (e: any) {
+      lastError = e.name === 'AbortError' ? 'Request timed out — try again' : (e.message ?? 'Network error');
+      clearTimeout(timer);
+      continue;
+    }
+    clearTimeout(timer);
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
@@ -82,7 +92,26 @@ If the model name is ambiguous use the closest known variant and note it in assu
     const json = await resp.json();
     const raw: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+
+    if (!cleaned) {
+      lastError = 'Empty response from AI';
+      continue;
+    }
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // Try to salvage truncated JSON by closing open brackets
+      const salvaged = cleaned.replace(/,\s*$/, '') + (cleaned.includes('[') && !cleaned.endsWith(']') ? ']}' : '}');
+      try {
+        parsed = JSON.parse(salvaged);
+      } catch {
+        lastError = 'AI returned invalid data — try again';
+        continue;
+      }
+    }
+
     return {
       assumption: parsed.assumption || undefined,
       items: parsed.items ?? [],
@@ -149,6 +178,16 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
     handleLookup();
   }
 
+  // Auto-lookup on first expand if no cached data
+  const hasTriggered = useRef(false);
+  useEffect(() => {
+    if (collapsed || loading || hasTriggered.current) return;
+    if (!result && bike.make && bike.model) {
+      hasTriggered.current = true;
+      handleLookup();
+    }
+  }, [collapsed]);
+
   const bikeLabel = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
 
   const itemCount = result?.items?.length ?? 0;
@@ -174,10 +213,21 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
       {!collapsed && (<View>
       {/* Action row */}
       <View style={s.headerRow}>
-        <View style={{ flex: 1 }} />
-        {result && (
-          <Pressable onPress={handleRefresh} hitSlop={8} style={s.iconBtn}>
-            <Feather name="refresh-cw" size={15} color={theme.textSecondary} />
+        <View style={s.headerLeft}>
+          {result && (
+            <Text style={[s.checkedAt, { color: theme.textMuted }]}>
+              Last checked {new Date(result.fetchedAt).toLocaleDateString()}
+            </Text>
+          )}
+        </View>
+        {result && !loading && (
+          <Pressable
+            style={[s.refreshBtn, { backgroundColor: theme.red }]}
+            onPress={handleRefresh}
+            hitSlop={6}
+          >
+            <Feather name="refresh-cw" size={12} color={theme.white} />
+            <Text style={s.refreshBtnText}>REFRESH</Text>
           </Pressable>
         )}
       </View>
@@ -205,7 +255,7 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
             style={({ pressed }) => [s.lookupBtn, { backgroundColor: theme.red }, pressed && { opacity: 0.8 }]}
             onPress={handleLookup}
           >
-            <Feather name="search" size={15} color="#fff" />
+            <Feather name="search" size={15} color={theme.white} />
             <Text style={s.lookupBtnText}>LOOK UP INTERVALS</Text>
           </Pressable>
         </View>
@@ -224,9 +274,6 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
       {/* Results */}
       {result && !loading && (
         <>
-          <Text style={[s.fetchedAt, { color: theme.textMuted }]}>
-            Last updated {new Date(result.fetchedAt).toLocaleDateString()}
-          </Text>
           {result.items.map((item, i) => (
             <View
               key={i}
@@ -279,10 +326,22 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 12,
     marginBottom: 12,
+    paddingHorizontal: 12,
   },
-  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
-  iconBtn: { padding: 4 },
+  headerLeft: { flex: 1, gap: 2 },
+  checkedAt: { fontSize: 10, letterSpacing: 0.2 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 1 },
 
   assumptionBanner: {
     flexDirection: 'row',
@@ -301,7 +360,7 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 8,
   },
-  emptyTitle: { fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
   emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
 
   lookupBtn: {
@@ -313,7 +372,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     marginTop: 8,
   },
-  lookupBtnText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.7 },
+  lookupBtnText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
 
   loadingState: { alignItems: 'center', paddingVertical: 40, gap: 14 },
   loadingText: { fontSize: 13 },

@@ -240,7 +240,7 @@ export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
         <Feather
           name={collapsed ? 'chevron-right' : 'chevron-left'}
           size={18}
-          color="#fff"
+          color={theme.white}
         />
       </Pressable>
     </Animated.View>

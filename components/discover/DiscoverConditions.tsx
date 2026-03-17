@@ -607,7 +607,7 @@ const s = StyleSheet.create({
   pillText: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.3,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   pillTextActive: { color: '#fff' },
@@ -655,7 +655,7 @@ const s = StyleSheet.create({
   severityText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 1,
   },
   cardRoad: {
     fontSize: 14,
@@ -681,7 +681,7 @@ const s = StyleSheet.create({
   emptyTitle: {
     fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
     textAlign: 'center',
   },
   emptyBody: {

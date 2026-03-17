@@ -708,8 +708,8 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
                     disabled={importing}
                   >
                     {importing
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <Feather name="upload" size={14} color="#fff" />
+                      ? <ActivityIndicator size="small" color={theme.white} />
+                      : <Feather name="upload" size={14} color={theme.white} />
                     }
                     <Text style={styles.toolbarImportText}>{importing ? 'IMPORTING…' : 'IMPORT GPX'}</Text>
                   </Pressable>
@@ -744,11 +744,9 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
             {!loading && routes.length === 0 && (
               <View style={styles.emptyState}>
                 <Feather name="map" size={32} color={theme.border} />
-                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No saved routes</Text>
+                <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No routes yet</Text>
                 <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>
-                  {showSavedRides
-                    ? 'Import a GPX file or save a recorded ride'
-                    : 'No routes yet. Import a GPX or record a ride.'}
+                  Import a GPX file or record a ride to get started.
                 </Text>
               </View>
             )}
@@ -776,7 +774,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
             {showSavedRides && !loading && !query && savedRides.length === 0 && otherRoutes.length > 0 && (
               <View style={srStyles.emptyRides}>
                 <Feather name="disc" size={20} color={theme.border} />
-                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>No saved rides yet. Head to the RECORD tab to log your first ride.</Text>
+                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>No recorded rides yet.{'\n'}Tap Ride & Record on the map to start.</Text>
               </View>
             )}
 

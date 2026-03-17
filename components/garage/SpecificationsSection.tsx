@@ -263,21 +263,27 @@ ${fieldList}`;
   });
 
   const endpoints = [
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
-    'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-pro:generateContent',
   ];
 
   for (const endpoint of endpoints) {
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15_000);
       const resp = await fetch(`${endpoint}?key=${GEMINI_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       if (!resp.ok) continue;
       const json = await resp.json();
       const raw: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      if (!raw.trim()) continue;
+      const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+      if (!cleaned) continue;
       const parsed = JSON.parse(cleaned);
       const result: Partial<BikeSpecs> = {};
       for (const [key, value] of Object.entries(parsed)) {
@@ -286,7 +292,8 @@ ${fieldList}`;
         }
       }
       return result;
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === 'AbortError') continue;
       console.error('[Specs] Gemini parse failed:', e);
       continue;
     }
@@ -420,6 +427,7 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
   const [specs, setSpecs] = useState<BikeSpecs>(bike.specs ?? {});
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupDone, setLookupDone] = useState(specs.specsLookedUp === true);
+  const [lookedUpAt, setLookedUpAt] = useState<string | null>(specs.specsLookedUpAt ?? null);
   const hasTriggered = useRef(false);
 
   // Sync when bike changes
@@ -427,6 +435,7 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
     const s = bike.specs ?? {};
     setSpecs(s);
     setLookupDone(s.specsLookedUp === true);
+    setLookedUpAt(s.specsLookedUpAt ?? null);
     hasTriggered.current = false;
   }, [bike.id]);
 
@@ -499,10 +508,12 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
     }
 
     merged.specsLookedUp = true;
+    merged.specsLookedUpAt = new Date().toISOString();
     if (source) merged.specsSource = source;
 
     await saveSpecs(merged);
     setLookupDone(true);
+    setLookedUpAt(merged.specsLookedUpAt ?? null);
     setLookingUp(false);
   }
 
@@ -531,6 +542,30 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
 
       {!collapsed && (
         <View>
+          {/* Action row with refresh button */}
+          <View style={st.actionRow}>
+            <View style={st.actionLeft}>
+              {lookupDone && (
+                <Text style={[st.checkedAt, { color: theme.textMuted }]}>
+                  {lookedUpAt ? `Last checked ${new Date(lookedUpAt).toLocaleDateString()}` : 'Specs loaded'}
+                </Text>
+              )}
+            </View>
+            {lookupDone && !lookingUp && (
+              <Pressable
+                style={[st.refreshBtn, { backgroundColor: theme.red }]}
+                onPress={() => {
+                  hasTriggered.current = true;
+                  performLookup();
+                }}
+                hitSlop={6}
+              >
+                <Feather name="refresh-cw" size={12} color={theme.white} />
+                <Text style={st.refreshBtnText}>REFRESH</Text>
+              </Pressable>
+            )}
+          </View>
+
           {/* Loading state / empty hint */}
           {lookingUp ? (
             <View style={st.lookupBox}>
@@ -559,20 +594,6 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
           ))}
 
           {/* Empty hint — removed, moved to top */}
-
-          {/* Manual re-lookup button */}
-          {lookupDone && !lookingUp && (
-            <Pressable
-              style={[st.relookupBtn, { borderColor: theme.border }]}
-              onPress={() => {
-                hasTriggered.current = true;
-                performLookup();
-              }}
-            >
-              <Feather name="refresh-cw" size={12} color={theme.textSecondary} />
-              <Text style={[st.relookupText, { color: theme.textSecondary }]}>Re-lookup specs</Text>
-            </Pressable>
-          )}
         </View>
       )}
     </View>
@@ -662,16 +683,23 @@ const st = StyleSheet.create({
   },
   hintText: { flex: 1, fontSize: 12, lineHeight: 17 },
 
-  relookupBtn: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
     marginTop: 12,
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  relookupText: { fontSize: 11, fontWeight: '600' },
+  actionLeft: { flex: 1, gap: 2 },
+  checkedAt: { fontSize: 10, letterSpacing: 0.2 },
+  refreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
 });

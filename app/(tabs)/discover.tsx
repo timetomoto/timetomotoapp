@@ -120,7 +120,7 @@ const s = StyleSheet.create({
   subNavText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 0.7,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   subNavUnderline: {

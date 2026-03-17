@@ -1,6 +1,13 @@
-import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  fetchRouteWeather,
+  hasRouteWeatherConcern,
+  getRouteWarningMessage,
+  type RouteWeatherPoint,
+} from '../../lib/routeWeather';
 import { useTheme } from '../../lib/useTheme';
 import { useAuthStore, useGarageStore, useSafetyStore, bikeLabel } from '../../lib/store';
 import { fetchDirections } from '../../lib/directions';
@@ -28,9 +35,7 @@ interface Props {
   onCancel: () => void;
   onTryDifferentRoute?: () => void;
   isSavedRoute?: boolean;
-  /** Start coords of the saved route (first trackpoint) */
   savedRouteStart?: { lat: number; lng: number } | null;
-  /** Called when the active geometry changes so the parent can update the map line */
   onGeometryChange?: (geometry: NavRoute['geometry']) => void;
 }
 
@@ -90,6 +95,7 @@ export default function RoutePreviewScreen({
   onGeometryChange,
 }: Props) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
   const { bikes, selectedBikeId } = useGarageStore();
@@ -104,6 +110,11 @@ export default function RoutePreviewScreen({
   const [crashOverride, setCrashOverride] = useState(false);
   const [locationOn, setLocationOn] = useState(shareActive);
   const [locationOverride, setLocationOverride] = useState(false);
+
+  // Weather summary
+  const [weatherMsg, setWeatherMsg] = useState<string | null>(null);
+  const [weatherSeverity, setWeatherSeverity] = useState<'clear' | 'minor' | 'moderate' | 'severe'>('clear');
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   function handleCrashToggle() {
     if (!crashOn && !isMonitoring) {
@@ -141,7 +152,6 @@ export default function RoutePreviewScreen({
 
   function handleStartNav() {
     if (!selectedRoute) return;
-    // Apply session overrides before starting
     if (crashOn && !isMonitoring) {
       setCrashDetectionOverride(true);
       setMonitoring(true);
@@ -151,15 +161,61 @@ export default function RoutePreviewScreen({
     }
     onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
   }
-  const translateY = useRef(new Animated.Value(0)).current;
+
+  // ── Saved route pill state ──
+  const [selectedPill, setSelectedPill] = useState<SavedRoutePill>('this_route');
+  const [pillLoading, setPillLoading] = useState(false);
+  const cacheRef = useRef<Record<string, NavRoute>>({});
+
+  const savedRoute = routes[0] ?? null;
+  const selectedRoute = isSavedRoute
+    ? (selectedPill === 'this_route' ? savedRoute : (cacheRef.current[selectedPill] ?? savedRoute))
+    : (routes[selectedRouteIdx] ?? null);
+
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Check if destination is favorited on mount / destination change
   useEffect(() => {
     loadFavorites(userId).then((favs) => {
       setIsFavorite(favs.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
     });
   }, [destination.name, destination.lat, destination.lng, userId]);
+
+  // Fetch route weather summary
+  useEffect(() => {
+    const coords = selectedRoute?.geometry?.coordinates;
+    if (!coords || coords.length < 2) { setWeatherMsg(null); return; }
+    setWeatherLoading(true);
+    fetchRouteWeather(coords)
+      .then(({ points, useCelsius }) => {
+        if (points.length === 0) { setWeatherMsg(null); return; }
+        const concern = hasRouteWeatherConcern(points, useCelsius);
+        if (!concern) {
+          setWeatherMsg('Weather looks good. Ride on.');
+          setWeatherSeverity('clear');
+          return;
+        }
+        const warning = getRouteWarningMessage(points, useCelsius);
+        if (!warning) { setWeatherMsg(null); return; }
+
+        // Determine severity tier
+        const worst = points.reduce((max, p) => Math.max(max, p.weatherCode), 0);
+        const freezeT = useCelsius ? 2 : 35;
+        const windT = useCelsius ? 56 : 35;
+        const hasFreeze = points.some((p) => p.temp < freezeT);
+        const hasSevereWind = points.some((p) => p.wind > windT);
+
+        if (worst >= 5000 || hasFreeze) {
+          setWeatherSeverity('severe');
+        } else if (points.some((p) => p.rainChance > 50) || hasSevereWind) {
+          setWeatherSeverity('moderate');
+        } else {
+          setWeatherSeverity('minor');
+        }
+        setWeatherMsg(warning);
+      })
+      .catch(() => setWeatherMsg(null))
+      .finally(() => setWeatherLoading(false));
+  }, [selectedRoute]);
 
   const toggleFavorite = useCallback(async () => {
     const fav: FavoriteLocation = { name: destination.name, lat: destination.lat, lng: destination.lng };
@@ -167,390 +223,225 @@ export default function RoutePreviewScreen({
     setIsFavorite(updated.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
   }, [destination.name, destination.lat, destination.lng, userId]);
 
-  // ── Saved route pill state ──
-  const [selectedPill, setSelectedPill] = useState<SavedRoutePill>('this_route');
-  const [pillLoading, setPillLoading] = useState(false);
-  const cacheRef = useRef<Record<string, NavRoute>>({});
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 8,
-      onPanResponderMove: (_, g) => {
-        if (g.dy > 0) translateY.setValue(g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 80 || g.vy > 0.5) {
-          Animated.timing(translateY, {
-            toValue: 600,
-            duration: 250,
-            useNativeDriver: true,
-          }).start(() => onCancel());
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-            damping: 20,
-            stiffness: 200,
-          }).start();
-        }
-      },
-    }),
-  ).current;
-
-  // The original saved route is always routes[0]
-  const savedRoute = routes[0] ?? null;
-
-  // For destination search, use the user-selected index
-  const selectedRoute = isSavedRoute
-    ? (selectedPill === 'this_route' ? savedRoute : (cacheRef.current[selectedPill] ?? savedRoute))
-    : (routes[selectedRouteIdx] ?? null);
-
-  // Fetch an alternative route from the Directions API
   const fetchAlternative = useCallback(async (pill: 'fastest' | 'no_hwy' | 'no_tolls') => {
-    // Use cache if available
     if (cacheRef.current[pill]) {
       setSelectedPill(pill);
       onGeometryChange?.(cacheRef.current[pill].geometry);
       return;
     }
-
-    // Need start + end coords
     const start = savedRouteStart;
     const end = destination;
     if (!start || !end) return;
-
     setPillLoading(true);
     setSelectedPill(pill);
-
     try {
-      const prefMap: Record<string, RoutePreference> = {
-        fastest: 'fastest',
-        no_hwy: 'no_highway',
-        no_tolls: 'no_tolls',
-      };
-      const pref = prefMap[pill] ?? 'fastest';
-      const results = await fetchDirections(start.lng, start.lat, end.lng, end.lat, pref);
-      if (results.length > 0) {
-        cacheRef.current[pill] = results[0];
-        onGeometryChange?.(results[0].geometry);
-      }
+      const prefMap: Record<string, RoutePreference> = { fastest: 'fastest', no_hwy: 'no_highway', no_tolls: 'no_tolls' };
+      const results = await fetchDirections(start.lng, start.lat, end.lng, end.lat, prefMap[pill] ?? 'fastest');
+      if (results.length > 0) { cacheRef.current[pill] = results[0]; onGeometryChange?.(results[0].geometry); }
     } catch {
-      // Revert to saved route on failure
       setSelectedPill('this_route');
       if (savedRoute) onGeometryChange?.(savedRoute.geometry);
-    } finally {
-      setPillLoading(false);
-    }
+    } finally { setPillLoading(false); }
   }, [savedRouteStart, destination, savedRoute, onGeometryChange]);
 
   const handleSavedPillPress = useCallback((pill: SavedRoutePill) => {
     if (pill === selectedPill) {
-      // Toggle off → back to THIS ROUTE
-      if (pill !== 'this_route') {
-        setSelectedPill('this_route');
-        if (savedRoute) onGeometryChange?.(savedRoute.geometry);
-      }
+      if (pill !== 'this_route') { setSelectedPill('this_route'); if (savedRoute) onGeometryChange?.(savedRoute.geometry); }
       return;
     }
-
-    if (pill === 'this_route') {
-      setSelectedPill('this_route');
-      if (savedRoute) onGeometryChange?.(savedRoute.geometry);
-    } else {
-      fetchAlternative(pill);
-    }
+    if (pill === 'this_route') { setSelectedPill('this_route'); if (savedRoute) onGeometryChange?.(savedRoute.geometry); }
+    else fetchAlternative(pill);
   }, [selectedPill, savedRoute, fetchAlternative, onGeometryChange]);
 
-  // Display meta — show loading placeholder when fetching
-  const displayMeta = pillLoading
-    ? '— mi · — min'
-    : selectedRoute
-    ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds)
-    : '';
+  const displayMeta = pillLoading ? '— mi · — min' : selectedRoute ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds) : '';
 
   return (
-    <View style={styles.overlay} pointerEvents="box-none">
-      {/* Bottom sheet container */}
-      <Animated.View
-        style={[
-          styles.sheet,
-          { backgroundColor: theme.bgPanel, borderTopColor: theme.border },
-          { transform: [{ translateY }] },
-        ]}
-      >
-        {/* Handle — drag zone */}
-        <View {...panResponder.panHandlers} style={styles.handleZone}>
-          <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        </View>
-
-        {/* Destination header */}
-        <View style={[styles.destRow, { borderBottomColor: theme.border }]}>
-          <View style={[styles.destIcon, { backgroundColor: theme.red + '22', borderColor: theme.red }]}>
-            <Feather name="map-pin" size={18} color={theme.red} />
-          </View>
-          <View style={styles.destInfo}>
-            <Text style={[styles.destName, { color: theme.textPrimary }]} numberOfLines={1}>
-              {destination.name}
-            </Text>
-            {isSavedRoute ? (
-              <Text style={[styles.destMeta, { color: theme.textSecondary }]}>
-                {displayMeta}
-              </Text>
-            ) : selectedRoute ? (
-              <Text style={[styles.destMeta, { color: theme.textSecondary }]}>
-                {formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds)}
-              </Text>
-            ) : null}
-          </View>
-          <Pressable onPress={toggleFavorite} hitSlop={8} style={styles.favBtn}>
-            <Ionicons
-              name={isFavorite ? 'heart' : 'heart-outline'}
-              size={22}
-              color={isFavorite ? theme.red : '#666666'}
-            />
+    <Modal
+      visible
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onCancel}
+    >
+      <View style={[st.root, { backgroundColor: theme.bgPanel }]}>
+        {/* Header */}
+        <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: theme.border }]}>
+          <View style={{ width: 40 }} />
+          <Text style={[st.headerTitle, { color: theme.textPrimary }]}>Start Ride</Text>
+          <Pressable onPress={onCancel} hitSlop={8} style={{ width: 40, alignItems: 'flex-end' }}>
+            <Feather name="x" size={22} color={theme.textSecondary} />
           </Pressable>
         </View>
 
-        {/* ── Saved route pills ── */}
-        {isSavedRoute && !loading && !error && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.pillsScroll}
-            contentContainerStyle={styles.pillsContent}
-          >
-            {SAVED_ROUTE_PILLS.map((pill) => {
-              const active = selectedPill === pill.key;
-              return (
-                <Pressable
-                  key={pill.key}
-                  style={[
-                    styles.pill,
-                    {
-                      backgroundColor: active ? theme.red : theme.bgCard,
-                      borderColor: active ? theme.red : theme.border,
-                    },
-                  ]}
-                  onPress={() => handleSavedPillPress(pill.key)}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      { color: active ? '#fff' : theme.textMuted },
-                    ]}
-                  >
-                    {pill.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-
-        {/* ── Destination search pills ── */}
-        {!isSavedRoute && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.pillsScroll}
-            contentContainerStyle={styles.pillsContent}
-          >
-            {PREFERENCE_PILLS.map((pill) => {
-              const active = routePreference === pill.key;
-              return (
-                <Pressable
-                  key={pill.key}
-                  style={[
-                    styles.pill,
-                    {
-                      backgroundColor: active ? theme.red : theme.bgCard,
-                      borderColor: active ? theme.red : theme.border,
-                    },
-                  ]}
-                  onPress={() => onChangePreference(pill.key)}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      { color: active ? '#fff' : theme.textMuted },
-                    ]}
-                  >
-                    {pill.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        )}
-
-        {/* Content area */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.red} />
-            <Text style={[styles.loadingText, { color: theme.textMuted }]}>
-              {isSavedRoute ? 'Loading route…' : 'Finding best routes…'}
-            </Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Feather name="alert-circle" size={32} color={theme.red} />
-            <Text style={[styles.errorText, { color: theme.textSecondary }]}>{error}</Text>
-            <Pressable
-              style={[styles.tryAgainBtn, { borderColor: theme.border }]}
-              onPress={() => onTryDifferentRoute ? onTryDifferentRoute() : onChangePreference(routePreference)}
-            >
-              <Text style={[styles.tryAgainText, { color: theme.textSecondary }]}>
-                Try Different Route
-              </Text>
+        {/* Scrollable body */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={st.body} showsVerticalScrollIndicator={false}>
+          {/* Destination header */}
+          <View style={[st.destRow, { borderBottomColor: theme.border }]}>
+            <View style={[st.destIcon, { backgroundColor: theme.red + '22', borderColor: theme.red }]}>
+              <Feather name="map-pin" size={18} color={theme.red} />
+            </View>
+            <View style={st.destInfo}>
+              <Text style={[st.destName, { color: theme.textPrimary }]} numberOfLines={1}>{destination.name}</Text>
+              {isSavedRoute ? (
+                <Text style={[st.destMeta, { color: theme.textSecondary }]}>{displayMeta}</Text>
+              ) : selectedRoute ? (
+                <Text style={[st.destMeta, { color: theme.textSecondary }]}>{formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds)}</Text>
+              ) : null}
+            </View>
+            <Pressable onPress={toggleFavorite} hitSlop={8} style={st.favBtn}>
+              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? theme.red : '#666666'} />
             </Pressable>
           </View>
-        ) : !isSavedRoute ? (
-          <>
-            {/* Alternate routes list — destination search */}
-            {routes.length > 1 && (
-              <ScrollView
-                style={styles.routeList}
-                showsVerticalScrollIndicator={false}
-              >
-                {routes.map((route, idx) => (
-                  <Pressable
-                    key={idx}
-                    style={[
-                      styles.routeRow,
-                      {
-                        backgroundColor:
-                          selectedRouteIdx === idx ? theme.red + '15' : theme.bgCard,
-                        borderColor:
-                          selectedRouteIdx === idx ? theme.red : theme.border,
-                      },
-                    ]}
-                    onPress={() => setSelectedRouteIdx(idx)}
-                  >
-                    <View style={styles.routeRowLeft}>
-                      <Text
-                        style={[
-                          styles.routeLabel,
-                          {
-                            color:
-                              selectedRouteIdx === idx ? theme.red : theme.textSecondary,
-                          },
-                        ]}
-                      >
-                        {idx === 0 ? 'Recommended' : `Alternate ${idx}`}
-                      </Text>
-                      <Text style={[styles.routeMeta, { color: theme.textMuted }]}>
-                        {formatRouteMeta(route.distanceMiles, route.durationSeconds)}
-                      </Text>
-                    </View>
-                    {selectedRouteIdx === idx && (
-                      <Feather name="check-circle" size={18} color={theme.red} />
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </>
-        ) : null}
 
-        {/* Bike selector — shared by saved route and destination search */}
-        {!loading && !error && bikes.length > 0 && (
-          <View style={styles.bikeSelector}>
-            <Text style={[styles.bikeSelectorLabel, { color: theme.textSecondary }]}>RIDE WITH</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bikePills}>
-              {bikes.map((bike) => {
-                const active = bike.id === navBikeId;
+          {/* Saved route pills */}
+          {isSavedRoute && !loading && !error && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.pillsScroll} contentContainerStyle={st.pillsContent}>
+              {SAVED_ROUTE_PILLS.map((pill) => {
+                const active = selectedPill === pill.key;
                 return (
-                  <Pressable
-                    key={bike.id}
-                    style={[
-                      styles.bikePill,
-                      { borderColor: active ? theme.red : theme.border },
-                      active && { backgroundColor: theme.red + '1F' },
-                    ]}
-                    onPress={() => setNavBikeId(active ? null : bike.id)}
-                  >
-                    <Feather name="disc" size={12} color={active ? theme.red : theme.textSecondary} />
-                    <Text style={[styles.bikePillText, { color: active ? theme.red : theme.textPrimary }]}>
-                      {bikeLabel(bike)}
-                    </Text>
+                  <Pressable key={pill.key} style={[st.pill, { backgroundColor: active ? theme.red : theme.bgCard, borderColor: active ? theme.red : theme.border }]} onPress={() => handleSavedPillPress(pill.key)}>
+                    <Text style={[st.pillText, { color: active ? theme.white : theme.textMuted }]}>{pill.label}</Text>
                   </Pressable>
                 );
               })}
             </ScrollView>
-          </View>
-        )}
+          )}
 
-        {/* Ride option toggles */}
-        {!loading && !error && selectedRoute && (
-          <View style={styles.toggleGroup}>
-            <Pressable
-              style={[styles.recordToggleRow, { borderColor: theme.border }]}
-              onPress={() => setRecordRide((v) => !v)}
-            >
-              <View style={styles.recordToggleLeft}>
-                <Feather name="play-circle" size={16} color={recordRide ? theme.toggleTrackOn : theme.textMuted} />
-                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Record this ride</Text>
-              </View>
-              <View style={[styles.recordToggleTrack, { backgroundColor: recordRide ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                <View style={[styles.recordToggleThumb, { backgroundColor: recordRide ? theme.toggleThumbOn : theme.toggleThumbOff }, recordRide && styles.recordToggleThumbOn]} />
-              </View>
-            </Pressable>
+          {/* Destination search pills */}
+          {!isSavedRoute && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.pillsScroll} contentContainerStyle={st.pillsContent}>
+              {PREFERENCE_PILLS.map((pill) => {
+                const active = routePreference === pill.key;
+                return (
+                  <Pressable key={pill.key} style={[st.pill, { backgroundColor: active ? theme.red : theme.bgCard, borderColor: active ? theme.red : theme.border }]} onPress={() => onChangePreference(pill.key)}>
+                    <Text style={[st.pillText, { color: active ? theme.white : theme.textMuted }]}>{pill.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
 
-            <Pressable
-              style={[styles.recordToggleRow, { borderColor: theme.border }]}
-              onPress={handleCrashToggle}
-            >
-              <View style={styles.recordToggleLeft}>
-                <Feather name="shield" size={16} color={crashOn ? theme.toggleTrackOn : theme.textMuted} />
-                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Crash detection</Text>
-                {crashOverride && (
-                  <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
-                )}
-              </View>
-              <View style={[styles.recordToggleTrack, { backgroundColor: crashOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                <View style={[styles.recordToggleThumb, { backgroundColor: crashOn ? theme.toggleThumbOn : theme.toggleThumbOff }, crashOn && styles.recordToggleThumbOn]} />
-              </View>
-            </Pressable>
+          {/* Content area */}
+          {loading ? (
+            <View style={st.centeredState}>
+              <ActivityIndicator size="large" color={theme.red} />
+              <Text style={[st.stateText, { color: theme.textMuted }]}>{isSavedRoute ? 'Loading route…' : 'Finding best routes…'}</Text>
+            </View>
+          ) : error ? (
+            <View style={st.centeredState}>
+              <Feather name="alert-circle" size={32} color={theme.red} />
+              <Text style={[st.stateText, { color: theme.textSecondary }]}>{error}</Text>
+              <Pressable style={[st.tryAgainBtn, { borderColor: theme.border }]} onPress={() => onTryDifferentRoute ? onTryDifferentRoute() : onChangePreference(routePreference)}>
+                <Text style={[st.tryAgainText, { color: theme.textSecondary }]}>Try Different Route</Text>
+              </Pressable>
+            </View>
+          ) : !isSavedRoute && routes.length > 1 ? (
+            <View style={st.routeCards}>
+              {routes.map((route, idx) => {
+                const active = selectedRouteIdx === idx;
+                const label = idx === 0 ? 'RECOMMENDED' : route.distanceMiles < routes[0].distanceMiles ? 'SHORTER' : route.durationSeconds < routes[0].durationSeconds ? 'FASTER' : `ALT ${idx}`;
+                return (
+                  <Pressable
+                    key={idx}
+                    style={[st.routeCard, { backgroundColor: active ? theme.red + '12' : theme.bgCard, borderColor: active ? theme.red : theme.border }]}
+                    onPress={() => setSelectedRouteIdx(idx)}
+                  >
+                    <Text style={[st.routeCardLabel, { color: active ? theme.red : theme.textMuted }]}>{label}</Text>
+                    <Text style={[st.routeCardDist, { color: theme.textPrimary }]}>{formatDistance(route.distanceMiles)}</Text>
+                    <Text style={[st.routeCardEta, { color: theme.textSecondary }]}>{formatDuration(route.durationSeconds)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
-            <Pressable
-              style={[styles.recordToggleRow, { borderColor: theme.border }]}
-              onPress={handleLocationToggle}
-            >
-              <View style={styles.recordToggleLeft}>
-                <Feather name="map-pin" size={16} color={locationOn ? theme.toggleTrackOn : theme.textMuted} />
-                <Text style={[styles.recordToggleText, { color: theme.textPrimary }]}>Share my location</Text>
-                {locationOverride && (
-                  <Text style={[styles.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>
-                )}
-              </View>
-              <View style={[styles.recordToggleTrack, { backgroundColor: locationOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                <View style={[styles.recordToggleThumb, { backgroundColor: locationOn ? theme.toggleThumbOn : theme.toggleThumbOff }, locationOn && styles.recordToggleThumbOn]} />
-              </View>
-            </Pressable>
-          </View>
-        )}
+          {/* Route weather summary */}
+          {!loading && !error && selectedRoute && (
+            <View style={st.weatherLine}>
+              {weatherLoading ? (
+                <Text style={[st.weatherText, { color: theme.textMuted }]}>Checking conditions along route...</Text>
+              ) : weatherMsg ? (
+                <Text style={[
+                  st.weatherText,
+                  { color: weatherSeverity === 'clear' ? theme.textMuted : weatherSeverity === 'severe' ? theme.red : '#FF9800' },
+                ]}>
+                  {weatherSeverity === 'severe' || weatherSeverity === 'moderate' ? '⚠️ ' : weatherSeverity === 'clear' ? '✓ ' : ''}{weatherMsg}
+                </Text>
+              ) : null}
+            </View>
+          )}
 
-        {/* Action buttons — shared */}
+          {/* Bike selector */}
+          {!loading && !error && bikes.length > 0 && (
+            <View style={st.bikeSelector}>
+              <Text style={[st.bikeSelectorLabel, { color: theme.textSecondary }]}>RIDE WITH</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.bikePills}>
+                {bikes.map((bike) => {
+                  const active = bike.id === navBikeId;
+                  return (
+                    <Pressable key={bike.id} style={[st.bikePill, { borderColor: active ? theme.red : theme.border }, active && { backgroundColor: theme.red + '1F' }]} onPress={() => setNavBikeId(active ? null : bike.id)}>
+                      <Feather name="disc" size={12} color={active ? theme.red : theme.textSecondary} />
+                      <Text style={[st.bikePillText, { color: active ? theme.red : theme.textPrimary }]}>{bikeLabel(bike)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Ride option toggles */}
+          {!loading && !error && selectedRoute && (
+            <View style={st.toggleGroup}>
+              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={() => setRecordRide((v) => !v)}>
+                <View style={st.toggleLeft}>
+                  <Feather name="play-circle" size={16} color={recordRide ? theme.toggleTrackOn : theme.textMuted} />
+                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Record this ride</Text>
+                </View>
+                <View style={[st.toggleTrack, { backgroundColor: recordRide ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                  <View style={[st.toggleThumb, { backgroundColor: recordRide ? theme.toggleThumbOn : theme.toggleThumbOff }, recordRide && st.toggleThumbOn_]} />
+                </View>
+              </Pressable>
+
+              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleCrashToggle}>
+                <View style={st.toggleLeft}>
+                  <Feather name="shield" size={16} color={crashOn ? theme.toggleTrackOn : theme.textMuted} />
+                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Crash detection</Text>
+                  {crashOverride && <Text style={[st.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>}
+                </View>
+                <View style={[st.toggleTrack, { backgroundColor: crashOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                  <View style={[st.toggleThumb, { backgroundColor: crashOn ? theme.toggleThumbOn : theme.toggleThumbOff }, crashOn && st.toggleThumbOn_]} />
+                </View>
+              </Pressable>
+
+              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleLocationToggle}>
+                <View style={st.toggleLeft}>
+                  <Feather name="map-pin" size={16} color={locationOn ? theme.toggleTrackOn : theme.textMuted} />
+                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Share my location</Text>
+                  {locationOverride && <Text style={[st.overrideLabel, { color: theme.textMuted }]}>(this ride only)</Text>}
+                </View>
+                <View style={[st.toggleTrack, { backgroundColor: locationOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
+                  <View style={[st.toggleThumb, { backgroundColor: locationOn ? theme.toggleThumbOn : theme.toggleThumbOff }, locationOn && st.toggleThumbOn_]} />
+                </View>
+              </Pressable>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Sticky footer — always visible */}
         {!loading && !error && (
-          <View style={styles.actions}>
+          <View style={[st.footer, { backgroundColor: theme.bgPanel, borderTopColor: theme.border, paddingBottom: insets.bottom + 16 }]}>
             {selectedRoute && (
-              <Pressable
-                style={[styles.startBtn, { backgroundColor: theme.red }]}
-                onPress={handleStartNav}
-              >
-                <Feather name="navigation" size={18} color="#fff" />
-                <Text style={styles.startBtnText}>START NAVIGATION</Text>
+              <Pressable style={[st.startBtn, { backgroundColor: recordRide ? theme.green : theme.red }]} onPress={handleStartNav}>
+                <Feather name={recordRide ? 'play-circle' : 'navigation'} size={18} color={theme.white} />
+                <Text style={st.startBtnText}>{recordRide ? 'START & RECORD' : 'START NAVIGATION'}</Text>
               </Pressable>
             )}
-
-            <Pressable style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={[styles.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
+            <Pressable style={st.cancelBtn} onPress={onCancel}>
+              <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
             </Pressable>
           </View>
         )}
-      </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -558,35 +449,31 @@ export default function RoutePreviewScreen({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 9996,
-    elevation: 17,
-  },
-  sheet: {
-    height: '62%',
-    borderTopWidth: 1,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: 32,
-  },
-  handleZone: {
-    paddingTop: 8,
-    paddingBottom: 12,
+const st = StyleSheet.create({
+  root: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
   },
+
+  body: {
+    paddingBottom: 120,
+  },
+
   destRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
@@ -598,196 +485,66 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  destInfo: {
-    flex: 1,
-  },
-  favBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  destName: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  destMeta: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  pillsScroll: {
-    maxHeight: 48,
-  },
-  pillsContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginRight: 6,
-  },
-  pillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 24,
-  },
-  errorText: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  tryAgainBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginTop: 4,
-  },
-  tryAgainText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  routeList: {
-    maxHeight: 150,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  routeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-  },
-  routeRowLeft: {
-    flex: 1,
-  },
-  routeLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  routeMeta: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  actions: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    gap: 10,
-  },
-  startBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 10,
-    paddingVertical: 15,
-  },
-  startBtnText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  bikeSelector: {
-    paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  bikeSelectorLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-    paddingHorizontal: 0,
-    marginBottom: 8,
-  },
-  bikePills: {
-    gap: 8,
-  },
-  bikePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  bikePillText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  cancelBtnText: {
-    fontSize: 14,
-  },
+  destInfo: { flex: 1 },
+  favBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  destName: { fontSize: 17, fontWeight: '700' },
+  destMeta: { fontSize: 13, marginTop: 2 },
 
-  // Ride option toggles
-  toggleGroup: {
-    gap: 8,
-    marginTop: 4,
-  },
-  overrideLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  recordToggleRow: {
+  pillsScroll: { maxHeight: 48 },
+  pillsContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  pill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 6 },
+  pillText: { fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+
+  centeredState: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 40, paddingHorizontal: 24 },
+  stateText: { fontSize: 14, textAlign: 'center' },
+  tryAgainBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10, marginTop: 4 },
+  tryAgainText: { fontSize: 13, fontWeight: '600' },
+
+  routeCards: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8 },
+  routeCard: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
+  routeCardLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
+  routeCardDist: { fontSize: 17, fontWeight: '700' },
+  routeCardEta: { fontSize: 12, marginTop: 2 },
+
+  weatherLine: { paddingHorizontal: 20, paddingVertical: 10 },
+  weatherText: { fontSize: 13, lineHeight: 18 },
+
+  bikeSelector: { paddingHorizontal: 20, marginTop: 16, marginBottom: 8 },
+  bikeSelectorLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
+  bikePills: { gap: 8 },
+  bikePill: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  bikePillText: { fontSize: 13, fontWeight: '600' },
+
+  toggleGroup: { gap: 6, marginTop: 12 },
+  overrideLabel: { fontSize: 10, fontWeight: '500', marginLeft: 4 },
+  toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: 20,
-    marginTop: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderRadius: 10,
   },
-  recordToggleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toggleText: { fontSize: 14, fontWeight: '600' },
+  toggleTrack: { width: 44, height: 24, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 2 },
+  toggleThumb: { width: 20, height: 20, borderRadius: 10 },
+  toggleThumbOn_: { alignSelf: 'flex-end' as const },
+
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
   },
-  recordToggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  recordToggleTrack: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  recordToggleThumb: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  recordToggleThumbOn: {
-    alignSelf: 'flex-end',
-  },
+  startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 15 },
+  startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  cancelBtn: { alignItems: 'center', paddingVertical: 6 },
+  cancelBtnText: { fontSize: 14 },
 });

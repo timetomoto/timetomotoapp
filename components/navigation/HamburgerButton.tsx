@@ -16,7 +16,7 @@ export default function HamburgerButton({ onPress }: Props) {
       accessibilityRole="button"
       hitSlop={8}
     >
-      <Feather name="menu" size={22} color="#fff" />
+      <Feather name="menu" size={22} color={theme.white} />
     </Pressable>
   );
 }

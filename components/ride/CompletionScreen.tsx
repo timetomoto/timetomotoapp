@@ -88,7 +88,7 @@ export default function CompletionScreen({
           style={[styles.saveBtn, { backgroundColor: theme.red }]}
           onPress={onSaveRide}
         >
-          <Feather name="save" size={16} color="#fff" />
+          <Feather name="save" size={16} color={theme.white} />
           <Text style={styles.saveBtnText}>SAVE RIDE</Text>
         </Pressable>
 
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     marginTop: 3,
   },
   statDivider: {

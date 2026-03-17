@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
 
   // Loading / empty
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 0.5,
   },
 
   // Scroll
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   bikeYear: {
     fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.7,
+    letterSpacing: 1,
     marginBottom: 2,
   },
   bikeNameContainer: {
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   sectionTabText: {
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 0.7,
+    letterSpacing: 1,
   },
 
 });

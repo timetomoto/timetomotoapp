@@ -102,7 +102,7 @@ function ContactForm({ index, data, onChange, onCancel, onSave, saving }: Contac
           disabled={saving}
         >
           {saving
-            ? <ActivityIndicator color="#fff" size="small" />
+            ? <ActivityIndicator color={theme.white} size="small" />
             : <Text style={styles.saveBtnText}>SAVE</Text>
           }
         </Pressable>
@@ -200,7 +200,7 @@ function AddContactForm({ onSave, onCancel, saving, prefill, error, onClearError
           disabled={saving}
         >
           {saving
-            ? <ActivityIndicator color="#fff" size="small" />
+            ? <ActivityIndicator color={theme.white} size="small" />
             : <Text style={styles.saveBtnText}>ADD</Text>
           }
         </Pressable>
@@ -424,7 +424,7 @@ export default function EmergencyContactsScreen() {
               onPress={() => { setAddFormPrefill(undefined); setShowAddForm(true); }}
               accessibilityLabel="Add contact manually"
             >
-              <Feather name="plus" size={14} color={showAddForm ? theme.textSecondary : '#fff'} />
+              <Feather name="plus" size={14} color={showAddForm ? theme.textSecondary : theme.white} />
               <Text style={[styles.addBtnFilledText, showAddForm && { color: theme.textSecondary }]}>ADD MANUALLY</Text>
             </Pressable>
           </View>
@@ -433,7 +433,7 @@ export default function EmergencyContactsScreen() {
         {contacts.length === 0 && !showAddForm && (
           <View style={[styles.emptyState, { borderColor: theme.border }]}>
             <Feather name="shield-off" size={36} color={theme.border} />
-            <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>No contacts yet</Text>
+            <Text style={[styles.emptyTitle, { color: theme.textSecondary }]}>No contacts yet.</Text>
             <Text style={[styles.emptySubtitle, { color: theme.textMuted }]}>
               Add an emergency contact to receive crash alerts.
             </Text>
