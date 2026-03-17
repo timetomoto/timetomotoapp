@@ -1035,9 +1035,16 @@ export default function RideScreen() {
           onPress={() => setMonitoring(!isMonitoring)}
         >
           <Feather name="shield" size={16} color={isMonitoring ? '#4CAF50' : theme.textSecondary} />
-          <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
-            {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
-          </Text>
+          <View>
+            <Text style={[styles.crashToggleText, { color: isMonitoring ? '#4CAF50' : theme.textSecondary }]}>
+              {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
+            </Text>
+            {selectedBike && (
+              <Text style={[styles.crashToggleBike, { color: isMonitoring ? '#4CAF5099' : theme.textSecondary }]}>
+                {bikeLabel(selectedBike).length > 13 ? bikeLabel(selectedBike).slice(0, 13) + '…' : bikeLabel(selectedBike)}
+              </Text>
+            )}
+          </View>
         </Pressable>
 
         {/* ── Map control icon (replaces MapOverlayControls) ── */}
@@ -1298,20 +1305,26 @@ const styles = StyleSheet.create({
   // Crash detection toggle
   crashToggle: {
     position: 'absolute',
-    bottom: END_BUTTON_BOTTOM,
-    left: 16,
+    top: Platform.OS === 'ios' ? 113 : 73,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     borderWidth: 1,
-    borderRadius: 26,
-    paddingHorizontal: 17,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   crashToggleText: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  crashToggleBike: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginTop: 1,
   },
 
   // Map control icon (layers button)
