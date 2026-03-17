@@ -25,7 +25,8 @@ import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
 import { routeGeoJson, calcDistance } from '../../lib/gpx';
@@ -341,6 +342,8 @@ function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: 
 
 export default function RideScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
+  const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
   const [mapStyle, setMapStyle] = useState<MapStyle>('standard');
   const { user }                = useAuthStore();
   const { addRoute, pendingNavigateRoute, setPendingNavigateRoute } = useRoutesStore();
@@ -1366,6 +1369,11 @@ export default function RideScreen() {
               handleStartNavigation(route);
             }}
             onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; setNavRouteGeojson(null); resetNavigation(); }}
+            onNavigateToRideWindow={() => {
+              resetNavigation();
+              setPendingWeatherSubTab('ride-window');
+              router.navigate('/(tabs)/weather' as any);
+            }}
             onTryDifferentRoute={() => {
               setIsSavedRoutePreview(false);
               savedRouteStartRef.current = null;

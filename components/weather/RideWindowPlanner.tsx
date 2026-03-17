@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import {
   ActivityIndicator,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { geocodePlace, planRideWindow, type GeoPlace, type RideWindowResult, type RiskLevel } from '../../lib/rideWindow';
+import { planRideWindow, type GeoPlace, type RideWindowResult, type RiskLevel } from '../../lib/rideWindow';
+import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
+import { useAuthStore } from '../../lib/store';
 import { useRideWindowStore } from '../../lib/store';
 import { codeMeta } from '../../lib/weather';
 import { useTheme } from '../../lib/useTheme';
@@ -41,8 +44,16 @@ function addDays(d: Date, n: number): Date {
 }
 
 // ---------------------------------------------------------------------------
-// City input with debounced geocode
+// Location search input with Mapbox autocomplete
 // ---------------------------------------------------------------------------
+
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+
+interface LocationSearchResult {
+  name: string;
+  lat: number;
+  lng: number;
+}
 
 interface CityInputProps {
   label: string;
@@ -51,38 +62,68 @@ interface CityInputProps {
   onChange: (text: string) => void;
   onGeocode: (place: GeoPlace | null) => void;
   placeholder: string;
+  userLocation?: { lat: number; lng: number } | null;
+  favorites?: FavoriteLocation[];
 }
 
-function CityInput({ label, value, place, onChange, onGeocode, placeholder }: CityInputProps) {
+function CityInput({ label, value, place, onChange, onGeocode, placeholder, userLocation, favorites = [] }: CityInputProps) {
   const { theme } = useTheme();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [results, setResults] = useState<LocationSearchResult[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function handleChange(text: string) {
     onChange(text);
     onGeocode(null);
-    setError('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (text.trim().length < 2) return;
+    if (text.trim().length < 2) { setResults([]); return; }
+    setSearching(true);
     debounceRef.current = setTimeout(async () => {
-      setLoading(true);
-      const result = await geocodePlace(text.trim());
-      setLoading(false);
-      if (result) {
-        onGeocode(result);
-        onChange(result.label);
-      } else {
-        setError('Location not found');
+      try {
+        const proxLng = userLocation?.lng ?? -97.7431;
+        const proxLat = userLocation?.lat ?? 30.2672;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text.trim())}.json?access_token=${MAPBOX_TOKEN}&types=place,address,postcode&country=us&limit=5&proximity=${proxLng},${proxLat}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        setResults((json.features ?? []).map((f: any) => ({
+          name: f.place_name,
+          lat: f.center[1],
+          lng: f.center[0],
+        })));
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
       }
-    }, 700);
+    }, 400);
   }
+
+  function selectResult(r: LocationSearchResult) {
+    onChange(r.name);
+    onGeocode({ lat: r.lat, lng: r.lng, label: r.name });
+    setResults([]);
+    setFocused(false);
+    Keyboard.dismiss();
+  }
+
+  function selectFavorite(fav: FavoriteLocation) {
+    const name = fav.nickname || fav.name;
+    onChange(name);
+    onGeocode({ lat: fav.lat, lng: fav.lng, label: name });
+    setResults([]);
+    setFocused(false);
+    Keyboard.dismiss();
+  }
+
+  const showFavorites = focused && !value.trim() && favorites.length > 0 && results.length === 0;
+  const showResults = results.length > 0;
 
   return (
     <View style={s.cityGroup}>
       <Text style={[s.cityLabel, { color: theme.textSecondary }]}>{label}</Text>
       <View style={[s.cityInputRow, { backgroundColor: theme.bgPanel, borderColor: theme.border }, place && { borderColor: RISK_COLOR.CLEAR + '66' }]}>
-        {loading
+        {searching
           ? <ActivityIndicator size="small" color={theme.red} style={{ marginRight: 8 }} />
           : place
             ? <Feather name="check-circle" size={16} color={RISK_COLOR.CLEAR} style={{ marginRight: 8 }} />
@@ -92,19 +133,57 @@ function CityInput({ label, value, place, onChange, onGeocode, placeholder }: Ci
           style={[s.cityInputText, { color: theme.textPrimary }]}
           value={value}
           onChangeText={handleChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 200)}
           placeholder={placeholder}
           placeholderTextColor={theme.textSecondary}
           autoCorrect={false}
           autoCapitalize="words"
           returnKeyType="done"
         />
-        {value.length > 0 && !loading && (
-          <Pressable onPress={() => { onChange(''); onGeocode(null); setError(''); }}>
+        {value.length > 0 && !searching && (
+          <Pressable onPress={() => { onChange(''); onGeocode(null); setResults([]); }}>
             <Feather name="x" size={14} color={theme.textSecondary} />
           </Pressable>
         )}
       </View>
-      {!!error && <Text style={[s.cityError, { color: theme.red }]}>{error}</Text>}
+      {(showResults || showFavorites) && (
+        <View style={[s.dropdown, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+          {showFavorites && (
+            <>
+              <Text style={[s.dropdownSectionLabel, { color: theme.textMuted }]}>FAVORITES</Text>
+              {[...favorites].sort((a, b) => (b.is_home ? 1 : 0) - (a.is_home ? 1 : 0)).map((fav, i) => (
+                <Pressable
+                  key={`fav-${i}`}
+                  style={[s.dropdownItem, { borderBottomColor: theme.border }]}
+                  onPress={() => selectFavorite(fav)}
+                >
+                  <Feather name="heart" size={12} color={theme.red} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.dropdownText, { color: theme.textPrimary }]} numberOfLines={1}>
+                      {fav.nickname || fav.name}
+                      {fav.is_home ? ' 🏠' : ''}
+                    </Text>
+                    {fav.nickname ? (
+                      <Text style={[s.dropdownSubtext, { color: theme.textMuted }]} numberOfLines={1}>{fav.name}</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              ))}
+            </>
+          )}
+          {showResults && results.map((r, i) => (
+            <Pressable
+              key={`${r.lat}-${r.lng}-${i}`}
+              style={[s.dropdownItem, { borderBottomColor: theme.border }]}
+              onPress={() => selectResult(r)}
+            >
+              <Feather name="map-pin" size={12} color={theme.textSecondary} />
+              <Text style={[s.dropdownText, { color: theme.textPrimary }]} numberOfLines={1}>{r.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -291,11 +370,15 @@ function RecommendationBox({ result }: { result: RideWindowResult }) {
 export default function RideWindowPlanner() {
   const { theme } = useTheme();
   const { result, setResult } = useRideWindowStore();
+  const { user } = useAuthStore();
+  const userId = user?.id ?? 'local';
 
   const [fromText, setFromText] = useState('');
   const [toText, setToText] = useState('');
   const [fromPlace, setFromPlace] = useState<GeoPlace | null>(null);
   const [toPlace, setToPlace] = useState<GeoPlace | null>(null);
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
 
   const defaultDeparture = () => {
     const d = new Date();
@@ -308,14 +391,16 @@ export default function RideWindowPlanner() {
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState('');
 
-  // Auto-populate FROM with current GPS location on mount
+  // Auto-populate FROM with current GPS + load favorites on mount
   useEffect(() => {
+    loadFavorites(userId).then(setFavorites).catch(() => {});
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         const { latitude: lat, longitude: lng } = loc.coords;
+        setUserLoc({ lat, lng });
         const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
         if (!place) return;
         const city   = place.city || place.subregion || place.region || '';
@@ -361,7 +446,9 @@ export default function RideWindowPlanner() {
           place={fromPlace}
           onChange={setFromText}
           onGeocode={setFromPlace}
-          placeholder="Starting city or zip"
+          placeholder="Search a location"
+          userLocation={userLoc}
+          favorites={favorites}
         />
         <View style={s.routeArrow}>
           <Feather name="arrow-down" size={16} color={theme.textSecondary} />
@@ -372,7 +459,9 @@ export default function RideWindowPlanner() {
           place={toPlace}
           onChange={setToText}
           onGeocode={setToPlace}
-          placeholder="Destination city or zip"
+          placeholder="Search a location"
+          userLocation={userLoc}
+          favorites={favorites}
         />
       </View>
 
@@ -465,6 +554,36 @@ const s = StyleSheet.create({
     fontSize: 15,
   },
   cityError: { fontSize: 11, marginTop: 4 },
+  dropdown: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dropdownText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  dropdownSubtext: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  dropdownSectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
   routeArrow: { alignItems: 'center', paddingVertical: 6 },
 
   // Date chips

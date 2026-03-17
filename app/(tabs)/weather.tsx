@@ -549,9 +549,17 @@ export default function WeatherScreen() {
   const userId = user?.id ?? 'local';
   const [activeTab, setActiveTab]   = useState<WeatherTab>('current');
   const weatherReset = useTabResetStore((s) => s.weatherReset);
+  const pendingSubTab = useTabResetStore((s) => s.pendingWeatherSubTab);
+  const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
   useEffect(() => {
     if (weatherReset > 0) setActiveTab('current');
   }, [weatherReset]);
+  useEffect(() => {
+    if (pendingSubTab) {
+      setActiveTab(pendingSubTab);
+      setPendingWeatherSubTab(null);
+    }
+  }, [pendingSubTab]);
   const [state, setState]           = useState<LoadState>('idle');
   const [data, setData]             = useState<WeatherData | null>(null);
   const [locationLabel, setLocationLabel] = useState('');

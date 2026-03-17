@@ -34,6 +34,7 @@ interface Props {
   onStartNavigation: (route: NavRoute, bikeId?: string | null, recordRide?: boolean, shareLocation?: boolean) => void;
   onCancel: () => void;
   onTryDifferentRoute?: () => void;
+  onNavigateToRideWindow?: () => void;
   isSavedRoute?: boolean;
   savedRouteStart?: { lat: number; lng: number } | null;
   onGeometryChange?: (geometry: NavRoute['geometry']) => void;
@@ -90,6 +91,7 @@ export default function RoutePreviewScreen({
   onStartNavigation,
   onCancel,
   onTryDifferentRoute,
+  onNavigateToRideWindow,
   isSavedRoute = false,
   savedRouteStart,
   onGeometryChange,
@@ -300,7 +302,7 @@ export default function RoutePreviewScreen({
               ) : null}
             </View>
             <Pressable onPress={toggleFavorite} hitSlop={8} style={st.favBtn}>
-              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? theme.red : '#666666'} />
+              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? theme.red : theme.textMuted} />
             </Pressable>
           </View>
 
@@ -372,12 +374,32 @@ export default function RoutePreviewScreen({
               {weatherLoading ? (
                 <Text style={[st.weatherText, { color: theme.textMuted }]}>Checking conditions along route...</Text>
               ) : weatherMsg ? (
-                <Text style={[
-                  st.weatherText,
-                  { color: weatherSeverity === 'clear' ? theme.textMuted : weatherSeverity === 'severe' ? theme.red : '#FF9800' },
-                ]}>
-                  {weatherSeverity === 'severe' || weatherSeverity === 'moderate' ? '⚠️ ' : weatherSeverity === 'clear' ? '✓ ' : ''}{weatherMsg}
-                </Text>
+                <>
+                  <View style={st.weatherMsgRow}>
+                    {(weatherSeverity === 'severe' || weatherSeverity === 'moderate') && (
+                      <Feather name="alert-triangle" size={14} color={weatherSeverity === 'severe' ? theme.red : '#FF9800'} style={{ marginRight: 6 }} />
+                    )}
+                    {weatherSeverity === 'clear' && (
+                      <Feather name="check-circle" size={14} color={theme.green} style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={[
+                      st.weatherText,
+                      { color: weatherSeverity === 'clear' ? theme.textMuted : weatherSeverity === 'severe' ? theme.red : '#FF9800', flex: 1 },
+                    ]}>
+                      {weatherMsg}
+                    </Text>
+                  </View>
+                  {(weatherSeverity === 'moderate' || weatherSeverity === 'severe') && onNavigateToRideWindow && (
+                    <Pressable onPress={onNavigateToRideWindow} style={st.rideWindowLink}>
+                      <Text style={[st.weatherText, { color: theme.textMuted }]}>
+                        For full route details, check Weather →{' '}
+                      </Text>
+                      <Text style={[st.weatherText, { color: theme.textPrimary, textDecorationLine: 'underline' }]}>
+                        Ride Window
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
               ) : null}
             </View>
           )}
@@ -519,7 +541,9 @@ const st = StyleSheet.create({
   routeCardEta: { fontSize: 12, marginTop: 2 },
 
   weatherLine: { paddingHorizontal: 20, paddingVertical: 10 },
+  weatherMsgRow: { flexDirection: 'row', alignItems: 'center' },
   weatherText: { fontSize: 13, lineHeight: 18 },
+  rideWindowLink: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
 
   bikeSelector: { paddingHorizontal: 20, marginTop: 16, marginBottom: 8 },
   bikeSelectorLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
