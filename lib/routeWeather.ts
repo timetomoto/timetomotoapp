@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { codeMeta } from './weather';
 
-const API_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
-const BASE = 'https://api.tomorrow.io/v4';
+const WINDY_KEY = process.env.EXPO_PUBLIC_WINDY_API_KEY ?? '';
+const TOMORROW_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
+const TOMORROW_BASE = 'https://api.tomorrow.io/v4';
+const WINDY_URL = 'https://api.windy.com/api/point-forecast/v2';
 
 async function getTempUnit(): Promise<'imperial' | 'metric'> {
   try {
@@ -37,6 +39,8 @@ export interface RouteWeatherPoint {
   wind: number;
   distanceKm: number;
 }
+
+type PointWeather = { temp: number; weatherCode: number; rainChance: number; wind: number };
 
 // ---------------------------------------------------------------------------
 // Coordinate sampling — pick points every ~25-30km along the route
@@ -75,14 +79,12 @@ export function sampleRouteCoordinates(
     }
   }
 
-  // Always include the end if far enough from last sample
   const last = coordinates[coordinates.length - 1];
   const lastSample = samples[samples.length - 1];
   if (haversineKm(lastSample.lat, lastSample.lng, last[1], last[0]) > 5) {
     samples.push({ lng: last[0], lat: last[1], distanceKm: Math.round(accumulated) });
   }
 
-  // Cap at 8 checkpoints
   if (samples.length > 8) {
     const step = Math.ceil(samples.length / 8);
     const filtered = samples.filter((_, i) => i === 0 || i === samples.length - 1 || i % step === 0);
@@ -93,75 +95,109 @@ export function sampleRouteCoordinates(
 }
 
 // ---------------------------------------------------------------------------
-// Batch weather fetch — single API call for all checkpoints
+// Windy — primary source
 // ---------------------------------------------------------------------------
 
-async function fetchBatchWeather(
-  samples: { lat: number; lng: number }[],
-  units: 'imperial' | 'metric',
-): Promise<{ temp: number; weatherCode: number; rainChance: number; wind: number }[]> {
-  const fields = ['temperature', 'weatherCode', 'precipitationProbability', 'windSpeed'];
+function kelvinToF(k: number): number { return (k - 273.15) * 9 / 5 + 32; }
+function kelvinToC(k: number): number { return k - 273.15; }
 
-  const body = samples.map((s) => ({
-    location: `${s.lat.toFixed(4)},${s.lng.toFixed(4)}`,
-    fields,
-    timesteps: ['current'],
-    units,
-  }));
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-
-  try {
-    const res = await fetch(`${BASE}/timelines?apikey=${API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      // Batch endpoint may not be available on free tier — fall back to individual
-      const errBody = await res.text().catch(() => '');
-      console.error(`[RouteWeather] Batch HTTP ${res.status}: ${errBody.slice(0, 200)}`);
-      return fallbackSequential(samples, units);
-    }
-
-    const json = await res.json();
-
-    // Parse batch response — array of timeline results
-    return (Array.isArray(json) ? json : json.data ?? []).map((item: any) => {
-      const v = item?.data?.timelines?.[0]?.intervals?.[0]?.values
-        ?? item?.timelines?.[0]?.intervals?.[0]?.values
-        ?? item?.data?.values
-        ?? {};
-      return {
-        temp: Math.round(Number(v.temperature) || 0),
-        weatherCode: Number(v.weatherCode) || 1000,
-        rainChance: Number(v.precipitationProbability) || 0,
-        wind: Math.round(Number(v.windSpeed) || 0),
-      };
-    });
-  } catch (e) {
-    clearTimeout(timer);
-    console.error('[RouteWeather] Batch failed, falling back to sequential:', e);
-    return fallbackSequential(samples, units);
-  }
+/** Derive a Tomorrow.io-compatible weather code from Windy data */
+function deriveWeatherCode(precipMm: number, snowMm: number, windMph: number): number {
+  if (snowMm > 1) return 5001; // Heavy snow
+  if (snowMm > 0) return 5000; // Snow
+  if (precipMm > 5) return 4201; // Heavy rain
+  if (precipMm > 1) return 4001; // Rain
+  if (precipMm > 0.1) return 4200; // Light rain
+  if (precipMm > 0) return 4000; // Drizzle
+  if (windMph > 40) return 1001; // Cloudy (windy)
+  return 1000; // Clear
 }
 
-// Fallback: sequential with delays (when batch endpoint isn't available)
-async function fallbackSequential(
+async function fetchWindyPoint(
+  lat: number,
+  lng: number,
+  useCelsius: boolean,
+): Promise<PointWeather> {
+  const res = await fetch(WINDY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat,
+      lon: lng,
+      model: 'gfs',
+      parameters: ['temp', 'precip', 'snowPrecip', 'wind'],
+      levels: ['surface'],
+      key: WINDY_KEY,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Windy HTTP ${res.status}`);
+  const json = await res.json();
+
+  // Find the timestamp index closest to now
+  const ts: number[] = json.ts ?? [];
+  const now = Date.now();
+  const idx = ts.length > 0
+    ? ts.reduce((best, t, i) => Math.abs(t - now) < Math.abs(ts[best] - now) ? i : best, 0)
+    : 0;
+
+  const tempK = json['temp-surface']?.[idx] ?? 273.15;
+  const precipMm = json['precip-surface']?.[idx] ?? 0;
+  const snowMm = json['snowPrecip-surface']?.[idx] ?? 0;
+  const windU = json['wind_u-surface']?.[idx] ?? 0;
+  const windV = json['wind_v-surface']?.[idx] ?? 0;
+
+  const windMs = Math.sqrt(windU * windU + windV * windV);
+  const windMph = windMs * 2.237;
+  const windKmh = windMs * 3.6;
+  const temp = useCelsius ? kelvinToC(tempK) : kelvinToF(tempK);
+  const weatherCode = deriveWeatherCode(precipMm, snowMm, windMph);
+
+  const rainChance = precipMm > 2 ? 80 : precipMm > 0.5 ? 60 : precipMm > 0.1 ? 40 : precipMm > 0 ? 20 : 0;
+
+  return {
+    temp: Math.round(temp),
+    weatherCode,
+    rainChance,
+    wind: Math.round(useCelsius ? windKmh : windMph),
+  };
+}
+
+async function fetchWindyBatch(
+  samples: { lat: number; lng: number }[],
+  useCelsius: boolean,
+): Promise<PointWeather[]> {
+  const results = await Promise.allSettled(
+    samples.map((s) => fetchWindyPoint(s.lat, s.lng, useCelsius)),
+  );
+
+  const data = results.map((r) =>
+    r.status === 'fulfilled' ? r.value : { temp: 0, weatherCode: 1000, rainChance: 0, wind: 0 },
+  );
+
+  // If all failed (all zeros), throw to trigger fallback
+  if (data.every((d) => d.temp === 0 && d.weatherCode === 1000 && d.rainChance === 0 && d.wind === 0)) {
+    throw new Error('All Windy fetches returned defaults');
+  }
+
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Tomorrow.io — fallback
+// ---------------------------------------------------------------------------
+
+async function fetchTomorrowFallback(
   samples: { lat: number; lng: number }[],
   units: 'imperial' | 'metric',
-): Promise<{ temp: number; weatherCode: number; rainChance: number; wind: number }[]> {
+): Promise<PointWeather[]> {
   const fields = 'temperature,weatherCode,precipitationProbability,windSpeed';
-  const results: { temp: number; weatherCode: number; rainChance: number; wind: number }[] = [];
+  const results: PointWeather[] = [];
 
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
     try {
-      const url = `${BASE}/weather/realtime?location=${s.lat.toFixed(4)},${s.lng.toFixed(4)}&units=${units}&fields=${fields}&apikey=${API_KEY}`;
+      const url = `${TOMORROW_BASE}/weather/realtime?location=${s.lat.toFixed(4)},${s.lng.toFixed(4)}&units=${units}&fields=${fields}&apikey=${TOMORROW_KEY}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -175,7 +211,7 @@ async function fallbackSequential(
     } catch {
       results.push({ temp: 0, weatherCode: 1000, rainChance: 0, wind: 0 });
     }
-    // 1.5s delay between requests to avoid 429
+    // Stagger to avoid 429
     if (i < samples.length - 1) {
       await new Promise((r) => setTimeout(r, 1500));
     }
@@ -185,7 +221,7 @@ async function fallbackSequential(
 }
 
 // ---------------------------------------------------------------------------
-// Main function — fetch weather for sampled route points
+// Main function — Windy primary, Tomorrow.io fallback
 // ---------------------------------------------------------------------------
 
 export async function fetchRouteWeather(
@@ -199,7 +235,20 @@ export async function fetchRouteWeather(
   const useCelsius = units === 'metric';
   const useMiles = distUnit === 'miles';
 
-  const weatherData = await fetchBatchWeather(samples, units);
+  let weatherData: PointWeather[];
+
+  // Try Windy first
+  if (WINDY_KEY) {
+    try {
+      weatherData = await fetchWindyBatch(samples, useCelsius);
+    } catch {
+      // Windy failed — fall back to Tomorrow.io
+      weatherData = await fetchTomorrowFallback(samples, units);
+    }
+  } else {
+    // No Windy key — use Tomorrow.io
+    weatherData = await fetchTomorrowFallback(samples, units);
+  }
 
   const points = samples.map((s, i) => {
     const weather = weatherData[i] ?? { temp: 0, weatherCode: 1000, rainChance: 0, wind: 0 };
@@ -220,27 +269,24 @@ export async function fetchRouteWeather(
 }
 
 // ---------------------------------------------------------------------------
-// Check for weather warnings along route
+// Warning helpers
 // ---------------------------------------------------------------------------
 
-/** Check if any checkpoint has concerning conditions worth showing */
 export function hasRouteWeatherConcern(points: RouteWeatherPoint[], useCelsius: boolean): boolean {
   const freezeThreshold = useCelsius ? 2 : 35;
   return points.some(
     (p) =>
       p.rainChance > 30 ||
-      p.weatherCode >= 5000 || // snow, freezing, ice, thunderstorm
+      p.weatherCode >= 5000 ||
       p.temp < freezeThreshold ||
       p.wind > (useCelsius ? 56 : 35),
   );
 }
 
-/** Generate a specific warning message for the most severe condition */
 export function getRouteWarningMessage(points: RouteWeatherPoint[], useCelsius: boolean): string | null {
   const freezeThreshold = useCelsius ? 2 : 35;
   const windThreshold = useCelsius ? 56 : 35;
 
-  // Check in severity order: thunderstorm > ice > snow > freezing > rain > wind
   const thunder = points.find((p) => p.weatherCode >= 8000);
   if (thunder) return `Thunderstorms near ${thunder.label}`;
 

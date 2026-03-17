@@ -130,10 +130,9 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
     debounceTimer.current = setTimeout(async () => {
       try {
         const encoded = encodeURIComponent(query.trim());
-        const proximityParam = userLocation
-          ? `&proximity=${userLocation.lng},${userLocation.lat}`
-          : '';
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=address,poi,place,postcode&limit=7${proximityParam}`;
+        const proxLng = userLocation?.lng ?? -97.7431;
+        const proxLat = userLocation?.lat ?? 30.2672;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=address,poi,place,postcode&limit=7&proximity=${proxLng},${proxLat}&country=us`;
         const res = await fetch(url);
         const json = await res.json();
         setResults(json.features ?? []);

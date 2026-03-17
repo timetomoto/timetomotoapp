@@ -476,12 +476,14 @@ async function fetchAllConditions(lat: number, lng: number): Promise<RoadConditi
 // Geocoding helpers (Mapbox)
 // ---------------------------------------------------------------------------
 
-export async function geocodeLocation(query: string): Promise<Array<{ name: string; lat: number; lng: number }>> {
+export async function geocodeLocation(query: string, userLocation?: { lat: number; lng: number } | null): Promise<Array<{ name: string; lat: number; lng: number }>> {
   const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
   if (!token || !query.trim()) return [];
+  const proxLng = userLocation?.lng ?? -97.7431;
+  const proxLat = userLocation?.lat ?? 30.2672;
   const url =
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-    `?access_token=${token}&types=place,address,postcode&country=us&limit=5`;
+    `?access_token=${token}&types=place,address,postcode&country=us&limit=5&proximity=${proxLng},${proxLat}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];
