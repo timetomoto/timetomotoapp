@@ -187,7 +187,12 @@ export default function RoutePreviewScreen({
     setWeatherLoading(true);
     fetchRouteWeather(coords)
       .then(({ points, useCelsius }) => {
-        if (points.length === 0) { setWeatherMsg(null); return; }
+        // No data or all zeros = failed
+        if (points.length === 0 || points.every((p) => p.temp === 0 && p.weatherCode === 1000 && p.rainChance === 0)) {
+          setWeatherMsg('Unable to check route weather right now.');
+          setWeatherSeverity('clear');
+          return;
+        }
         const concern = hasRouteWeatherConcern(points, useCelsius);
         if (!concern) {
           setWeatherMsg('Weather looks good. Ride on.');
@@ -195,7 +200,11 @@ export default function RoutePreviewScreen({
           return;
         }
         const warning = getRouteWarningMessage(points, useCelsius);
-        if (!warning) { setWeatherMsg(null); return; }
+        if (!warning) {
+          setWeatherMsg('Weather looks good. Ride on.');
+          setWeatherSeverity('clear');
+          return;
+        }
 
         // Determine severity tier
         const worst = points.reduce((max, p) => Math.max(max, p.weatherCode), 0);
@@ -213,7 +222,10 @@ export default function RoutePreviewScreen({
         }
         setWeatherMsg(warning);
       })
-      .catch(() => setWeatherMsg(null))
+      .catch(() => {
+        setWeatherMsg('Unable to check route weather right now.');
+        setWeatherSeverity('clear');
+      })
       .finally(() => setWeatherLoading(false));
   }, [selectedRoute]);
 

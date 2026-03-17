@@ -872,13 +872,28 @@ export default function RideScreen() {
 
   // Save recorded ride
   async function handleSaveRide(name: string) {
+    if (recordedPoints.length < 3) {
+      Alert.alert('Not enough data', 'Not enough GPS data to save this ride. Try riding for longer next time.');
+      clearRecordedPoints();
+      setRecording(false);
+      setShowSaveSheet(false);
+      useSafetyStore.getState().clearSessionOverrides();
+      return;
+    }
     if (user) {
-      const miles   = recordedPoints.length >= 2 ? calcDistance(recordedPoints) : 0;
+      const miles   = calcDistance(recordedPoints);
       const gainFt  = 0;
-      const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, undefined, 'recorded', recordingBikeIdRef.current);
-      if (saved) {
-        addRoute(saved);
-        showToast('Ride saved!');
+      try {
+        const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, undefined, 'recorded', recordingBikeIdRef.current);
+        if (saved) {
+          addRoute(saved);
+          showToast('Ride saved!');
+        } else {
+          showToast('Ride saved locally');
+        }
+      } catch (e: any) {
+        console.error('[SaveRide] error:', e);
+        Alert.alert('Save failed', e?.message ?? 'Could not save ride. It has been saved locally.');
       }
     }
     clearRecordedPoints();
