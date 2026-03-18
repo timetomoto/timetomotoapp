@@ -205,8 +205,11 @@ export type BikeSpecs = {
   tireFrontSize?: string;
   tireRearSize?: string;
   fuelType?: string;
+  fuelCapacityGal?: number;
   engineDisplacement?: string;
   engineType?: string;
+  oilType?: string;
+  oilCapacityQt?: number;
   maxLoadLbs?: number;
   seatHeight?: string;
   groundClearance?: string;

@@ -35,10 +35,9 @@ import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 import { fetchDirections } from '../../lib/directions';
 import { createRoute, fetchUserRoutes, seedRoutes } from '../../lib/routes';
 import { serializeGpx } from '../../lib/gpx';
-import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage, type RouteWeatherPoint } from '../../lib/routeWeather';
+import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage, haversineKm, sampleRouteCoordinates, type RouteWeatherPoint } from '../../lib/routeWeather';
 import { codeMeta } from '../../lib/weather';
 import { fetchHEREConditions, type RoadCondition } from '../../lib/discoverStore';
-import { sampleRouteCoordinates } from '../../lib/routeWeather';
 import { darkTheme } from '../../lib/theme';
 import type { Route } from '../../lib/routes';
 
@@ -64,15 +63,6 @@ async function reverseGeocodeLoc(lat: number, lng: number): Promise<string> {
 function addDays(d: Date, n: number): Date { const c = new Date(d); c.setDate(c.getDate() + n); return c; }
 function defaultDeparture(): Date { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d; }
 function daysBetween(a: Date, b: Date): number { return Math.floor((b.getTime() - a.getTime()) / 86_400_000); }
-
-/** Haversine distance in km between two points */
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 /**
  * Find the cumulative distance along a route to the nearest point to the given coordinate.
@@ -116,7 +106,7 @@ export default function TripPlanner() {
   // State 1 (off): map hidden, full panel
   // State 2 (compact): map 55%, panel compact (stops only)
   // State 3 (expanded): map 30%, panel expanded (weather + conditions)
-  const MAP_H_COMPACT = SCREEN_H * 0.30 + 200;
+  const MAP_H_COMPACT = SCREEN_H * 0.30 + 160;
   const MAP_H_EXPANDED = SCREEN_H * 0.55;
   const [mapVisible, setMapVisible] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
@@ -216,6 +206,7 @@ export default function TripPlanner() {
   // State
   const [saved, setSaved] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
 
   // Save modal state
@@ -226,6 +217,13 @@ export default function TripPlanner() {
 
   // Keep routeGeojson ref in sync for toggleMap closure
   useEffect(() => { routeGeojsonRef.current = routeGeojson; }, [routeGeojson]);
+
+  // Cleanup timers on unmount
+  useEffect(() => () => {
+    if (dragRouteDebounceRef.current) clearTimeout(dragRouteDebounceRef.current);
+    if (placingTimeoutRef.current) clearTimeout(placingTimeoutRef.current);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
 
   const toggleMap = useCallback(() => {
     const showing = !mapVisible;
@@ -584,7 +582,11 @@ export default function TripPlanner() {
     try { await Share.share({ title: name, message: serializeGpx(name, points) }); } catch {}
   }
 
-  function showToast(msg: string) { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2500); }
+  function showToast(msg: string) {
+    setToastMsg(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(''), 2500);
+  }
 
   const canNavigate = !!origin && !!destination && !!routeGeojson;
   const daysOut = daysBetween(new Date(), departure);
@@ -658,7 +660,7 @@ export default function TripPlanner() {
         )}
 
         {/* Map toggle + Import row — pinned, never scrolls */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.bgCard, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginTop: mapVisible ? 4 : 12, marginBottom: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginTop: mapVisible ? 4 : 12, marginBottom: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Switch
               value={mapVisible}
@@ -678,7 +680,7 @@ export default function TripPlanner() {
         <ScrollView style={[st.panel, { backgroundColor: theme.bgPanel }]} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
-            <View style={{ padding: 16 }}>
+            <View style={st.searchPad}>
               <View style={[st.searchWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <Feather name="search" size={16} color={theme.textMuted} />
                 <TextInput style={[st.searchInput, { color: theme.textPrimary }]} placeholder="Search..." placeholderTextColor={theme.textMuted} value={query} onChangeText={handleSearch} autoFocus />
@@ -705,7 +707,7 @@ export default function TripPlanner() {
             </View>
           ) : (
             /* Fields mode */
-            <View style={{ padding: 16, gap: 10 }}>
+            <View style={st.fieldsWrap}>
               {/* Origin */}
               <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('origin')}>
                 <View style={[st.dot, { backgroundColor: theme.green }]} />
@@ -748,7 +750,7 @@ export default function TripPlanner() {
               </Pressable>
 
               {/* Add Stop | Reverse */}
-              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
+              <View style={st.actionsRow}>
                 <Pressable style={st.addStop} onPress={() => { setWaypoints((p) => [...p, { name: 'New Stop', lat: 0, lng: 0 }]); setActiveField(waypoints.length); }}>
                   <Feather name="plus" size={13} color={theme.textSecondary} />
                   <Text style={[st.addStopText, { color: theme.textSecondary }]}>Add Stop</Text>
@@ -868,7 +870,7 @@ export default function TripPlanner() {
                         const hasConcern = pt.weatherCode >= 51 || pt.temp < (weatherUseCelsius ? 2 : 35) || pt.wind > (weatherUseCelsius ? 56 : 35);
                         return (
                           <View key={idx} style={[st.checkpointCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                            <View style={{ width: 48 }}>
+                            <View style={st.checkpointDistWrap}>
                               <Text style={[st.checkpointDist, { color: theme.textPrimary }]}>{distLabel}</Text>
                               {!!distSub && <Text style={{ fontSize: 9, color: theme.textMuted }}>{distSub}</Text>}
                             </View>
@@ -1011,7 +1013,7 @@ export default function TripPlanner() {
             <Text style={[st.importTitle, { color: theme.textPrimary }]}>Save Route</Text>
             <Pressable onPress={() => setSaveModalOpen(false)}><Feather name="x" size={22} color={theme.textSecondary} /></Pressable>
           </View>
-          <View style={{ padding: 20, gap: 16 }}>
+          <View style={st.saveModalPad}>
             {/* Route name */}
             <View style={{ gap: 6 }}>
               <Text style={[st.sectionLabel, { color: theme.textSecondary }]}>ROUTE NAME</Text>
@@ -1115,4 +1117,13 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 13, textAlign: 'center', paddingVertical: 40 },
   toast: { position: 'absolute', bottom: 140, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 14 },
   toastText: { fontSize: 13, fontWeight: '600' },
+  flexOne: { flex: 1 },
+  fieldsWrap: { padding: 16, gap: 10 },
+  searchPad: { padding: 16 },
+  actionsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 },
+  secBtnRow: { flexDirection: 'row', gap: 8 },
+  checkpointDistWrap: { width: 48 },
+  condMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  condTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  saveModalPad: { padding: 20, gap: 16 },
 });

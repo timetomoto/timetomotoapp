@@ -72,6 +72,15 @@ const OPERATIONAL_ROWS: SpecRowDef[] = [
     isFuelType: true,
   },
   {
+    key: 'fuelCapacity',
+    icon: 'droplet',
+    label: 'Fuel Capacity',
+    getValue: (s) => (s.fuelCapacityGal != null ? `${s.fuelCapacityGal} gal` : '\u2014'),
+    editKeys: ['fuelCapacityGal'],
+    editLabels: ['Gallons'],
+    isNumeric: true,
+  },
+  {
     key: 'engine',
     icon: 'settings',
     label: 'Engine',
@@ -81,6 +90,23 @@ const OPERATIONAL_ROWS: SpecRowDef[] = [
     },
     editKeys: ['engineDisplacement', 'engineType'],
     editLabels: ['Displacement', 'Type'],
+  },
+  {
+    key: 'oilType',
+    icon: 'thermometer',
+    label: 'Oil Type',
+    getValue: (s) => s.oilType || '\u2014',
+    editKeys: ['oilType'],
+    editLabels: ['e.g. 10W-40'],
+  },
+  {
+    key: 'oilCapacity',
+    icon: 'thermometer',
+    label: 'Oil Capacity',
+    getValue: (s) => (s.oilCapacityQt != null ? `${s.oilCapacityQt} qt` : '\u2014'),
+    editKeys: ['oilCapacityQt'],
+    editLabels: ['Quarts'],
+    isNumeric: true,
   },
   {
     key: 'maxLoad',
@@ -200,7 +226,10 @@ async function lookupApiNinjas(
     let fuelCapacity: number | undefined;
     if (bike.fuel_capacity) {
       const parsed = parseFloat(bike.fuel_capacity);
-      if (!isNaN(parsed)) fuelCapacity = parsed;
+      if (!isNaN(parsed)) {
+        fuelCapacity = parsed;
+        specs.fuelCapacityGal = parsed;
+      }
     }
 
     return { specs, fuelCapacity };
@@ -218,8 +247,11 @@ const SPEC_FIELD_HINTS: Record<string, string> = {
   tireFrontSize: 'string e.g. "90/90-21"',
   tireRearSize: 'string e.g. "150/70-R17"',
   fuelType: '"Regular" | "Premium" | "E85"',
+  fuelCapacityGal: 'number (US gallons)',
   engineDisplacement: 'string e.g. "888cc"',
   engineType: 'string e.g. "Inline 3-cylinder"',
+  oilType: 'string e.g. "10W-40"',
+  oilCapacityQt: 'number (US quarts)',
   maxLoadLbs: 'number (lbs)',
   seatHeight: 'string e.g. "33.9 in"',
   groundClearance: 'string e.g. "9.8 in"',

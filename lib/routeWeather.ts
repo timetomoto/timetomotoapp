@@ -43,7 +43,7 @@ async function getDistanceUnit(): Promise<'miles' | 'kilometers'> {
 // Coordinate sampling — pick points every ~25-30km along the route
 // ---------------------------------------------------------------------------
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;

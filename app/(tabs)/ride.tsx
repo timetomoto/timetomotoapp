@@ -81,7 +81,6 @@ const MAP_STYLES: Record<MapStyle, string> = {
 };
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
-const EMPTY_LINE: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 
 // ---------------------------------------------------------------------------

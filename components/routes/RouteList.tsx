@@ -636,17 +636,17 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
         try { setCategoryOrder(JSON.parse(stored)); } catch { /* ignore */ }
       }
       orderLoadedRef.current = true;
-    });
+    }).catch((e) => console.error('AsyncStorage read failed:', e));
     AsyncStorage.getItem(ROUTE_SORT_KEY(userId)).then((stored) => {
       if (stored) {
         try { setRouteSortOrder(JSON.parse(stored)); } catch { /* ignore */ }
       }
-    });
+    }).catch((e) => console.error('AsyncStorage read failed:', e));
     AsyncStorage.getItem(EXPANDED_STATE_KEY(userId)).then((stored) => {
       if (stored) {
         try { setExpandedCategories(JSON.parse(stored)); autoExpandedRef.current = true; } catch { /* ignore */ }
       }
-    });
+    }).catch((e) => console.error('AsyncStorage read failed:', e));
   }, [userId]);
 
   const { bikes } = useGarageStore();
@@ -675,7 +675,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
     const current = orderedKeys;
     if (JSON.stringify(current) !== JSON.stringify(categoryOrder)) {
       setCategoryOrder(current);
-      AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(current));
+      AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(current)).catch((e) => console.error('AsyncStorage write failed:', e));
     }
   }, [allGroupKeys.join(','), loading]);
 
@@ -692,7 +692,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
   function toggleCategory(category: string) {
     setExpandedCategories((prev) => {
       const next = { ...prev, [category]: !prev[category] };
-      AsyncStorage.setItem(EXPANDED_STATE_KEY(userId), JSON.stringify(next));
+      AsyncStorage.setItem(EXPANDED_STATE_KEY(userId), JSON.stringify(next)).catch((e) => console.error('AsyncStorage write failed:', e));
       return next;
     });
   }
@@ -788,11 +788,11 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
 
   const handleDragEnd = useCallback(({ data }: { data: string[] }) => {
     setCategoryOrder(data);
-    AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(data));
+    AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(data)).catch((e) => console.error('AsyncStorage write failed:', e));
     // Persist route order based on new category arrangement
     const allIds = data.flatMap((cat) => (grouped.get(cat) ?? []).map((r) => r.id));
     setRouteSortOrder(allIds);
-    AsyncStorage.setItem(ROUTE_SORT_KEY(userId), JSON.stringify(allIds));
+    AsyncStorage.setItem(ROUTE_SORT_KEY(userId), JSON.stringify(allIds)).catch((e) => console.error('AsyncStorage write failed:', e));
   }, [grouped, userId]);
 
   const renderCategoryItem = useCallback(({ item, drag, isActive }: RenderItemParams<string>) => {
