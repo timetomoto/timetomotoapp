@@ -56,7 +56,6 @@ import { useNavigationStore } from '../../lib/navigationStore';
 import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMeters } from '../../lib/directions';
 import MapControlDrawer from '../../components/ride/MapControlDrawer';
 import SearchSheet from '../../components/ride/SearchSheet';
-import TripPlannerSheet from '../../components/ride/TripPlannerSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
 import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type RouteWeatherPoint } from '../../lib/routeWeather';
@@ -84,7 +83,6 @@ const MAP_STYLES: Record<MapStyle, string> = {
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
 const EMPTY_LINE: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-const TOMORROW_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
 
 // ---------------------------------------------------------------------------
 // Weather legend overlay
@@ -376,12 +374,12 @@ export default function RideScreen() {
     setCurrentStepIndex, setRemainingDistance, setEta,
     setRoutePreference, setSpeed, setHeading, setIsOffRoute,
     resetNavigation,
+    pendingSearchDest, setPendingSearchDest,
   } = useNavigationStore();
 
   // ── Drawer / sheet state ──
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
-  const [tripPlannerOpen, setTripPlannerOpen] = useState(false);
   const [tripPlannerRouteName, setTripPlannerRouteName] = useState<string | null>(null);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
   const [routeLoading, setRouteLoading] = useState(false);
@@ -857,6 +855,14 @@ export default function RideScreen() {
     }
   }, [pendingNavigateRoute]);
 
+  // Consume pending search destination from Weather Ride Window
+  useEffect(() => {
+    if (pendingSearchDest) {
+      fetchAndPreviewRoute(pendingSearchDest);
+      setPendingSearchDest(null);
+    }
+  }, [pendingSearchDest]);
+
   // Dismiss checklist when recording starts
   useEffect(() => {
     if (isRecording) setShowChecklist(false);
@@ -991,8 +997,8 @@ export default function RideScreen() {
       : 'mapbox://styles/mapbox/light-v11';
   })();
 
-  // Weather tile URL template
-  const weatherTileUrl = `https://api.tomorrow.io/v4/map/tile/{z}/{x}/{y}/precipitationIntensity/now.png?apikey=${TOMORROW_KEY}`;
+  // Weather tile URL — RainViewer open radar (no API key needed)
+  const weatherTileUrl = `https://tilecache.rainviewer.com/v2/radar/nowcast/{z}/{x}/{y}/2/1_1.png`;
 
   const isNavigatingActive = navMode === 'navigating' || navMode === 'off_route' || navMode === 'recalculating';
 
@@ -1049,7 +1055,7 @@ export default function RideScreen() {
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
           compassEnabled
-          compassPosition={{ top: Platform.OS === 'ios' ? 114 : 74, right: 12 }}
+          compassPosition={{ top: Platform.OS === 'ios' ? 102 : 62, right: 12 }}
           // @ts-expect-error compassViewStyle exists at runtime but missing from types
           compassViewStyle={{ opacity: 0.7 }}
           scaleBarEnabled={false}
@@ -1079,7 +1085,7 @@ export default function RideScreen() {
           <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
 
           {/* ── Weather tile overlay ── */}
-          {weatherOn && !!TOMORROW_KEY && (
+          {weatherOn && (
             <RasterSource
               id="weather-tiles"
               tileUrlTemplates={[weatherTileUrl]}
@@ -1196,7 +1202,7 @@ export default function RideScreen() {
         </MapView>
 
         {/* ── Recenter / locate me button (below compass) ── */}
-        {!drawerOpen && !searchSheetOpen && !showChecklist && !tripPlannerOpen && <View style={styles.locateBtnWrap} pointerEvents="box-none">
+        {!drawerOpen && !searchSheetOpen && !showChecklist && <View style={styles.locateBtnWrap} pointerEvents="box-none">
           <Pressable
             style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             hitSlop={8}
@@ -1238,7 +1244,10 @@ export default function RideScreen() {
           </>
           <Pressable
             style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
-            onPress={() => setTripPlannerOpen(true)}
+            onPress={() => {
+              useTabResetStore.getState().setPendingDiscoverSubTab('trip-planner');
+              router.navigate('/(tabs)/discover' as any);
+            }}
           >
             <Feather name="map" size={20} color={theme.textPrimary} />
           </Pressable>
@@ -1425,7 +1434,8 @@ export default function RideScreen() {
             onNavigateToRideWindow={() => {
               resetNavigation();
               setPendingWeatherSubTab('ride-window');
-              router.navigate('/(tabs)/weather' as any);
+              useTabResetStore.getState().setPendingDiscoverSubTab('trip-planner');
+              router.navigate('/(tabs)/discover' as any);
             }}
             onTryDifferentRoute={() => {
               setIsSavedRoutePreview(false);
@@ -1543,48 +1553,6 @@ export default function RideScreen() {
         }}
       />
 
-      {/* ── Trip Planner ── */}
-      <TripPlannerSheet
-        visible={tripPlannerOpen}
-        onClose={() => setTripPlannerOpen(false)}
-        userLocation={lastKnownLocation}
-        onPlanRoute={(origin, dest, wps) => {
-          setTripPlannerOpen(false);
-          setRoutePreference('fastest');
-          setTripPlannerRouteName(`${origin.name.split(',')[0]} → ${dest.name.split(',')[0]}`);
-          setDestination(dest);
-          setNavMode('preview');
-          setIsSavedRoutePreview(false);
-          setRouteLoading(true);
-          setRouteError(null);
-          const waypoints = wps.map((w) => ({ lng: w.lng, lat: w.lat }));
-          fetchDirections(origin.lng, origin.lat, dest.lng, dest.lat, routePreference, waypoints)
-            .then((routes) => {
-              if (routes.length > 0) {
-                setActiveRoute(routes[0]);
-                setAlternateRoutes(routes.slice(1));
-                setNavRouteGeojson(routes[0].geometry);
-                const coords = routes[0].geometry.coordinates;
-                if (coords.length >= 2) {
-                  const lats = coords.map((c) => c[1]);
-                  const lngs = coords.map((c) => c[0]);
-                  cameraRef.current?.fitBounds(
-                    [Math.max(...lngs), Math.max(...lats)],
-                    [Math.min(...lngs), Math.min(...lats)],
-                    [80, 80, 220, 80],
-                    800,
-                  );
-                }
-              }
-            })
-            .catch((e: any) => {
-              setRouteError(e?.message ?? 'Could not fetch route');
-              setActiveRoute(null);
-              setAlternateRoutes([]);
-            })
-            .finally(() => setRouteLoading(false));
-        }}
-      />
     </View>
   );
 }

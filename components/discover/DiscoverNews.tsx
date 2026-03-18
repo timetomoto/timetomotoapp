@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
@@ -108,7 +108,8 @@ const NewsCard = memo(function NewsCard({
         <Image
           source={{ uri: imageUrl }}
           style={s.cardImage}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
           onError={() => setImgError(true)}
         />
       )}
@@ -227,11 +228,7 @@ export default function DiscoverNews() {
   if (loadState === 'loading') {
     return (
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        <View style={s.loadingRow}>
-          <ActivityIndicator size="small" color={theme.red} />
-          <Text style={[s.loadingText, { color: theme.textSecondary }]}>Loading latest news…</Text>
-        </View>
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3, 4].map((i) => (
           <FeedCardSkeleton key={i} />
         ))}
       </ScrollView>

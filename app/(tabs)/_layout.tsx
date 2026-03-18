@@ -52,9 +52,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="discover"
         options={{
-          title: 'DISCOVER',
+          title: 'TRIP',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="compass" size={size} color={color} accessibilityLabel="Discover tab" />
+            <Feather name="compass" size={size} color={color} accessibilityLabel="Trip tab" />
           ),
         }}
         listeners={() => ({
@@ -65,25 +65,9 @@ export default function TabLayout() {
         })}
       />
       <Tabs.Screen
-        name="weather"
-        options={{
-          title: 'WEATHER',
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="cloud" size={size} color={color} accessibilityLabel="Weather tab" />
-          ),
-        }}
-        listeners={() => ({
-          tabPress: () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            resetTab('weather');
-          },
-        })}
-      />
-      <Tabs.Screen
         name="garage"
         options={{
           title: 'GARAGE',
-          tabBarItemStyle: { marginRight: 10 },
           tabBarIcon: ({ color, size }) => (
             <Feather name="tool" size={size} color={color} accessibilityLabel="Garage tab" />
           ),
@@ -94,6 +78,26 @@ export default function TabLayout() {
             resetTab('garage');
           },
         })}
+      />
+      <Tabs.Screen
+        name="news"
+        options={{
+          title: 'NEWS',
+          tabBarItemStyle: { marginRight: 10 },
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="rss" size={size} color={color} accessibilityLabel="News tab" />
+          ),
+        }}
+        listeners={() => ({
+          tabPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          },
+        })}
+      />
+      {/* Hide weather tab — content moved to NEWS → WEATHER sub-tab */}
+      <Tabs.Screen
+        name="weather"
+        options={{ href: null }}
       />
     </Tabs>
   );

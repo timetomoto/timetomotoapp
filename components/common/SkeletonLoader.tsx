@@ -82,12 +82,75 @@ export function BikeCardSkeleton() {
   const { theme } = useTheme();
   return (
     <View style={[s.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+      <Skeleton width="100%" height={180} borderRadius={0} />
       <View style={s.bikeCardHeader}>
-        <View style={{ gap: 8 }}>
-          <Skeleton width={60} height={12} />
-          <Skeleton width={160} height={22} />
+        <View style={{ gap: 8, flex: 1 }}>
+          <Skeleton width="70%" height={18} />
+          <Skeleton width="40%" height={14} />
         </View>
-        <Skeleton width={72} height={52} borderRadius={6} />
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Service section skeleton (3 list item rows)
+// ---------------------------------------------------------------------------
+
+export function ServiceSectionSkeleton() {
+  const { theme } = useTheme();
+  return (
+    <View style={{ paddingLeft: 16, paddingRight: 16, gap: 10, paddingVertical: 12 }}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={[s.serviceRow, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <Skeleton width="80%" height={14} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Weather skeleton (current conditions + hourly strip)
+// ---------------------------------------------------------------------------
+
+export function WeatherSkeleton() {
+  const { theme } = useTheme();
+  return (
+    <View style={s.weatherWrap}>
+      {/* Current conditions card */}
+      <View style={[s.weatherCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <View style={{ alignItems: 'center', gap: 10, paddingVertical: 16 }}>
+          <Skeleton width={80} height={80} borderRadius={40} />
+          <Skeleton width={120} height={40} borderRadius={8} />
+          <Skeleton width="60%" height={16} />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 12 }}>
+          <Skeleton width={50} height={12} />
+          <Skeleton width={50} height={12} />
+          <Skeleton width={50} height={12} />
+        </View>
+      </View>
+      {/* Hourly strip */}
+      <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 16 }}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <View key={i} style={[s.weatherHourCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <Skeleton width={28} height={10} />
+            <Skeleton width={24} height={24} borderRadius={12} />
+            <Skeleton width={32} height={12} />
+          </View>
+        ))}
+      </View>
+      {/* Daily forecast rows */}
+      <View style={{ gap: 10, paddingHorizontal: 16, marginTop: 16 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Skeleton width={36} height={12} />
+            <Skeleton width={24} height={24} borderRadius={12} />
+            <View style={{ flex: 1 }}><Skeleton width="100%" height={8} borderRadius={4} /></View>
+            <Skeleton width={40} height={12} />
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -127,5 +190,29 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: 20,
+  },
+
+  serviceRow: {
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+
+  weatherWrap: { paddingTop: 16 },
+  weatherCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  weatherHourCard: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
   },
 });

@@ -13,8 +13,9 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { planRideWindow, type GeoPlace, type RideWindowResult, type RiskLevel } from '../../lib/rideWindow';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useRoutesStore } from '../../lib/store';
 import { useRideWindowStore } from '../../lib/store';
+import type { Route } from '../../lib/routes';
 import { codeMeta } from '../../lib/weather';
 import { useTheme } from '../../lib/useTheme';
 
@@ -369,11 +370,24 @@ function RecommendationBox({ result }: { result: RideWindowResult }) {
 // Main RideWindowPlanner
 // ---------------------------------------------------------------------------
 
-export default function RideWindowPlanner() {
+interface RideWindowPlannerProps {
+  onNavigate?: (from: GeoPlace, to: GeoPlace) => void;
+  onNavigateRoute?: (route: Route) => void;
+}
+
+type PlannerMode = 'plan' | 'saved';
+
+export default function RideWindowPlanner({ onNavigate, onNavigateRoute }: RideWindowPlannerProps = {}) {
   const { theme } = useTheme();
   const { result, setResult } = useRideWindowStore();
+  const { routes: savedRoutes } = useRoutesStore();
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
+  const [mode, setModeRaw] = useState<PlannerMode>('plan');
+  const setMode = (m: PlannerMode) => { setModeRaw(m); setResult(null); };
+
+  // Clear stale results on mount
+  useEffect(() => { setResult(null); }, []);
 
   const [fromText, setFromText] = useState('');
   const [toText, setToText] = useState('');
@@ -392,6 +406,9 @@ export default function RideWindowPlanner() {
 
   const [planning, setPlanning] = useState(false);
   const [planError, setPlanError] = useState('');
+
+  // Saved route mode state
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
   // Auto-populate FROM with current GPS + load favorites on mount
   useEffect(() => {
@@ -417,19 +434,63 @@ export default function RideWindowPlanner() {
     })();
   }, []);
 
-  async function handlePlan() {
+  const lastFetchRef = useRef<{ key: string; ts: number }>({ key: '', ts: 0 });
+  const planTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handlePlan() {
     if (!fromPlace) { setPlanError('Enter a valid starting city.'); return; }
     if (!toPlace)   { setPlanError('Enter a valid destination city.'); return; }
+
+    // Skip if same coordinates were fetched within 5 minutes
+    const cacheKey = `${fromPlace.lat.toFixed(3)},${fromPlace.lng.toFixed(3)}-${toPlace.lat.toFixed(3)},${toPlace.lng.toFixed(3)}`;
+    if (cacheKey === lastFetchRef.current.key && Date.now() - lastFetchRef.current.ts < 5 * 60 * 1000 && result) {
+      return; // Already have fresh results for these coords
+    }
+
+    // Debounce 1s
+    if (planTimerRef.current) clearTimeout(planTimerRef.current);
     setPlanError('');
     setPlanning(true);
-    try {
-      const r = await planRideWindow(fromPlace, toPlace, departure);
-      setResult(r);
-    } catch (e: any) {
-      setPlanError(e?.message ?? 'Failed to plan ride window.');
-    } finally {
-      setPlanning(false);
-    }
+    planTimerRef.current = setTimeout(async () => {
+      try {
+        const r = await planRideWindow(fromPlace, toPlace, departure);
+        setResult(r);
+        lastFetchRef.current = { key: cacheKey, ts: Date.now() };
+      } catch (e: any) {
+        setPlanError(e?.message ?? 'Failed to plan ride window.');
+      } finally {
+        setPlanning(false);
+      }
+    }, 1000);
+  }
+
+  function handleSelectSavedRoute(route: Route) {
+    setSelectedRoute(route);
+    setResult(null);
+  }
+
+  function handleSavedRoutePlan() {
+    if (!selectedRoute || selectedRoute.points.length < 2) return;
+    const first = selectedRoute.points[0];
+    const last = selectedRoute.points[selectedRoute.points.length - 1];
+    const from: GeoPlace = { lat: first.lat, lng: first.lng, label: selectedRoute.name.split('→')[0]?.trim() || 'Start' };
+    const to: GeoPlace = { lat: last.lat, lng: last.lng, label: selectedRoute.name.split('→')[1]?.trim() || selectedRoute.name };
+    setPlanError('');
+    setPlanning(true);
+    setTimeout(async () => {
+      try {
+        const r = await planRideWindow(from, to, departure);
+        setResult(r);
+      } catch (e: any) {
+        setPlanError(e?.message ?? 'Failed to load weather for this route.');
+      } finally {
+        setPlanning(false);
+      }
+    }, 1000);
+  }
+
+  function clearSavedRoute() {
+    setSelectedRoute(null);
   }
 
   return (
@@ -439,7 +500,68 @@ export default function RideWindowPlanner() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Route inputs */}
+      {/* Mode toggle */}
+      <View style={[s.modeRow, { borderColor: theme.border }]}>
+        <Pressable
+          style={[s.modeBtn, mode === 'plan' && { backgroundColor: theme.red }]}
+          onPress={() => setMode('plan')}
+        >
+          <Text style={[s.modeBtnText, { color: mode === 'plan' ? theme.white : theme.textSecondary }]}>PLAN A ROUTE</Text>
+        </Pressable>
+        <Pressable
+          style={[s.modeBtn, mode === 'saved' && { backgroundColor: theme.red }]}
+          onPress={() => setMode('saved')}
+        >
+          <Text style={[s.modeBtnText, { color: mode === 'saved' ? theme.white : theme.textSecondary }]}>USE SAVED ROUTE</Text>
+        </Pressable>
+      </View>
+
+      {/* SAVED ROUTE mode */}
+      {mode === 'saved' && (
+        <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          {selectedRoute ? (
+            <>
+              <View style={s.selectedRouteRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.cardTitle, { color: theme.textSecondary }]}>SELECTED ROUTE</Text>
+                  <Text style={[s.selectedRouteName, { color: theme.textPrimary }]}>{selectedRoute.name}</Text>
+                  <Text style={[s.selectedRouteMeta, { color: theme.textMuted }]}>
+                    {selectedRoute.distance_miles.toFixed(1)} mi
+                    {selectedRoute.duration_seconds ? ` · ${Math.floor(selectedRoute.duration_seconds / 3600)}h ${Math.floor((selectedRoute.duration_seconds % 3600) / 60)}m` : ''}
+                  </Text>
+                </View>
+                <Pressable onPress={() => { clearSavedRoute(); setResult(null); }} hitSlop={8} style={{ padding: 4 }}>
+                  <Feather name="x" size={18} color={theme.textMuted} />
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[s.cardTitle, { color: theme.textSecondary }]}>SELECT A ROUTE</Text>
+              {savedRoutes.length === 0 ? (
+                <Text style={[s.noRoutesText, { color: theme.textMuted }]}>No saved routes yet.</Text>
+              ) : (
+                savedRoutes.map((route) => (
+                  <Pressable
+                    key={route.id}
+                    style={[s.routePickerRow, { borderBottomColor: theme.border }]}
+                    onPress={() => handleSelectSavedRoute(route)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.routePickerName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
+                      <Text style={[s.routePickerMeta, { color: theme.textMuted }]}>{route.distance_miles.toFixed(1)} mi{route.category ? ` · ${route.category}` : ''}</Text>
+                    </View>
+                    <Feather name="chevron-right" size={14} color={theme.textMuted} />
+                  </Pressable>
+                ))
+              )}
+            </>
+          )}
+        </View>
+      )}
+
+      {/* PLAN A ROUTE mode */}
+      {mode === 'plan' && (
       <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <Text style={[s.cardTitle, { color: theme.textSecondary }]}>ROUTE</Text>
         <CityInput
@@ -447,7 +569,7 @@ export default function RideWindowPlanner() {
           value={fromText}
           place={fromPlace}
           onChange={setFromText}
-          onGeocode={setFromPlace}
+          onGeocode={(p) => { setFromPlace(p); if (!p) setResult(null); }}
           placeholder="Search a location"
           userLocation={userLoc}
           favorites={favorites}
@@ -460,14 +582,16 @@ export default function RideWindowPlanner() {
           value={toText}
           place={toPlace}
           onChange={setToText}
-          onGeocode={setToPlace}
+          onGeocode={(p) => { setToPlace(p); if (!p) setResult(null); }}
           placeholder="Search a location"
           userLocation={userLoc}
           favorites={favorites}
         />
       </View>
+      )}
 
-      {/* Departure time */}
+      {/* Departure time — both modes */}
+      {(mode === 'plan' || (mode === 'saved' && selectedRoute)) && (
       <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
         <Text style={[s.cardTitle, { color: theme.textSecondary }]}>DEPARTURE</Text>
         <DateChips selected={departure} onChange={setDeparture} />
@@ -476,8 +600,11 @@ export default function RideWindowPlanner() {
         </View>
         <TimePicker departure={departure} onChange={setDeparture} />
       </View>
+      )}
 
       {/* Plan button */}
+      {mode === 'plan' && (
+      <>
       {!!planError && <Text style={[s.planError, { color: theme.red }]}>{planError}</Text>}
       <Pressable
         style={({ pressed }) => [s.planBtn, { backgroundColor: theme.red }, pressed && s.planBtnPressed, planning && s.planBtnDisabled]}
@@ -488,15 +615,40 @@ export default function RideWindowPlanner() {
           ? <ActivityIndicator color={theme.white} />
           : (
             <>
-              <Feather name="compass" size={16} color={theme.white} />
-              <Text style={s.planBtnText}>PLAN WINDOW</Text>
+              <Feather name="cloud" size={16} color={theme.white} />
+              <Text style={s.planBtnText}>{result ? 'REFRESH WEATHER CONDITIONS' : 'GET WEATHER CONDITIONS'}</Text>
             </>
           )
         }
       </Pressable>
 
-      {/* Results */}
-      {result && (
+      </>
+      )}
+
+      {/* GET WEATHER CONDITIONS — saved route mode */}
+      {mode === 'saved' && selectedRoute && (
+      <>
+      {!!planError && <Text style={[s.planError, { color: theme.red }]}>{planError}</Text>}
+      <Pressable
+        style={({ pressed }) => [s.planBtn, { backgroundColor: theme.red }, pressed && s.planBtnPressed, planning && s.planBtnDisabled]}
+        onPress={handleSavedRoutePlan}
+        disabled={planning}
+      >
+        {planning
+          ? <ActivityIndicator color={theme.white} />
+          : (
+            <>
+              <Feather name="cloud" size={16} color={theme.white} />
+              <Text style={s.planBtnText}>{result ? 'REFRESH WEATHER CONDITIONS' : 'GET WEATHER CONDITIONS'}</Text>
+            </>
+          )
+        }
+      </Pressable>
+      </>
+      )}
+
+      {/* Shared results — both modes */}
+      {result && (mode === 'plan' ? (fromPlace && toPlace) : selectedRoute) && (
         <>
           <RecommendationBox result={result} />
 
@@ -508,6 +660,28 @@ export default function RideWindowPlanner() {
           <Text style={[s.plannedNote, { color: theme.textSecondary }]}>
             Planned {new Date(result.plannedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </Text>
+
+          {/* Navigate — plan mode */}
+          {mode === 'plan' && onNavigate && fromPlace && toPlace && (
+            <Pressable
+              style={[s.navigateBtn, { backgroundColor: theme.red }]}
+              onPress={() => onNavigate(fromPlace, toPlace)}
+            >
+              <Feather name="navigation" size={16} color={theme.white} />
+              <Text style={s.navigateBtnText}>NAVIGATE</Text>
+            </Pressable>
+          )}
+
+          {/* Navigate — saved route mode */}
+          {mode === 'saved' && onNavigateRoute && selectedRoute && (
+            <Pressable
+              style={[s.navigateBtn, { backgroundColor: theme.red }]}
+              onPress={() => onNavigateRoute(selectedRoute)}
+            >
+              <Feather name="navigation" size={16} color={theme.white} />
+              <Text style={s.navigateBtnText}>NAVIGATE</Text>
+            </Pressable>
+          )}
         </>
       )}
     </ScrollView>
@@ -691,4 +865,69 @@ const s = StyleSheet.create({
 
   // Planned note
   plannedNote: { fontSize: 11, textAlign: 'center', marginTop: 8 },
+
+  // Mode toggle
+  modeRow: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  // Saved route picker
+  selectedRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  selectedRouteName: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  selectedRouteMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  routePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  routePickerName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  routePickerMeta: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  noRoutesText: {
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  navigateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingVertical: 15,
+    marginTop: 16,
+  },
+  navigateBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

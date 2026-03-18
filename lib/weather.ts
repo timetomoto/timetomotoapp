@@ -1,9 +1,8 @@
 // ---------------------------------------------------------------------------
-// Tomorrow.io weather API helpers
+// Open-Meteo weather API helpers (no API key required)
+// Attribution: Weather data by Open-Meteo.com (CC BY 4.0)
 // ---------------------------------------------------------------------------
 
-const API_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
-const BASE = 'https://api.tomorrow.io/v4';
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 // ---------------------------------------------------------------------------
@@ -22,7 +21,7 @@ export interface CurrentWeather {
 }
 
 export interface HourlySlot {
-  time: string;          // ISO string
+  time: string;
   temperature: number;
   weatherCode: number;
   precipitationProbability: number;
@@ -74,117 +73,125 @@ export function windDirLabel(degrees: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Tomorrow.io weather codes → human labels + icon names (Feather/Ionicons)
+// WMO weather codes → human labels + icon names
 // ---------------------------------------------------------------------------
 
 interface CodeMeta { label: string; icon: string; iconSet: 'Feather' | 'Ionicons' }
 
-const CODE_MAP: Record<number, CodeMeta> = {
-  1000: { label: 'Clear',           icon: 'sun',          iconSet: 'Feather'  },
-  1100: { label: 'Mostly Clear',    icon: 'sun',          iconSet: 'Feather'  },
-  1101: { label: 'Partly Cloudy',   icon: 'cloud',        iconSet: 'Feather'  },
-  1102: { label: 'Mostly Cloudy',   icon: 'cloud',        iconSet: 'Feather'  },
-  1001: { label: 'Cloudy',          icon: 'cloud',        iconSet: 'Feather'  },
-  2000: { label: 'Fog',             icon: 'wind',         iconSet: 'Feather'  },
-  2100: { label: 'Light Fog',       icon: 'wind',         iconSet: 'Feather'  },
-  4000: { label: 'Drizzle',         icon: 'cloud-drizzle',iconSet: 'Feather'  },
-  4001: { label: 'Rain',            icon: 'cloud-rain',   iconSet: 'Feather'  },
-  4200: { label: 'Light Rain',      icon: 'cloud-rain',   iconSet: 'Feather'  },
-  4201: { label: 'Heavy Rain',      icon: 'cloud-rain',   iconSet: 'Feather'  },
-  5000: { label: 'Snow',            icon: 'cloud-snow',   iconSet: 'Feather'  },
-  5001: { label: 'Flurries',        icon: 'cloud-snow',   iconSet: 'Feather'  },
-  5100: { label: 'Light Snow',      icon: 'cloud-snow',   iconSet: 'Feather'  },
-  5101: { label: 'Heavy Snow',      icon: 'cloud-snow',   iconSet: 'Feather'  },
-  6000: { label: 'Freezing Drizzle',icon: 'cloud-drizzle',iconSet: 'Feather'  },
-  6001: { label: 'Freezing Rain',   icon: 'cloud-rain',   iconSet: 'Feather'  },
-  6200: { label: 'Light Freezing',  icon: 'cloud-rain',   iconSet: 'Feather'  },
-  6201: { label: 'Heavy Freezing',  icon: 'cloud-rain',   iconSet: 'Feather'  },
-  7000: { label: 'Ice Pellets',     icon: 'cloud-snow',   iconSet: 'Feather'  },
-  7101: { label: 'Heavy Ice',       icon: 'cloud-snow',   iconSet: 'Feather'  },
-  7102: { label: 'Light Ice',       icon: 'cloud-snow',   iconSet: 'Feather'  },
-  8000: { label: 'Thunderstorm',    icon: 'cloud-lightning',iconSet: 'Feather'},
+const WMO_MAP: Record<number, CodeMeta> = {
+  0:  { label: 'Clear',           icon: 'sun',            iconSet: 'Feather' },
+  1:  { label: 'Mostly Clear',    icon: 'sun',            iconSet: 'Feather' },
+  2:  { label: 'Partly Cloudy',   icon: 'cloud',          iconSet: 'Feather' },
+  3:  { label: 'Overcast',        icon: 'cloud',          iconSet: 'Feather' },
+  45: { label: 'Fog',             icon: 'wind',           iconSet: 'Feather' },
+  48: { label: 'Rime Fog',        icon: 'wind',           iconSet: 'Feather' },
+  51: { label: 'Light Drizzle',   icon: 'cloud-drizzle',  iconSet: 'Feather' },
+  53: { label: 'Drizzle',         icon: 'cloud-drizzle',  iconSet: 'Feather' },
+  55: { label: 'Heavy Drizzle',   icon: 'cloud-drizzle',  iconSet: 'Feather' },
+  56: { label: 'Freezing Drizzle',icon: 'cloud-drizzle',  iconSet: 'Feather' },
+  57: { label: 'Heavy Frz Drizzle',icon:'cloud-drizzle',  iconSet: 'Feather' },
+  61: { label: 'Light Rain',      icon: 'cloud-rain',     iconSet: 'Feather' },
+  63: { label: 'Rain',            icon: 'cloud-rain',     iconSet: 'Feather' },
+  65: { label: 'Heavy Rain',      icon: 'cloud-rain',     iconSet: 'Feather' },
+  66: { label: 'Freezing Rain',   icon: 'cloud-rain',     iconSet: 'Feather' },
+  67: { label: 'Heavy Frz Rain',  icon: 'cloud-rain',     iconSet: 'Feather' },
+  71: { label: 'Light Snow',      icon: 'cloud-snow',     iconSet: 'Feather' },
+  73: { label: 'Snow',            icon: 'cloud-snow',     iconSet: 'Feather' },
+  75: { label: 'Heavy Snow',      icon: 'cloud-snow',     iconSet: 'Feather' },
+  77: { label: 'Snow Grains',     icon: 'cloud-snow',     iconSet: 'Feather' },
+  80: { label: 'Light Showers',   icon: 'cloud-rain',     iconSet: 'Feather' },
+  81: { label: 'Showers',         icon: 'cloud-rain',     iconSet: 'Feather' },
+  82: { label: 'Heavy Showers',   icon: 'cloud-rain',     iconSet: 'Feather' },
+  85: { label: 'Snow Showers',    icon: 'cloud-snow',     iconSet: 'Feather' },
+  86: { label: 'Heavy Snow Shwrs',icon: 'cloud-snow',     iconSet: 'Feather' },
+  95: { label: 'Thunderstorm',    icon: 'cloud-lightning', iconSet: 'Feather' },
+  96: { label: 'T-Storm w/ Hail', icon: 'cloud-lightning', iconSet: 'Feather' },
+  99: { label: 'Heavy T-Storm',   icon: 'cloud-lightning', iconSet: 'Feather' },
 };
 
 const FALLBACK: CodeMeta = { label: 'Unknown', icon: 'cloud', iconSet: 'Feather' };
 
 export function codeMeta(code: number): CodeMeta {
-  return CODE_MAP[code] ?? FALLBACK;
+  return WMO_MAP[code] ?? FALLBACK;
 }
 
 // ---------------------------------------------------------------------------
-// Fetch helpers
+// Open-Meteo fetch helpers
 // ---------------------------------------------------------------------------
 
-async function fetchRealtime(lat: number, lng: number): Promise<CurrentWeather> {
-  const fields = [
-    'temperature','temperatureApparent','windSpeed','windDirection',
-    'humidity','visibility','weatherCode',
-  ].join(',');
-  const url =
-    `${BASE}/weather/realtime?location=${lat},${lng}&units=imperial&fields=${fields}&apikey=${API_KEY}`;
+const OM_BASE = 'https://api.open-meteo.com/v1/forecast';
+
+async function fetchCurrent(lat: number, lng: number): Promise<CurrentWeather> {
+  const url = `${OM_BASE}?latitude=${lat}&longitude=${lng}` +
+    `&current=temperature_2m,apparent_temperature,weathercode,windspeed_10m,winddirection_10m,relativehumidity_2m,visibility` +
+    `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Realtime HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Open-Meteo current HTTP ${res.status}`);
   const json = await res.json();
-  return { ...json.data.values, fetchedAt: Date.now() };
+  const c = json.current ?? {};
+  return {
+    temperature: c.temperature_2m ?? 0,
+    temperatureApparent: c.apparent_temperature ?? c.temperature_2m ?? 0,
+    windSpeed: c.windspeed_10m ?? 0,
+    windDirection: c.winddirection_10m ?? 0,
+    humidity: c.relativehumidity_2m ?? 0,
+    visibility: (c.visibility ?? 10000) / 1000, // m → km
+    weatherCode: c.weathercode ?? 0,
+    fetchedAt: Date.now(),
+  };
 }
 
 async function fetchForecast(lat: number, lng: number) {
-  const fields = [
-    'temperature','weatherCode','precipitationProbability',
-    'temperatureMax','temperatureMin',
-  ].join(',');
-  const url =
-    `${BASE}/weather/forecast?location=${lat},${lng}&units=imperial&timesteps=1h,1d&fields=${fields}&apikey=${API_KEY}`;
+  const url = `${OM_BASE}?latitude=${lat}&longitude=${lng}` +
+    `&hourly=temperature_2m,weathercode,precipitation_probability` +
+    `&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max` +
+    `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=5`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Forecast HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`Open-Meteo forecast HTTP ${res.status}`);
   const json = await res.json();
 
-  const hourly: HourlySlot[] = (json.timelines?.hourly ?? [])
-    .slice(0, 12)
-    .map((h: any) => ({
-      time: h.time,
-      temperature: h.values.temperature,
-      weatherCode: h.values.weatherCode,
-      precipitationProbability: h.values.precipitationProbability ?? 0,
+  const hourlyTimes: string[] = json.hourly?.time ?? [];
+  const hourlyTemps: number[] = json.hourly?.temperature_2m ?? [];
+  const hourlyCodes: number[] = json.hourly?.weathercode ?? [];
+  const hourlyPrecip: number[] = json.hourly?.precipitation_probability ?? [];
+
+  // Find the index closest to now, take next 12 hours
+  const now = Date.now();
+  let startIdx = 0;
+  let bestDiff = Infinity;
+  for (let i = 0; i < hourlyTimes.length; i++) {
+    const diff = Math.abs(new Date(hourlyTimes[i]).getTime() - now);
+    if (diff < bestDiff) { bestDiff = diff; startIdx = i; }
+  }
+
+  const hourly: HourlySlot[] = hourlyTimes
+    .slice(startIdx, startIdx + 12)
+    .map((t, i) => ({
+      time: t,
+      temperature: hourlyTemps[startIdx + i] ?? 0,
+      weatherCode: hourlyCodes[startIdx + i] ?? 0,
+      precipitationProbability: hourlyPrecip[startIdx + i] ?? 0,
     }));
 
-  const daily: DailySlot[] = (json.timelines?.daily ?? [])
-    .slice(0, 5)
-    .map((d: any) => ({
-      time: d.time,
-      temperatureMax: d.values.temperatureMax,
-      temperatureMin: d.values.temperatureMin,
-      weatherCode: d.values.weatherCode,
-      precipitationProbability: d.values.precipitationProbability ?? 0,
-    }));
+  const dailyTimes: string[] = json.daily?.time ?? [];
+  const dailyMax: number[] = json.daily?.temperature_2m_max ?? [];
+  const dailyMin: number[] = json.daily?.temperature_2m_min ?? [];
+  const dailyCodes: number[] = json.daily?.weathercode ?? [];
+  const dailyPrecipMax: number[] = json.daily?.precipitation_probability_max ?? [];
+
+  const daily: DailySlot[] = dailyTimes.slice(0, 5).map((t, i) => ({
+    time: t,
+    temperatureMax: dailyMax[i] ?? 0,
+    temperatureMin: dailyMin[i] ?? 0,
+    weatherCode: dailyCodes[i] ?? 0,
+    precipitationProbability: dailyPrecipMax[i] ?? 0,
+  }));
 
   return { hourly, daily };
 }
 
-async function fetchAlerts(lat: number, lng: number): Promise<WeatherAlert[]> {
-  try {
-    const url =
-      `${BASE}/weather/alerts?location=${lat},${lng}&apikey=${API_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.data?.events ?? []).map((e: any) => ({
-      id: e.id ?? String(Math.random()),
-      title: e.title ?? e.eventType ?? 'Weather Alert',
-      description: e.description ?? '',
-      severity: e.severity ?? 'Advisory',
-      affectedArea: e.affectedArea ?? '',
-      startTime: e.startTime ?? '',
-      endTime: e.endTime ?? '',
-    }));
-  } catch {
-    return [];
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Main fetch — with cache
-// Accepts either lat/lng coords OR a freeform location string (city name etc.)
 // ---------------------------------------------------------------------------
 
 export async function fetchWeather(
@@ -197,47 +204,15 @@ export async function fetchWeather(
     return cache.data;
   }
 
-  const [current, { hourly, daily }, alerts] = await Promise.all([
-    fetchRealtime(lat, lng),
+  const [current, { hourly, daily }] = await Promise.all([
+    fetchCurrent(lat, lng),
     fetchForecast(lat, lng),
-    fetchAlerts(lat, lng),
   ]);
+
+  // Open-Meteo doesn't have weather alerts — return empty
+  const alerts: WeatherAlert[] = [];
 
   const data: WeatherData = { current, hourly, daily, alerts, fetchedAt: Date.now() };
   cache = { data, key, ts: Date.now() };
   return data;
-}
-
-// Fetch by freeform location string — Tomorrow.io accepts city names, zip codes, etc.
-// Returns coords from the API response for cache keying.
-export async function fetchWeatherByLocation(
-  location: string,
-  force = false,
-): Promise<{ data: WeatherData; lat: number; lng: number }> {
-  const fields = [
-    'temperature','temperatureApparent','windSpeed','windDirection',
-    'humidity','visibility','weatherCode',
-  ].join(',');
-  const realtimeUrl =
-    `${BASE}/weather/realtime?location=${encodeURIComponent(location)}&units=imperial&fields=${fields}&apikey=${API_KEY}`;
-  const res = await fetch(realtimeUrl);
-  if (!res.ok) throw new Error(`Location not found: "${location}"`);
-  const json = await res.json();
-  const lat: number = json.location?.lat ?? 0;
-  const lng: number = json.location?.lon ?? 0;
-
-  const key = cacheKey(lat, lng);
-  if (!force && cache && cache.key === key && Date.now() - cache.ts < CACHE_TTL) {
-    return { data: cache.data, lat, lng };
-  }
-
-  const current: CurrentWeather = { ...json.data.values, fetchedAt: Date.now() };
-  const [{ hourly, daily }, alerts] = await Promise.all([
-    fetchForecast(lat, lng),
-    fetchAlerts(lat, lng),
-  ]);
-
-  const data: WeatherData = { current, hourly, daily, alerts, fetchedAt: Date.now() };
-  cache = { data, key, ts: Date.now() };
-  return { data, lat, lng };
 }

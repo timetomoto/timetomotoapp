@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import DiscoverNews from '../../components/discover/DiscoverNews';
 import DiscoverRoutes from '../../components/discover/DiscoverRoutes';
-import DiscoverConditions from '../../components/discover/DiscoverConditions';
+import TripPlanner from '../../components/discover/TripPlanner';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
@@ -14,7 +13,7 @@ import { useTabResetStore } from '../../lib/store';
 // Types
 // ---------------------------------------------------------------------------
 
-type SubTab = 'NEWS' | 'ROUTES' | 'CONDITIONS';
+type SubTab = 'MY ROUTES' | 'TRIP PLANNER';
 
 // ---------------------------------------------------------------------------
 // Sub-nav
@@ -22,8 +21,7 @@ type SubTab = 'NEWS' | 'ROUTES' | 'CONDITIONS';
 
 function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) => void }) {
   const { theme } = useTheme();
-  const tabs: SubTab[] = ['ROUTES', 'CONDITIONS', 'NEWS'];
-  const labels: Record<SubTab, string> = { ROUTES: 'ROUTES', CONDITIONS: 'ROAD CONDITIONS', NEWS: 'NEWS' };
+  const tabs: SubTab[] = ['TRIP PLANNER', 'MY ROUTES'];
   return (
     <View style={[s.subNav, { backgroundColor: theme.subNavBg, borderBottomColor: theme.subNavBorder }]}>
       {tabs.map((tab) => (
@@ -38,7 +36,7 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
           accessibilityRole="tab"
         >
           <Text style={[s.subNavText, { color: theme.pillText }, active === tab && { color: theme.red }]}>
-            {labels[tab]}
+            {tab}
           </Text>
           {active === tab && <View style={[s.subNavUnderline, { backgroundColor: theme.red }]} />}
         </Pressable>
@@ -53,12 +51,22 @@ function SubNav({ active, onChange }: { active: SubTab; onChange: (t: SubTab) =>
 
 export default function DiscoverScreen() {
   const { theme } = useTheme();
-  const [subTab, setSubTab] = useState<SubTab>('ROUTES');
+  const [subTab, setSubTab] = useState<SubTab>('TRIP PLANNER');
   const [menuOpen, setMenuOpen] = useState(false);
   const discoverReset = useTabResetStore((s) => s.discoverReset);
+  const pendingDiscoverSubTab = useTabResetStore((s) => s.pendingDiscoverSubTab);
+  const setPendingDiscoverSubTab = useTabResetStore((s) => s.setPendingDiscoverSubTab);
+
   useEffect(() => {
-    if (discoverReset > 0) setSubTab('ROUTES');
+    if (discoverReset > 0) setSubTab('TRIP PLANNER');
   }, [discoverReset]);
+
+  useEffect(() => {
+    if (pendingDiscoverSubTab === 'trip-planner') {
+      setSubTab('TRIP PLANNER');
+      setPendingDiscoverSubTab(null);
+    }
+  }, [pendingDiscoverSubTab]);
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.bg }]} edges={['top']}>
@@ -67,16 +75,15 @@ export default function DiscoverScreen() {
         <HamburgerButton onPress={() => setMenuOpen(true)} />
         <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[s.heading, { color: theme.textPrimary }]}>DISCOVER</Text>
+            <Text style={[s.heading, { color: theme.textPrimary }]}>TRIP</Text>
           </View>
         </View>
         <View style={s.headerSpacer} />
       </View>
       <SubNav active={subTab} onChange={setSubTab} />
       <View style={s.content}>
-        {subTab === 'NEWS' && <DiscoverNews />}
-        {subTab === 'ROUTES' && <DiscoverRoutes />}
-        {subTab === 'CONDITIONS' && <DiscoverConditions />}
+        {subTab === 'MY ROUTES' && <DiscoverRoutes />}
+        {subTab === 'TRIP PLANNER' && <TripPlanner />}
       </View>
 
       <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -90,7 +97,6 @@ export default function DiscoverScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -106,7 +112,6 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
   },
   headerSpacer: { width: 40 },
-
   subNav: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -131,6 +136,5 @@ const s = StyleSheet.create({
     height: 2,
     borderRadius: 1,
   },
-
   content: { flex: 1 },
 });

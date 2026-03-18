@@ -33,7 +33,10 @@ import RideWindowPlanner from '../../components/weather/RideWindowPlanner';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore, useTabResetStore } from '../../lib/store';
+import { useRouter } from 'expo-router';
+import { useAuthStore, useTabResetStore, useRoutesStore } from '../../lib/store';
+import { useNavigationStore } from '../../lib/navigationStore';
+
 import {
   loadFavorites,
   toggleFavorite as toggleFavoriteApi,
@@ -547,6 +550,7 @@ type WeatherTab = 'current' | 'ride-window';
 
 export default function WeatherScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
   const [activeTab, setActiveTab]   = useState<WeatherTab>('current');
@@ -885,11 +889,23 @@ export default function WeatherScreen() {
               <Text style={[styles.cacheNote, { color: theme.textSecondary }]}>
                 Updated {new Date(data.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </Text>
+              <Text style={[styles.cacheNote, { color: theme.textMuted, marginTop: 4 }]}>
+                Weather data: Open-Meteo.com
+              </Text>
             </>
           )}
         </ScrollView>
       ) : (
-        <RideWindowPlanner />
+        <RideWindowPlanner
+          onNavigate={(_from, to) => {
+            useNavigationStore.getState().setPendingSearchDest({ name: to.label, lat: to.lat, lng: to.lng });
+            router.navigate('/(tabs)/ride' as any);
+          }}
+          onNavigateRoute={(route) => {
+            useRoutesStore.getState().setPendingNavigateRoute(route);
+            router.navigate('/(tabs)/ride' as any);
+          }}
+        />
       )}
 
       <LocationSearchModal

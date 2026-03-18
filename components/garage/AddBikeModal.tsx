@@ -510,7 +510,7 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
               autoCapitalize="words"
             />
             <Text style={[styles.helperText, { color: theme.textMuted }]}>
-              Your nickname appears on the ride screen, route previews, and the Ride With selector.
+              Your nickname appears on the ride screen, route previews, and the Riding selector.
             </Text>
 
             <FieldLabel label="CURRENT ODOMETER (MI) — OPTIONAL" />

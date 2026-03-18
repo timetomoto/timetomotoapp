@@ -66,7 +66,7 @@ export default function WeatherFavoritesScreen() {
             <Ionicons name="heart-outline" size={40} color={theme.border} />
             <Text style={[s.emptyTitle, { color: theme.textPrimary }]}>No favorites yet</Text>
             <Text style={[s.emptyDetail, { color: theme.textSecondary }]}>
-              Search for a location in the Weather tab and tap the heart icon to save it here.
+              Search for a location in the News & Weather tab and tap the heart icon to save it here.
             </Text>
           </View>
         ) : (

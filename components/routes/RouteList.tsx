@@ -56,6 +56,18 @@ function fmtDate(iso: string | null | undefined) {
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 
+/** Thumbnail with error fallback */
+function RouteThumbnail({ url }: { url: string }) {
+  const { theme } = useTheme();
+  const [error, setError] = useState(false);
+  if (error) return (
+    <View style={[styles.cardThumbnail, { backgroundColor: theme.bgCard, alignItems: 'center', justifyContent: 'center' }]}>
+      <Feather name="map" size={24} color={theme.border} />
+    </View>
+  );
+  return <Image source={{ uri: url }} style={styles.cardThumbnail} cachePolicy="memory-disk" contentFit="cover" onError={() => setError(true)} />;
+}
+
 /** Encode coordinates as Mapbox polyline (Google polyline encoding) */
 function encodePolyline(coords: { lat: number; lng: number }[]): string {
   let encoded = '';
@@ -83,10 +95,28 @@ function encodePolyline(coords: { lat: number; lng: number }[]): string {
 /** Build Mapbox Static Image URL for a route thumbnail */
 function routeThumbnailUrl(points: { lat: number; lng: number }[]): string | null {
   if (!MAPBOX_TOKEN || points.length < 2) return null;
+
+  // Check minimum bounding box — skip if route is essentially a single point
+  const lats = points.map((p) => p.lat);
+  const lngs = points.map((p) => p.lng);
+  const latSpan = Math.max(...lats) - Math.min(...lats);
+  const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+  if (latSpan < 0.001 && lngSpan < 0.001) return null;
+
   // Sample points to keep URL under length limits (~50 points max)
   const sampled = points.length <= 50 ? points : points.filter((_, i) => i % Math.ceil(points.length / 50) === 0 || i === points.length - 1);
   const poly = encodePolyline(sampled);
-  return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encodeURIComponent(poly)})/auto/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=20`;
+  const encoded = encodeURIComponent(poly);
+
+  // Use auto fit with generous padding; fall back to explicit zoom if URL is too long
+  if (encoded.length > 1800) {
+    // URL too long for auto — use midpoint with zoom 10
+    const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const midLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encoded})/${midLng},${midLat},10/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
+  }
+
+  return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encoded})/auto/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
 }
 
 const UNCATEGORIZED = '__uncategorized__';
@@ -254,7 +284,7 @@ function RouteCard({
       {route.points.length >= 2 && (() => {
         const url = routeThumbnailUrl(route.points);
         return url ? (
-          <Image source={{ uri: url }} style={styles.cardThumbnail} cachePolicy="memory-disk" contentFit="cover" />
+          <RouteThumbnail url={url} />
         ) : null;
       })()}
 
@@ -359,7 +389,7 @@ function SavedRideCard({
       {route.points.length >= 2 && (() => {
         const url = routeThumbnailUrl(route.points);
         return url ? (
-          <Image source={{ uri: url }} style={styles.cardThumbnail} cachePolicy="memory-disk" contentFit="cover" />
+          <RouteThumbnail url={url} />
         ) : null;
       })()}
 

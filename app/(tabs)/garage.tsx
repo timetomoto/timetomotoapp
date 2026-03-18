@@ -196,6 +196,8 @@ export default function GarageScreen() {
       {loading ? (
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <BikeCardSkeleton />
+          <View style={{ height: 16 }} />
+          <BikeCardSkeleton />
         </ScrollView>
       ) : bikes.length === 0 ? (
         <View style={styles.centered}>

@@ -4,8 +4,6 @@
 
 import * as Location from 'expo-location';
 
-const API_KEY = process.env.EXPO_PUBLIC_TOMORROW_API_KEY ?? '';
-const BASE = 'https://api.tomorrow.io/v4';
 const AVG_SPEED_MPH = 50;
 
 // ---------------------------------------------------------------------------
@@ -91,29 +89,35 @@ async function fetchSegmentWeather(
   lng: number,
   targetTime: Date,
 ): Promise<{ temperature: number; weatherCode: number; precipProbability: number; windSpeed: number }> {
-  const fields = ['temperature', 'weatherCode', 'precipitationProbability', 'windSpeed'].join(',');
-  const url =
-    `${BASE}/weather/forecast?location=${lat},${lng}&units=imperial&timesteps=1h&fields=${fields}&apikey=${API_KEY}`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+    `&hourly=temperature_2m,weathercode,precipitation_probability,windspeed_10m` +
+    `&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&forecast_days=3`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
-  const hourly: any[] = json.timelines?.hourly ?? [];
-  if (!hourly.length) throw new Error('No hourly data');
+  const times: string[] = json.hourly?.time ?? [];
+  const temps: number[] = json.hourly?.temperature_2m ?? [];
+  const codes: number[] = json.hourly?.weathercode ?? [];
+  const precip: number[] = json.hourly?.precipitation_probability ?? [];
+  const winds: number[] = json.hourly?.windspeed_10m ?? [];
 
+  if (!times.length) throw new Error('No hourly data');
+
+  // Find closest time slot to target
   const target = targetTime.getTime();
-  let best = hourly[0];
-  let bestDiff = Math.abs(new Date(best.time).getTime() - target);
-  for (const slot of hourly.slice(1)) {
-    const diff = Math.abs(new Date(slot.time).getTime() - target);
-    if (diff < bestDiff) { best = slot; bestDiff = diff; }
+  let bestIdx = 0;
+  let bestDiff = Math.abs(new Date(times[0]).getTime() - target);
+  for (let i = 1; i < times.length; i++) {
+    const diff = Math.abs(new Date(times[i]).getTime() - target);
+    if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
   }
 
   return {
-    temperature: best.values.temperature ?? 0,
-    weatherCode: best.values.weatherCode ?? 1000,
-    precipProbability: best.values.precipitationProbability ?? 0,
-    windSpeed: best.values.windSpeed ?? 0,
+    temperature: temps[bestIdx] ?? 0,
+    weatherCode: codes[bestIdx] ?? 0,
+    precipProbability: precip[bestIdx] ?? 0,
+    windSpeed: winds[bestIdx] ?? 0,
   };
 }
 
@@ -156,7 +160,9 @@ export async function planRideWindow(
 
   const numSegments = totalMiles < 60 ? 4 : totalMiles < 200 ? 6 : 8;
 
-  const segmentPromises = Array.from({ length: numSegments }, async (_, i) => {
+  // Fetch segments sequentially with delay to avoid 429 rate limiting
+  const segments: RouteSegment[] = [];
+  for (let i = 0; i < numSegments; i++) {
     const startFrac = i / numSegments;
     const endFrac = (i + 1) / numSegments;
     const midFrac = (startFrac + endFrac) / 2;
@@ -184,10 +190,11 @@ export async function planRideWindow(
       : i === numSegments - 1 ? `Near ${to.label}`
       : `Mile ${startMile}–${endMile}`;
 
-    return { name, startMile, endMile, midLat, midLng, eta, ...weather, risk } as RouteSegment;
-  });
+    segments.push({ name, startMile, endMile, midLat, midLng, eta, ...weather, risk } as RouteSegment);
 
-  const segments = await Promise.all(segmentPromises);
+    // Stagger to avoid 429
+    if (i < numSegments - 1) await new Promise((r) => setTimeout(r, 500));
+  }
   const recommendation = buildRecommendation(segments);
 
   return {

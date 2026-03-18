@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { XMLParser } from 'fast-xml-parser';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,32 +28,7 @@ export interface NewsItem {
   category: NewsCategory;
 }
 
-export type CamsFilter = 'all' | 'traffic' | 'road' | 'weather' | 'scenic';
 
-export interface WindyCamera {
-  webcamId: string;
-  title: string;
-  status: 'active' | 'inactive';
-  location: {
-    city: string;
-    region: string;
-    country: string;
-    latitude: number;
-    longitude: number;
-  };
-  images: {
-    current: {
-      preview: string;
-      icon: string;
-    };
-    sizes?: {
-      medium?: { width: number; height: number };
-    };
-  };
-  player: {
-    day: { embed: string };
-  };
-}
 
 export interface RoadCondition {
   id: string;
@@ -332,7 +308,7 @@ function mapHEREToCondition(result: any, userLat: number, userLng: number): Road
   };
 }
 
-async function fetchHEREConditions(lat: number, lng: number): Promise<RoadCondition[]> {
+export async function fetchHEREConditions(lat: number, lng: number): Promise<RoadCondition[]> {
   const key = process.env.EXPO_PUBLIC_HERE_API_KEY;
   if (!key) return [];
 
@@ -518,78 +494,6 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 // Windy Webcams fetcher
 // ---------------------------------------------------------------------------
 
-const WINDY_CATEGORY_MAP: Record<CamsFilter, string | null> = {
-  all: null,
-  traffic: 'traffic',
-  road: 'driving',
-  weather: 'weather',
-  scenic: 'landscape',
-};
-
-async function fetchWindyCameras(
-  lat: number,
-  lng: number,
-  category?: CamsFilter,
-): Promise<WindyCamera[]> {
-  const apiKey = process.env.EXPO_PUBLIC_WINDY_API_KEY;
-  if (!apiKey) return [];
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
-  try {
-    const params = new URLSearchParams({
-      lang: 'en',
-      near: `${lat},${lng},50`,
-      include: 'location,images,player',
-      limit: '20',
-      offset: '0',
-    });
-
-    const windyCat = category ? WINDY_CATEGORY_MAP[category] : null;
-    if (windyCat) params.set('categories', windyCat);
-
-    const res = await fetch(
-      `https://api.windy.com/webcams/api/v3/webcams?${params}`,
-      {
-        signal: controller.signal,
-        headers: { 'x-windy-api-key': apiKey },
-      },
-    );
-    if (!res.ok) return [];
-    const json = await res.json();
-
-    const items: any[] = json.webcams ?? json.result?.webcams ?? [];
-
-    return items.map((cam: any): WindyCamera => ({
-      webcamId: String(cam.webcamId ?? cam.id ?? ''),
-      title: String(cam.title ?? ''),
-      status: cam.status === 'active' ? 'active' : 'inactive',
-      location: {
-        city: cam.location?.city ?? '',
-        region: cam.location?.region ?? '',
-        country: cam.location?.country ?? '',
-        latitude: Number(cam.location?.latitude ?? 0),
-        longitude: Number(cam.location?.longitude ?? 0),
-      },
-      images: {
-        current: {
-          preview: cam.images?.current?.preview ?? cam.image?.current?.preview ?? '',
-          icon: cam.images?.current?.icon ?? cam.image?.current?.icon ?? '',
-        },
-        sizes: cam.images?.sizes,
-      },
-      player: {
-        day: {
-          embed: cam.player?.day?.embed ?? cam.player?.lifetime?.embed ?? '',
-        },
-      },
-    }));
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Store
@@ -618,15 +522,6 @@ interface DiscoverStore {
   setConditionsFilter: (filter: string) => void;
   setConditionsLocation: (loc: { lat: number; lng: number; name: string } | null) => void;
 
-  // Cams
-  cameras: WindyCamera[];
-  camsLoading: boolean;
-  camsError: string | null;
-  camsLocation: { lat: number; lng: number; name: string } | null;
-  activeCamsFilter: CamsFilter;
-  fetchCameras: (lat: number, lng: number, category?: CamsFilter) => Promise<void>;
-  setCamsLocation: (loc: { lat: number; lng: number; name: string } | null) => void;
-  setActiveCamsFilter: (filter: CamsFilter) => void;
 }
 
 export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
@@ -639,7 +534,21 @@ export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
 
   fetchNews: async () => {
     const { newsLastFetched } = get();
+    // In-memory cache hit
     if (newsLastFetched && Date.now() - newsLastFetched < CACHE_MS) return;
+
+    // Check AsyncStorage cache
+    try {
+      const cached = await AsyncStorage.getItem('@ttm/news_cache');
+      if (cached) {
+        const { items, ts } = JSON.parse(cached);
+        if (ts && Date.now() - ts < CACHE_MS && items?.length > 0) {
+          const hydrated = items.map((item: any) => ({ ...item, publishedAt: new Date(item.publishedAt) }));
+          set({ newsItems: hydrated, newsLastFetched: ts, newsLoading: false });
+          return;
+        }
+      }
+    } catch {}
 
     set({ newsLoading: true, newsError: null });
 
@@ -665,7 +574,13 @@ export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
     // Sort newest first
     unique.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
 
-    set({ newsItems: unique, newsLastFetched: Date.now(), newsLoading: false });
+    const now = Date.now();
+    set({ newsItems: unique, newsLastFetched: now, newsLoading: false });
+
+    // Persist to AsyncStorage
+    try {
+      await AsyncStorage.setItem('@ttm/news_cache', JSON.stringify({ items: unique, ts: now }));
+    } catch {}
   },
 
   setNewsFilter: (activeNewsFilter) => set({ activeNewsFilter }),
@@ -695,25 +610,4 @@ export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
   setConditionsFilter: (activeConditionsFilter) => set({ activeConditionsFilter }),
   setConditionsLocation: (conditionsLocation) => set({ conditionsLocation }),
 
-  // Cams
-  cameras: [],
-  camsLoading: false,
-  camsError: null,
-  camsLocation: null,
-  activeCamsFilter: 'all',
-
-  fetchCameras: async (lat: number, lng: number, category?: CamsFilter) => {
-    if (!process.env.EXPO_PUBLIC_WINDY_API_KEY) {
-      set({ cameras: [], camsLoading: false, camsError: 'Add your Windy API key to enable cameras.' });
-      return;
-    }
-
-    set({ camsLoading: true, camsError: null });
-
-    const cameras = await fetchWindyCameras(lat, lng, category);
-    set({ cameras, camsLoading: false });
-  },
-
-  setCamsLocation: (camsLocation) => set({ camsLocation }),
-  setActiveCamsFilter: (activeCamsFilter) => set({ activeCamsFilter }),
 }));

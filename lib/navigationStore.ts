@@ -78,6 +78,8 @@ interface NavigationState {
   setHeading: (deg: number) => void;
   setIsOffRoute: (v: boolean) => void;
   resetNavigation: () => void;
+  pendingSearchDest: NavDestination | null;
+  setPendingSearchDest: (dest: NavDestination | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -120,4 +122,7 @@ export const useNavigationStore = create<NavigationState>((set) => ({
       eta: null,
       isOffRoute: false,
     }),
+
+  pendingSearchDest: null,
+  setPendingSearchDest: (dest) => set({ pendingSearchDest: dest }),
 }));
