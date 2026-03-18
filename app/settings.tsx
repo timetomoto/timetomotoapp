@@ -128,7 +128,7 @@ export default function SettingsScreen() {
   const isDark = theme.bg === '#0D0D0D';
   const router = useRouter();
   const { isMonitoring, setMonitoring, shareActive, setShareActive, emergencyContacts, loadContacts } = useSafetyStore();
-  const { user } = useAuthStore();
+  const { user, setOnboardingDone } = useAuthStore();
 
   // Load emergency contacts so the crash-detection check is accurate
   useEffect(() => {
@@ -270,14 +270,20 @@ export default function SettingsScreen() {
 
             <SectionHeader label="NOTIFICATIONS" />
             <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
-              <ToggleRow
-                label="Ride start alerts"
-                value={false}
-                onValueChange={() => {}}
-              />
-              <Text style={[styles.helperText, { color: theme.textMuted }]}>
-                Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
-              </Text>
+              <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Ride start alerts</Text>
+                <Switch
+                  value={false}
+                  onValueChange={() => {}}
+                  thumbColor={theme.toggleThumbOff}
+                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+                />
+              </View>
+              <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                  Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
+                </Text>
+              </View>
               <ToggleRow
                 label="Weather alerts"
                 value={notifWeather}
@@ -294,14 +300,20 @@ export default function SettingsScreen() {
           <>
             <SectionHeader label="NOTIFICATIONS" />
             <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
-              <ToggleRow
-                label="Ride start alerts"
-                value={false}
-                onValueChange={() => {}}
-              />
-              <Text style={[styles.helperText, { color: theme.textMuted }]}>
-                Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
-              </Text>
+              <View style={[styles.row, { borderBottomWidth: 0 }]}>
+                <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Ride start alerts</Text>
+                <Switch
+                  value={false}
+                  onValueChange={() => {}}
+                  thumbColor={theme.toggleThumbOff}
+                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+                />
+              </View>
+              <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
+                  Coming soon — Notifies your emergency contacts when you start a ride. Requires notification setup.
+                </Text>
+              </View>
               <ToggleRow
                 label="Weather alerts"
                 value={notifWeather}
@@ -407,6 +419,26 @@ export default function SettingsScreen() {
             muted
           />
         </View>
+
+        {/* TODO: Remove before launch */}
+        {__DEV__ && (
+          <>
+            <SectionHeader label="DEVELOPER" />
+            <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+              <Pressable
+                style={[styles.row, { borderBottomWidth: 0 }]}
+                onPress={async () => {
+                  await AsyncStorage.removeItem('@ttm/onboarding_v1');
+                  setOnboardingDone(false);
+                  Alert.alert('Onboarding Reset', 'Restart the app to see the onboarding flow.');
+                }}
+              >
+                <Text style={[styles.rowLabel, { color: theme.red }]}>Reset Onboarding</Text>
+                <Feather name="refresh-cw" size={16} color={theme.red} />
+              </Pressable>
+            </View>
+          </>
+        )}
 
       </ScrollView>
     </SafeAreaView>

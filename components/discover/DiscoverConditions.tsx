@@ -20,6 +20,8 @@ import {
   type RoadCondition,
 } from '../../lib/discoverStore';
 import { useTheme } from '../../lib/useTheme';
+import { useAuthStore } from '../../lib/store';
+import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -158,6 +160,12 @@ export default function DiscoverConditions() {
   const [searchResults, setSearchResults] = useState<Array<{ name: string; lat: number; lng: number }>>([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { user } = useAuthStore();
+  const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
+
+  useEffect(() => {
+    loadFavorites(user?.id ?? 'local').then(setFavorites).catch(() => {});
+  }, [user?.id]);
 
   // The effective location for fetching + distance calculation
   const effectiveLoc = conditionsLocation ?? (gpsLoc ? { ...gpsLoc, name: gpsName } : null);
@@ -241,7 +249,7 @@ export default function DiscoverConditions() {
     setRefreshing(false);
   }, [loadConditions, conditionsLocation, gpsLoc]);
 
-  // Debounced geocoding search
+  // Debounced geocoding search with proximity bias
   const handleSearchChange = useCallback((text: string) => {
     setSearchText(text);
     if (searchTimer.current !== null) clearTimeout(searchTimer.current);
@@ -250,10 +258,10 @@ export default function DiscoverConditions() {
       return;
     }
     searchTimer.current = setTimeout(async () => {
-      const results = await geocodeLocation(text);
+      const results = await geocodeLocation(text, gpsLoc ? { lat: gpsLoc.lat, lng: gpsLoc.lng } : null);
       setSearchResults(results);
     }, 350);
-  }, []);
+  }, [gpsLoc]);
 
   const handleSelectResult = useCallback(
     (result: { name: string; lat: number; lng: number }) => {
@@ -267,6 +275,14 @@ export default function DiscoverConditions() {
       loadConditions(result.lat, result.lng);
     },
     [setConditionsLocation, loadConditions],
+  );
+
+  const handleSelectFavorite = useCallback(
+    (fav: FavoriteLocation) => {
+      const name = fav.nickname || fav.name;
+      handleSelectResult({ name, lat: fav.lat, lng: fav.lng });
+    },
+    [handleSelectResult],
   );
 
   const handleClearSearch = useCallback(() => {
@@ -402,9 +418,36 @@ export default function DiscoverConditions() {
           <Text style={[s.helperText, { color: theme.textMuted }]}>Search a location to view conditions</Text>
         )}
 
-        {/* Search results dropdown */}
-        {searchFocused && searchResults.length > 0 && (
+        {/* Search results / favorites dropdown */}
+        {searchFocused && (searchResults.length > 0 || (!searchText.trim() && favorites.length > 0)) && (
           <View style={[s.dropdown, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            {/* Favorites when empty */}
+            {!searchText.trim() && favorites.length > 0 && (
+              <>
+                <Text style={[s.dropdownSectionLabel, { color: theme.textMuted }]}>FAVORITES</Text>
+                {[...favorites].sort((a, b) => (b.is_home ? 1 : 0) - (a.is_home ? 1 : 0)).map((fav, i) => (
+                  <Pressable
+                    key={`fav-${i}`}
+                    style={[s.dropdownItem, { borderBottomColor: theme.border }]}
+                    onPress={() => handleSelectFavorite(fav)}
+                  >
+                    <Feather name="heart" size={12} color={theme.red} />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[s.dropdownText, { color: theme.textPrimary }]} numberOfLines={1}>
+                          {fav.nickname || fav.name}
+                        </Text>
+                        {fav.is_home && <Feather name="home" size={12} color={theme.green} style={{ marginLeft: 4 }} />}
+                      </View>
+                      {fav.nickname ? (
+                        <Text style={[s.dropdownSubtext, { color: theme.textMuted }]} numberOfLines={1}>{fav.name}</Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                ))}
+              </>
+            )}
+            {/* Geocoding results */}
             {searchResults.map((result, idx) => (
               <Pressable
                 key={`${result.lat}-${result.lng}-${idx}`}
@@ -587,6 +630,18 @@ const s = StyleSheet.create({
   dropdownText: {
     fontSize: 13,
     flex: 1,
+  },
+  dropdownSubtext: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  dropdownSectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
 
   pillsContainer: {

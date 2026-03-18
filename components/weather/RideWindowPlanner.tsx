@@ -134,7 +134,7 @@ function CityInput({ label, value, place, onChange, onGeocode, placeholder, user
           value={value}
           onChangeText={handleChange}
           onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 200)}
+          onBlur={() => setTimeout(() => { setFocused(false); setResults([]); }, 200)}
           placeholder={placeholder}
           placeholderTextColor={theme.textSecondary}
           autoCorrect={false}
@@ -160,10 +160,12 @@ function CityInput({ label, value, place, onChange, onGeocode, placeholder, user
                 >
                   <Feather name="heart" size={12} color={theme.red} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.dropdownText, { color: theme.textPrimary }]} numberOfLines={1}>
-                      {fav.nickname || fav.name}
-                      {fav.is_home ? ' 🏠' : ''}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[s.dropdownText, { color: theme.textPrimary }]} numberOfLines={1}>
+                        {fav.nickname || fav.name}
+                      </Text>
+                      {fav.is_home && <Feather name="home" size={12} color={theme.green} style={{ marginLeft: 4 }} />}
+                    </View>
                     {fav.nickname ? (
                       <Text style={[s.dropdownSubtext, { color: theme.textMuted }]} numberOfLines={1}>{fav.name}</Text>
                     ) : null}

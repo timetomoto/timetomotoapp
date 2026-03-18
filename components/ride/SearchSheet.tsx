@@ -132,7 +132,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
         const encoded = encodeURIComponent(query.trim());
         const proxLng = userLocation?.lng ?? -97.7431;
         const proxLat = userLocation?.lat ?? 30.2672;
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=address,poi,place,postcode&limit=7&proximity=${proxLng},${proxLat}&country=us`;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json?access_token=${TOKEN}&types=address,poi,place,postcode&limit=5&proximity=${proxLng},${proxLat}&country=us`;
         const res = await fetch(url);
         const json = await res.json();
         setResults(json.features ?? []);
@@ -154,13 +154,6 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
     onClose();
   }
 
-  function shortAddress(feature: GeocodingFeature): string {
-    const parts = feature.place_name.split(',');
-    if (parts.length > 2) {
-      return parts.slice(1, 3).join(',').trim();
-    }
-    return parts.slice(1).join(',').trim();
-  }
 
   if (!panelMounted) return null;
 
@@ -208,7 +201,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
                 key={feature.id}
                 style={[styles.resultRow, { borderBottomColor: theme.border }]}
                 onPress={() =>
-                  handleSelect({ name: feature.text, lat, lng })
+                  handleSelect({ name: feature.place_name, lat, lng })
                 }
               >
                 <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
@@ -216,10 +209,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
                 </View>
                 <View style={styles.resultText}>
                   <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {feature.text}
-                  </Text>
-                  <Text style={[styles.resultAddress, { color: theme.textMuted }]} numberOfLines={1}>
-                    {shortAddress(feature)}
+                    {feature.place_name}
                   </Text>
                 </View>
                 <Feather name="chevron-right" size={14} color={theme.textMuted} />
@@ -233,19 +223,27 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
             <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
               FAVORITES
             </Text>
-            {favorites.map((fav, idx) => (
+            {[...favorites].sort((a, b) => (b.is_home ? 1 : 0) - (a.is_home ? 1 : 0)).map((fav, idx) => (
               <Pressable
                 key={`fav-${fav.lat}-${fav.lng}-${idx}`}
                 style={[styles.resultRow, { borderBottomColor: theme.border }]}
-                onPress={() => handleSelect({ name: fav.name, lat: fav.lat, lng: fav.lng })}
+                onPress={() => handleSelect({ name: fav.nickname || fav.name, lat: fav.lat, lng: fav.lng })}
               >
                 <View style={[styles.resultIcon, { backgroundColor: theme.bgCard }]}>
                   <Ionicons name="heart" size={14} color={theme.red} />
                 </View>
                 <View style={styles.resultText}>
-                  <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
-                    {fav.name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={[styles.resultName, { color: theme.textPrimary }]} numberOfLines={1}>
+                      {fav.nickname || fav.name}
+                    </Text>
+                    {fav.is_home && <Feather name="home" size={12} color={theme.green} style={{ marginLeft: 4 }} />}
+                  </View>
+                  {fav.nickname ? (
+                    <Text style={[styles.resultAddress, { color: theme.textMuted }]} numberOfLines={1}>
+                      {fav.name}
+                    </Text>
+                  ) : null}
                 </View>
                 <Feather name="chevron-right" size={14} color={theme.textMuted} />
               </Pressable>

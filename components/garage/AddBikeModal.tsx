@@ -159,7 +159,7 @@ export function MakeAutocomplete({ value, onChange }: { value: string; onChange:
 // Bike type selector
 // ---------------------------------------------------------------------------
 
-function BikeTypeSelector({ value, onChange }: { value: BikeType | null; onChange: (t: BikeType | null) => void }) {
+export function BikeTypeSelector({ value, onChange }: { value: BikeType | null; onChange: (t: BikeType | null) => void }) {
   const { theme } = useTheme();
   return (
     <View style={styles.typeGrid}>
