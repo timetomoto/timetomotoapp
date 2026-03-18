@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useAuthStore, useGarageStore, useRoutesStore, bikeLabel } from '../../lib/store';
 import {
   deleteRoute,
@@ -53,9 +54,45 @@ function fmtDate(iso: string | null | undefined) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+
+/** Encode coordinates as Mapbox polyline (Google polyline encoding) */
+function encodePolyline(coords: { lat: number; lng: number }[]): string {
+  let encoded = '';
+  let pLat = 0;
+  let pLng = 0;
+  for (const c of coords) {
+    const lat = Math.round(c.lat * 1e5);
+    const lng = Math.round(c.lng * 1e5);
+    let dLat = lat - pLat;
+    let dLng = lng - pLng;
+    pLat = lat;
+    pLng = lng;
+    for (const d of [dLat, dLng]) {
+      let v = d < 0 ? ~(d << 1) : d << 1;
+      while (v >= 0x20) {
+        encoded += String.fromCharCode((0x20 | (v & 0x1f)) + 63);
+        v >>= 5;
+      }
+      encoded += String.fromCharCode(v + 63);
+    }
+  }
+  return encoded;
+}
+
+/** Build Mapbox Static Image URL for a route thumbnail */
+function routeThumbnailUrl(points: { lat: number; lng: number }[]): string | null {
+  if (!MAPBOX_TOKEN || points.length < 2) return null;
+  // Sample points to keep URL under length limits (~50 points max)
+  const sampled = points.length <= 50 ? points : points.filter((_, i) => i % Math.ceil(points.length / 50) === 0 || i === points.length - 1);
+  const poly = encodePolyline(sampled);
+  return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encodeURIComponent(poly)})/auto/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=20`;
+}
+
 const UNCATEGORIZED = '__uncategorized__';
 const CATEGORY_ORDER_KEY = 'ttm_route_category_order';
 const ROUTE_SORT_KEY = (userId: string) => `@ttm/routes_sort_order_${userId}`;
+const EXPANDED_STATE_KEY = (userId: string) => `@ttm/routes_expanded_state_${userId}`;
 
 function applyPersistedOrder(routes: Route[], savedOrder: string[]): Route[] {
   if (!savedOrder.length) return routes;
@@ -92,7 +129,8 @@ function sortRoutes(routes: Route[], mode: SortMode): Route[] {
 function groupRoutes(routes: Route[]): Map<string, Route[]> {
   const map = new Map<string, Route[]>();
   for (const route of routes) {
-    const key = route.category?.trim() || UNCATEGORIZED;
+    let key = route.category?.trim() || 'My Routes';
+    if (route.source === 'recorded' && key === 'My Routes') key = 'Recorded Rides';
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(route);
   }
@@ -188,45 +226,37 @@ function RouteCard({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <Text style={[styles.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
-        <View style={styles.cardHeaderActions}>
-          <Pressable onPress={onRename} hitSlop={8} style={styles.cardHeaderBtn}>
-            <Feather name="edit-2" size={14} color={theme.textSecondary} />
+      </View>
+
+      <View style={styles.cardMeta}>
+        <Text style={[styles.statsText, { color: theme.textSecondary }]}>
+          {fmtMiles(route.distance_miles)} mi | {fmtEle(route.elevation_gain_ft)} ft{dur ? ` | ${dur}` : ''}
+        </Text>
+        <View style={styles.cardIconRow}>
+          <Pressable onPress={onRename} hitSlop={6} style={styles.cardHeaderBtn}>
+            <Feather name="edit-2" size={13} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={showCategorySheet} hitSlop={8} style={styles.cardHeaderBtn}>
-            <Feather name="folder" size={14} color={theme.textSecondary} />
+          <Pressable onPress={showCategorySheet} hitSlop={6} style={styles.cardHeaderBtn}>
+            <Feather name="folder" size={13} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={() => shareRoute(route)} hitSlop={8} style={styles.cardHeaderBtn}>
-            <Feather name="share-2" size={14} color={theme.textSecondary} />
+          <Pressable onPress={onExport} hitSlop={6} style={styles.cardHeaderBtn}>
+            <Feather name="download" size={13} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
-            <Feather name="trash-2" size={15} color={theme.textSecondary} />
+          <Pressable onPress={onDelete} hitSlop={6} style={styles.cardHeaderBtn}>
+            <Feather name="trash-2" size={13} color={theme.textSecondary} />
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.cardMeta}>
-        <View style={styles.metaItem}>
-          <Feather name="map" size={11} color={theme.textSecondary} />
-          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtMiles(route.distance_miles)} mi</Text>
-        </View>
-        <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
-        <View style={styles.metaItem}>
-          <Feather name="trending-up" size={11} color={theme.textSecondary} />
-          <Text style={[styles.metaText, { color: theme.textSecondary }]}>{fmtEle(route.elevation_gain_ft)} ft</Text>
-        </View>
-        {dur && (
-          <>
-            <View style={[styles.metaSep, { backgroundColor: theme.cardDivider }]} />
-            <View style={styles.metaItem}>
-              <Feather name="clock" size={11} color={theme.textSecondary} />
-              <Text style={[styles.metaText, { color: theme.textSecondary }]}>{dur}</Text>
-            </View>
-          </>
-        )}
-      </View>
+      {route.points.length >= 2 && (() => {
+        const url = routeThumbnailUrl(route.points);
+        return url ? (
+          <Image source={{ uri: url }} style={styles.cardThumbnail} cachePolicy="memory-disk" contentFit="cover" />
+        ) : null;
+      })()}
 
       <View style={[styles.cardActions, { borderTopColor: theme.cardDivider }]}>
         <Pressable style={styles.actionBtn} onPress={onNavigate}>
@@ -234,9 +264,9 @@ function RouteCard({
           <Text style={[styles.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
         <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
-        <Pressable style={styles.actionBtn} onPress={onExport}>
-          <Feather name="download" size={13} color={theme.textSecondary} />
-          <Text style={[styles.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
+        <Pressable style={styles.actionBtn} onPress={() => shareRoute(route)}>
+          <Feather name="share-2" size={13} color={theme.textSecondary} />
+          <Text style={[styles.actionText, { color: theme.textSecondary }]}>SHARE</Text>
         </Pressable>
       </View>
     </View>
@@ -267,7 +297,7 @@ function SavedRideCard({
   const dateStr = fmtDate(route.recorded_at ?? route.created_at);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
+    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <View style={srStyles.nameRow}>
           <View style={srStyles.recBadge}>
@@ -280,8 +310,8 @@ function SavedRideCard({
           <Pressable onPress={onRename} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="edit-2" size={14} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={() => shareRoute(route)} hitSlop={8} style={styles.cardHeaderBtn}>
-            <Feather name="share-2" size={14} color={theme.textSecondary} />
+          <Pressable onPress={onExport} hitSlop={8} style={styles.cardHeaderBtn}>
+            <Feather name="download" size={14} color={theme.textSecondary} />
           </Pressable>
           <Pressable onPress={onDelete} hitSlop={8} style={styles.cardHeaderBtn}>
             <Feather name="trash-2" size={15} color={theme.textSecondary} />
@@ -326,15 +356,22 @@ function SavedRideCard({
         </View>
       ) : null}
 
+      {route.points.length >= 2 && (() => {
+        const url = routeThumbnailUrl(route.points);
+        return url ? (
+          <Image source={{ uri: url }} style={styles.cardThumbnail} cachePolicy="memory-disk" contentFit="cover" />
+        ) : null;
+      })()}
+
       <View style={[styles.cardActions, { borderTopColor: theme.cardDivider }]}>
         <Pressable style={styles.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
           <Text style={[styles.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
         <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
-        <Pressable style={styles.actionBtn} onPress={onExport}>
-          <Feather name="download" size={13} color={theme.textSecondary} />
-          <Text style={[styles.actionText, { color: theme.textSecondary }]}>EXPORT GPX</Text>
+        <Pressable style={styles.actionBtn} onPress={() => shareRoute(route)}>
+          <Feather name="share-2" size={13} color={theme.textSecondary} />
+          <Text style={[styles.actionText, { color: theme.textSecondary }]}>SHARE</Text>
         </Pressable>
       </View>
     </View>
@@ -365,7 +402,6 @@ function CategoryHeader({
   onDeleteCategory: (name: string) => void;
 }) {
   const { theme } = useTheme();
-  const isUncategorized = label === UNCATEGORIZED;
 
   return (
     <Pressable
@@ -382,7 +418,7 @@ function CategoryHeader({
         style={{ marginRight: 8 }}
       />
       <Text style={[styles.categoryLabel, { color: theme.textSecondary }]}>
-        {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
+        {label.toUpperCase()}
       </Text>
       <View style={styles.categoryHeaderRight}>
         {!isExpanded && count > 0 && (
@@ -390,16 +426,12 @@ function CategoryHeader({
             <Text style={styles.categoryCountText}>{count}</Text>
           </View>
         )}
-        {!isUncategorized && (
-          <>
-            <Pressable onPress={() => onRenameCategory(label)} hitSlop={6} style={{ padding: 4 }}>
-              <Feather name="edit-2" size={12} color={theme.textMuted} />
-            </Pressable>
-            <Pressable onPress={() => onDeleteCategory(label)} hitSlop={6} style={{ padding: 4 }}>
-              <Feather name="trash-2" size={12} color={theme.red} />
-            </Pressable>
-          </>
-        )}
+        <Pressable onPress={() => onRenameCategory(label)} hitSlop={6} style={{ padding: 4 }}>
+          <Feather name="edit-2" size={12} color={theme.textMuted} />
+        </Pressable>
+        <Pressable onPress={() => onDeleteCategory(label)} hitSlop={6} style={{ padding: 4 }}>
+          <Feather name="trash-2" size={12} color={theme.red} />
+        </Pressable>
         <Pressable onLongPress={onLongPress} delayLongPress={150} hitSlop={6} style={{ padding: 4 }}>
           <Feather name="menu" size={16} color={theme.textMuted} />
         </Pressable>
@@ -498,7 +530,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
   const autoExpandedRef = useRef(false);
   const userId = user?.id ?? 'local';
 
-  // Load persisted category order + route sort order
+  // Load persisted category order, route sort order, and expanded state
   useEffect(() => {
     AsyncStorage.getItem(CATEGORY_ORDER_KEY).then((stored) => {
       if (stored) {
@@ -509,6 +541,11 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
     AsyncStorage.getItem(ROUTE_SORT_KEY(userId)).then((stored) => {
       if (stored) {
         try { setRouteSortOrder(JSON.parse(stored)); } catch { /* ignore */ }
+      }
+    });
+    AsyncStorage.getItem(EXPANDED_STATE_KEY(userId)).then((stored) => {
+      if (stored) {
+        try { setExpandedCategories(JSON.parse(stored)); autoExpandedRef.current = true; } catch { /* ignore */ }
       }
     });
   }, [userId]);
@@ -523,10 +560,8 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
         r.name.toLowerCase().includes(query) ||
         (r.category ?? '').toLowerCase().includes(query))
     : sortedRoutes;
-  const savedRides = filteredRoutes.filter((r) => r.source === 'recorded');
-  const otherRoutes = filteredRoutes.filter((r) => r.source !== 'recorded');
-  const grouped = groupRoutes(otherRoutes);
-  const allCategories = [...grouped.keys()].filter((k) => k !== UNCATEGORIZED);
+  const grouped = groupRoutes(filteredRoutes);
+  const allCategories = [...grouped.keys()];
 
   // Build ordered category list
   const allGroupKeys = [...grouped.keys()];
@@ -556,7 +591,11 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
   }, [orderedKeys, grouped, loading]);
 
   function toggleCategory(category: string) {
-    setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
+    setExpandedCategories((prev) => {
+      const next = { ...prev, [category]: !prev[category] };
+      AsyncStorage.setItem(EXPANDED_STATE_KEY(userId), JSON.stringify(next));
+      return next;
+    });
   }
 
   // ── Action handlers ──
@@ -683,9 +722,9 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
         />
         {isExpanded && (
           <View style={styles.categoryContent}>
-            {categoryRoutes.map((route) => (
+            {categoryRoutes.map((route, idx) => (
+              <View key={route.id} style={idx === 0 ? { marginTop: 5 } : undefined}>
               <RouteCard
-                key={route.id}
                 route={route}
                 categories={allCategories}
                 onNavigate={() => onNavigate(route)}
@@ -694,6 +733,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
                 onRename={() => handleRename(route)}
                 onMoveCategory={(cat) => handleMoveCategory(route, cat)}
               />
+              </View>
             ))}
           </View>
         )}
@@ -787,29 +827,6 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
               </View>
             )}
 
-            {/* Saved Rides section */}
-            {showSavedRides && !loading && savedRides.length > 0 && (
-              <SavedRidesSection
-                rides={savedRides}
-                bikesById={bikesById}
-                onNavigate={onNavigate}
-                onExport={handleExport}
-                onDelete={handleDelete}
-                onRename={handleRename}
-              />
-            )}
-
-            {showSavedRides && !loading && !query && savedRides.length === 0 && otherRoutes.length > 0 && (
-              <View style={srStyles.emptyRides}>
-                <Feather name="disc" size={20} color={theme.border} />
-                <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>No recorded rides yet.{'\n'}Tap Ride & Record on the map to start.</Text>
-              </View>
-            )}
-
-            {/* Divider between saved rides and route categories */}
-            {showSavedRides && !loading && savedRides.length > 0 && otherRoutes.length > 0 && (
-              <View style={{ height: 1, marginHorizontal: 16, backgroundColor: theme.border }} />
-            )}
           </>
         }
       />
@@ -874,7 +891,7 @@ const styles = StyleSheet.create({
   categoryContent: {
     paddingHorizontal: 8,
     paddingBottom: 12,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   categoryHeader: {
     flexDirection: 'row',
@@ -915,11 +932,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden',
   },
+  cardThumbnail: {
+    width: '100%',
+    height: 120,
+    marginTop: 2,
+    marginBottom: 0,
+  },
 
   cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 6,
@@ -943,8 +963,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginTop: 6,
-    paddingBottom: 14,
+    marginTop: 4,
+    paddingBottom: 10,
+  },
+  statsText: {
+    fontSize: 11,
+    flex: 1,
+  },
+  cardIconRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    width: 116,
     gap: 8,
   },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -954,7 +983,7 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    marginTop: 2,
+    marginTop: 0,
   },
   actionBtn: {
     flex: 1,

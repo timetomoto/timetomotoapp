@@ -1,7 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Keyboard,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -35,6 +38,14 @@ const FILTER_PILLS = [
   { label: 'NEAR ME < 50mi', value: 'near_me' },
 ];
 
+const AGE_OPTIONS = [
+  { label: 'All time', value: 0 },
+  { label: 'Last 7 days', value: 7 },
+  { label: 'Last 30 days', value: 30 },
+  { label: 'Last 60 days', value: 60 },
+  { label: 'Last 90 days', value: 90 },
+];
+
 const AUTO_REFRESH_MS = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
@@ -60,8 +71,23 @@ function relativeTime(date: Date): string {
   const diffMin = Math.floor(diffMs / 60_000);
   if (diffMin < 1) return 'just now';
   if (diffMin < 60) return `${diffMin} min ago`;
-  if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
-  return `${Math.floor(diffMin / 1440)}d ago`;
+  const diffHrs = Math.floor(diffMin / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+  return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
+}
+
+function reportAgeDays(date: Date): number {
+  return Math.floor((Date.now() - date.getTime()) / 86_400_000);
+}
+
+function ageColor(date: Date, theme: any): string {
+  const days = reportAgeDays(date);
+  if (days < 7) return theme.green;
+  if (days <= 30) return '#FF9800';
+  return theme.red;
 }
 
 function getConditionIcon(type: RoadCondition['type']): string {
@@ -85,12 +111,14 @@ interface ConditionCardProps {
   condition: RoadCondition;
   distanceMi?: number;
   hasLocation: boolean;
+  locationLabel?: string;
 }
 
-const ConditionCard = memo(function ConditionCard({ condition, distanceMi, hasLocation }: ConditionCardProps) {
+const ConditionCard = memo(function ConditionCard({ condition, distanceMi, hasLocation, locationLabel }: ConditionCardProps) {
   const { theme } = useTheme();
 
   const icon = getConditionIcon(condition.type);
+  const reportAge = ageColor(condition.reportedAt, theme);
 
   let badgeColor = theme.textMuted;
   if (distanceMi !== undefined) {
@@ -126,7 +154,14 @@ const ConditionCard = memo(function ConditionCard({ condition, distanceMi, hasLo
         {condition.description ? ` — ${condition.description}` : ''}
       </Text>
 
-      <Text style={[s.cardTime, { color: theme.textMuted }]}>Reported {relativeTime(condition.reportedAt)}</Text>
+      {locationLabel ? (
+        <Text style={[s.cardLocation, { color: theme.textSecondary }]} numberOfLines={1}>Near {locationLabel}</Text>
+      ) : null}
+
+      <View style={s.cardBottomRow}>
+        <View style={[s.ageDot, { backgroundColor: reportAge }]} />
+        <Text style={[s.cardTime, { color: reportAge }]}>Reported {relativeTime(condition.reportedAt)}</Text>
+      </View>
     </View>
   );
 });
@@ -159,6 +194,8 @@ export default function DiscoverConditions() {
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<Array<{ name: string; lat: number; lng: number }>>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [ageFilter, setAgeFilter] = useState(0); // 0 = all
+  const [locationLabels, setLocationLabels] = useState<Record<string, string>>({});
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user } = useAuthStore();
   const [favorites, setFavorites] = useState<FavoriteLocation[]>([]);
@@ -297,6 +334,26 @@ export default function DiscoverConditions() {
     }
   }, [setConditionsLocation, gpsLoc, loadConditions]);
 
+  // Reverse geocode condition locations for street names
+  useEffect(() => {
+    if (conditions.length === 0) return;
+    const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+    if (!token) return;
+    const toGeocode = conditions.filter((c) => !locationLabels[c.id]).slice(0, 10);
+    if (toGeocode.length === 0) return;
+    toGeocode.forEach(async (c) => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${c.lng},${c.lat}.json?access_token=${token}&types=address,poi&limit=1`,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        const name = json.features?.[0]?.text ?? json.features?.[0]?.place_name ?? '';
+        if (name) setLocationLabels((prev) => ({ ...prev, [c.id]: name }));
+      } catch { /* best-effort */ }
+    });
+  }, [conditions]);
+
   // Distance calculations
   const conditionsWithDistance = useMemo(() => {
     const loc = effectiveLoc;
@@ -324,6 +381,11 @@ export default function DiscoverConditions() {
         break;
     }
 
+    // Age filter
+    if (ageFilter > 0) {
+      list = list.filter((c) => reportAgeDays(c.condition.reportedAt) <= ageFilter);
+    }
+
     if (effectiveLoc) {
       list.sort((a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity));
     } else {
@@ -332,7 +394,7 @@ export default function DiscoverConditions() {
     }
 
     return list;
-  }, [conditionsWithDistance, activeConditionsFilter, effectiveLoc]);
+  }, [conditionsWithDistance, activeConditionsFilter, effectiveLoc, ageFilter]);
 
   const lastUpdatedText = useMemo(() => {
     if (!conditionsLastFetched) return '';
@@ -495,6 +557,30 @@ export default function DiscoverConditions() {
         })}
       </ScrollView>
 
+      {/* Age filter dropdown */}
+      <Pressable
+        style={[s.ageDropdown, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+        onPress={() => {
+          const options = [...AGE_OPTIONS.map((o) => o.label), 'Cancel'];
+          if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+              { options, cancelButtonIndex: options.length - 1, title: 'Show conditions from' },
+              (idx) => { if (idx < AGE_OPTIONS.length) setAgeFilter(AGE_OPTIONS[idx].value); },
+            );
+          } else {
+            Alert.alert('Show conditions from', undefined,
+              [...AGE_OPTIONS.map((o) => ({ text: o.label, onPress: () => setAgeFilter(o.value) })), { text: 'Cancel', style: 'cancel' as const }],
+            );
+          }
+        }}
+      >
+        <Feather name="clock" size={12} color={theme.textSecondary} />
+        <Text style={[s.ageDropdownText, { color: theme.textSecondary }]}>
+          {AGE_OPTIONS.find((o) => o.value === ageFilter)?.label ?? 'All time'}
+        </Text>
+        <Feather name="chevron-down" size={12} color={theme.textMuted} />
+      </Pressable>
+
       {/* Count header */}
       {initialLoaded && hasLocation && conditions.length > 0 && (
         <View style={s.countRow}>
@@ -540,6 +626,7 @@ export default function DiscoverConditions() {
               condition={condition}
               distanceMi={distanceMi}
               hasLocation={hasLocation}
+              locationLabel={locationLabels[condition.id]}
             />
           ))
         )}
@@ -716,6 +803,37 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
+  },
+  ageDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  ageDropdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cardLocation: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  ageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   cardTime: {
     fontSize: 11,

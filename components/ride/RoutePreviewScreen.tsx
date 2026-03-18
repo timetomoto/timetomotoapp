@@ -1,5 +1,10 @@
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import {
+  loadFavorites,
+  toggleFavorite as toggleFavoriteApi,
+  type FavoriteLocation,
+} from '../../lib/favorites';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -12,11 +17,6 @@ import { useTheme } from '../../lib/useTheme';
 import { useAuthStore, useGarageStore, useSafetyStore, bikeLabel } from '../../lib/store';
 import { fetchDirections } from '../../lib/directions';
 import type { NavDestination, NavRoute, RoutePreference } from '../../lib/navigationStore';
-import {
-  loadFavorites,
-  toggleFavorite as toggleFavoriteApi,
-  type FavoriteLocation,
-} from '../../lib/favorites';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +36,9 @@ interface Props {
   onTryDifferentRoute?: () => void;
   onNavigateToRideWindow?: () => void;
   isSavedRoute?: boolean;
+  isTripPlannerRoute?: boolean;
+  tripPlannerName?: string;
+  onSaveRoute?: (name: string, route: NavRoute) => void;
   savedRouteStart?: { lat: number; lng: number } | null;
   onGeometryChange?: (geometry: NavRoute['geometry']) => void;
 }
@@ -93,6 +96,9 @@ export default function RoutePreviewScreen({
   onTryDifferentRoute,
   onNavigateToRideWindow,
   isSavedRoute = false,
+  isTripPlannerRoute = false,
+  tripPlannerName,
+  onSaveRoute,
   savedRouteStart,
   onGeometryChange,
 }: Props) {
@@ -174,20 +180,24 @@ export default function RoutePreviewScreen({
     onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
   }, [selectedRoute, crashOn, isMonitoring, locationOn, shareActive, navBikeId, recordRide, setCrashDetectionOverride, setMonitoring, setLocationSharingOverride, onStartNavigation]);
 
+  const [routeSaved, setRouteSaved] = useState(false);
+
+  // Favorites — only for destination search / drop pin (no saved route, no trip planner)
+  const showHeart = !isSavedRoute && !isTripPlannerRoute;
   const [isFavorite, setIsFavorite] = useState(false);
-  const [favList, setFavList] = useState<FavoriteLocation[]>([]);
 
-  // Load favorites once on mount
   useEffect(() => {
+    if (!showHeart) return;
     loadFavorites(userId).then((favs) => {
-      setFavList(favs);
+      setIsFavorite(favs.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
     });
-  }, [userId]);
+  }, [showHeart, userId, destination.name, destination.lat, destination.lng]);
 
-  // Derive isFavorite from local list whenever destination or list changes
-  useEffect(() => {
-    setIsFavorite(favList.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
-  }, [favList, destination.name, destination.lat, destination.lng]);
+  const toggleFavorite = useCallback(async () => {
+    const fav: FavoriteLocation = { name: destination.name, lat: destination.lat, lng: destination.lng };
+    const updated = await toggleFavoriteApi(fav, userId);
+    setIsFavorite(updated.some((f) => f.name === destination.name && f.lat === destination.lat && f.lng === destination.lng));
+  }, [destination.name, destination.lat, destination.lng, userId]);
 
   // Fetch route weather summary
   useEffect(() => {
@@ -238,11 +248,6 @@ export default function RoutePreviewScreen({
       .finally(() => setWeatherLoading(false));
   }, [selectedRoute]);
 
-  const toggleFavorite = useCallback(async () => {
-    const fav: FavoriteLocation = { name: destination.name, lat: destination.lat, lng: destination.lng };
-    const updated = await toggleFavoriteApi(fav, userId);
-    setFavList(updated);
-  }, [destination.name, destination.lat, destination.lng, userId]);
 
   const fetchAlternative = useCallback(async (pill: 'fastest' | 'no_hwy' | 'no_tolls') => {
     if (cacheRef.current[pill]) {
@@ -310,9 +315,11 @@ export default function RoutePreviewScreen({
                 <Text style={[st.destMeta, { color: theme.textSecondary }]}>{formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds)}</Text>
               ) : null}
             </View>
-            <Pressable onPress={toggleFavorite} hitSlop={8} style={st.favBtn}>
-              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? theme.red : theme.textMuted} />
-            </Pressable>
+            {showHeart && (
+              <Pressable onPress={toggleFavorite} hitSlop={8} style={st.favBtn}>
+                <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={22} color={isFavorite ? theme.red : theme.textMuted} />
+              </Pressable>
+            )}
           </View>
 
           {/* Saved route pills */}
@@ -505,6 +512,22 @@ export default function RoutePreviewScreen({
                 <Text style={st.startBtnText}>{recordRide ? 'START & RECORD' : 'START NAVIGATION'}</Text>
               </Pressable>
             )}
+            {isTripPlannerRoute && !isSavedRoute && selectedRoute && onSaveRoute && (
+              <Pressable
+                style={[st.saveRouteBtn, { borderColor: theme.border }]}
+                onPress={() => {
+                  const name = tripPlannerName || destination.name;
+                  onSaveRoute(name, selectedRoute);
+                  setRouteSaved(true);
+                }}
+                disabled={routeSaved}
+              >
+                <Feather name={routeSaved ? 'check' : 'bookmark'} size={14} color={routeSaved ? theme.green : theme.textSecondary} />
+                <Text style={[st.saveRouteBtnText, { color: routeSaved ? theme.green : theme.textSecondary }]}>
+                  {routeSaved ? 'ROUTE SAVED' : 'SAVE ROUTE'}
+                </Text>
+              </Pressable>
+            )}
             <Pressable style={st.cancelBtn} onPress={onCancel}>
               <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
             </Pressable>
@@ -618,6 +641,16 @@ const st = StyleSheet.create({
   },
   startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 15 },
   startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  saveRouteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  saveRouteBtnText: { fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
   cancelBtn: { alignItems: 'center', paddingVertical: 6 },
   cancelBtnText: { fontSize: 14 },
 });

@@ -382,6 +382,7 @@ export default function RideScreen() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const [tripPlannerOpen, setTripPlannerOpen] = useState(false);
+  const [tripPlannerRouteName, setTripPlannerRouteName] = useState<string | null>(null);
   const [lastSearchQuery, setLastSearchQuery] = useState('');
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -714,6 +715,7 @@ export default function RideScreen() {
   async function fetchAndPreviewRoute(dest: { name: string; lat: number; lng: number }, prefOverride?: import('../../lib/navigationStore').RoutePreference) {
     // Reset preference to fastest for each new route
     if (!prefOverride) setRoutePreference('fastest');
+    setTripPlannerRouteName(null);
     setDestination(dest);
     setNavMode('preview');
     setIsSavedRoutePreview(false);
@@ -893,7 +895,7 @@ export default function RideScreen() {
       const miles   = calcDistance(recordedPoints);
       const gainFt  = 0;
       try {
-        const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, undefined, 'recorded', recordingBikeIdRef.current);
+        const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, 'Recorded Rides', 'recorded', recordingBikeIdRef.current);
         if (saved) {
           addRoute(saved);
           showToast('Ride saved!');
@@ -1433,6 +1435,15 @@ export default function RideScreen() {
               setSearchSheetOpen(true);
             }}
             isSavedRoute={isSavedRoutePreview}
+            isTripPlannerRoute={!!tripPlannerRouteName}
+            tripPlannerName={tripPlannerRouteName ?? undefined}
+            onSaveRoute={async (name, route) => {
+              if (!user) return;
+              try {
+                const saved = await createRoute(user.id, name, route.geometry.coordinates.map(([lng, lat]) => ({ lat, lng, time: new Date().toISOString() })), route.distanceMiles, 0, route.durationSeconds, 'Planned Rides', 'planned');
+                if (saved) { addRoute(saved); showToast('Route saved to Planned Rides'); }
+              } catch { showToast('Could not save route'); }
+            }}
             savedRouteStart={savedRouteStartRef.current}
             onGeometryChange={(geo) => setNavRouteGeojson(geo)}
           />
@@ -1540,6 +1551,7 @@ export default function RideScreen() {
         onPlanRoute={(origin, dest, wps) => {
           setTripPlannerOpen(false);
           setRoutePreference('fastest');
+          setTripPlannerRouteName(`${origin.name.split(',')[0]} → ${dest.name.split(',')[0]}`);
           setDestination(dest);
           setNavMode('preview');
           setIsSavedRoutePreview(false);

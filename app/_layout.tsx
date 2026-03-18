@@ -188,7 +188,7 @@ function SafetyService() {
       Location.requestForegroundPermissionsAsync().then(({ status }) => {
         if (status !== 'granted') return;
         Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 5 },
+          { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 0 },
           (loc) => {
             const pt: TrackPoint = {
               lat:  loc.coords.latitude,

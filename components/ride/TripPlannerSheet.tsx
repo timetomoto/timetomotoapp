@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTheme } from '../../lib/useTheme';
 import { useAuthStore } from '../../lib/store';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
@@ -274,30 +276,48 @@ export default function TripPlannerSheet({ visible, onClose, onPlanRoute, userLo
             </Pressable>
 
             {/* Swap button */}
-            <Pressable style={[s.swapBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={swapOriginDest}>
-              <Feather name="repeat" size={16} color={theme.textSecondary} />
+            <Pressable style={s.swapWrap} onPress={swapOriginDest}>
+              <View style={[s.swapBtn, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                <Feather name="repeat" size={16} color={theme.textSecondary} />
+              </View>
+              <Text style={[s.swapLabel, { color: theme.textMuted }]}>Swap starting point &amp; destination</Text>
             </Pressable>
 
-            {/* Waypoints */}
-            {waypoints.map((wp, idx) => (
-              <View key={idx} style={s.waypointRow}>
-                <Pressable
-                  style={[s.field, { backgroundColor: theme.bgCard, borderColor: theme.border, flex: 1 }]}
-                  onPress={() => setActiveField(idx)}
-                >
-                  <View style={[s.fieldDot, { backgroundColor: theme.orange }]} />
-                  <Text
-                    style={[s.fieldText, { color: wp ? theme.textPrimary : theme.textMuted }]}
-                    numberOfLines={1}
-                  >
-                    {wp?.name ?? `Stop ${idx + 1}`}
-                  </Text>
-                </Pressable>
-                <Pressable onPress={() => removeWaypoint(idx)} hitSlop={8} style={s.removeWp}>
-                  <Feather name="x-circle" size={18} color={theme.textMuted} />
-                </Pressable>
-              </View>
-            ))}
+            {/* Waypoints — draggable */}
+            {waypoints.length > 0 && (
+              <GestureHandlerRootView>
+                <DraggableFlatList
+                  data={waypoints.map((wp, i) => ({ wp, idx: i }))}
+                  keyExtractor={(item) => String(item.idx)}
+                  scrollEnabled={false}
+                  onDragEnd={({ data }) => {
+                    setWaypoints(data.map((d) => d.wp));
+                  }}
+                  renderItem={({ item, drag, isActive }: RenderItemParams<{ wp: Location | null; idx: number }>) => (
+                    <View style={[s.waypointRow, isActive && { opacity: 0.85, transform: [{ scale: 1.02 }] }]}>
+                      <Pressable
+                        style={[s.field, { backgroundColor: theme.bgCard, borderColor: theme.border, flex: 1 }]}
+                        onPress={() => setActiveField(item.idx)}
+                      >
+                        <View style={[s.fieldDot, { backgroundColor: theme.orange }]} />
+                        <Text
+                          style={[s.fieldText, { color: item.wp ? theme.textPrimary : theme.textMuted }]}
+                          numberOfLines={1}
+                        >
+                          {item.wp?.name ?? `Stop ${item.idx + 1}`}
+                        </Text>
+                      </Pressable>
+                      <Pressable onPress={() => removeWaypoint(item.idx)} hitSlop={6} style={s.removeWp}>
+                        <Feather name="x-circle" size={16} color={theme.textMuted} />
+                      </Pressable>
+                      <Pressable onLongPress={drag} delayLongPress={150} hitSlop={6} style={s.dragHandle}>
+                        <Feather name="menu" size={16} color={theme.textMuted} />
+                      </Pressable>
+                    </View>
+                  )}
+                />
+              </GestureHandlerRootView>
+            )}
 
             {/* Add stop */}
             <Pressable style={s.addStopBtn} onPress={addWaypoint}>
@@ -436,16 +456,24 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  swapBtn: {
+  swapWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'center',
+    gap: 8,
+    marginVertical: -4,
+    zIndex: 1,
+  },
+  swapLabel: {
+    fontSize: 11,
+  },
+  swapBtn: {
     borderWidth: 1,
     borderRadius: 20,
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: -4,
-    zIndex: 1,
   },
   waypointRow: {
     flexDirection: 'row',
@@ -453,6 +481,9 @@ const s = StyleSheet.create({
     gap: 8,
   },
   removeWp: {
+    padding: 4,
+  },
+  dragHandle: {
     padding: 4,
   },
   addStopBtn: {
