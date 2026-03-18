@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -46,6 +47,7 @@ export default function FavoriteLocationsScreen() {
   const [searchResults, setSearchResults] = useState<Array<{ name: string; lat: number; lng: number }>>([]);
   const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
   const [nickname, setNickname] = useState('');
+  const [makeHome, setMakeHome] = useState(false);
   const [saving, setSaving] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<TextInput>(null);
@@ -64,6 +66,7 @@ export default function FavoriteLocationsScreen() {
     setSearchResults([]);
     setSelectedLocation(null);
     setNickname('');
+    setMakeHome(false);
     Animated.timing(addViewAnim, {
       toValue: 1,
       duration: 280,
@@ -123,7 +126,12 @@ export default function FavoriteLocationsScreen() {
         ...selectedLocation,
         nickname: nickname.trim() || null,
       };
-      const updated = await addFavorite(favToAdd, userId);
+      let updated = await addFavorite(favToAdd, userId);
+      if (makeHome) {
+        // Find the just-added favorite and set as home
+        const added = updated.find((f) => f.lat === favToAdd.lat && f.lng === favToAdd.lng);
+        if (added) updated = await setAsHome(added, userId);
+      }
       setFavorites(updated);
       closeAddView();
     } catch {
@@ -326,6 +334,31 @@ export default function FavoriteLocationsScreen() {
                   value={nickname}
                   onChangeText={setNickname}
                   returnKeyType="done"
+                />
+              </View>
+            )}
+
+            {/* Set as Home toggle */}
+            {selectedLocation && (
+              <View style={[s.homeToggleRow, { borderColor: theme.border }]}>
+                <View style={s.homeToggleLeft}>
+                  <Feather name="home" size={16} color={makeHome ? theme.green : theme.textMuted} />
+                  <View>
+                    <Text style={[s.homeToggleLabel, { color: theme.textPrimary }]}>
+                      {favorites.some((f) => f.is_home) ? 'Replace current Home' : 'Set as Home'}
+                    </Text>
+                    {favorites.some((f) => f.is_home) && (
+                      <Text style={[s.homeToggleSub, { color: theme.textMuted }]}>
+                        Current: {favorites.find((f) => f.is_home)?.nickname || favorites.find((f) => f.is_home)?.name}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                <Switch
+                  value={makeHome}
+                  onValueChange={setMakeHome}
+                  thumbColor={makeHome ? theme.toggleThumbOn : theme.toggleThumbOff}
+                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
                 />
               </View>
             )}
@@ -552,6 +585,32 @@ const s = StyleSheet.create({
   nicknameInput: {
     fontSize: 14,
     padding: 0,
+  },
+
+  // Home toggle
+  homeToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  homeToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  homeToggleLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  homeToggleSub: {
+    fontSize: 11,
+    marginTop: 1,
   },
 
   // Favorites list

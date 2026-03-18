@@ -58,7 +58,7 @@ import SearchSheet from '../../components/ride/SearchSheet';
 import TripPlannerSheet from '../../components/ride/TripPlannerSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
-import RouteWeatherStrip from '../../components/ride/RouteWeatherStrip';
+import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type RouteWeatherPoint } from '../../lib/routeWeather';
 import NavigationStatsBar from '../../components/ride/NavigationStatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
@@ -423,6 +423,11 @@ export default function RideScreen() {
     dismissDroppedPin();
     fetchAndPreviewRoute(dest);
   }
+
+  // ── Nav weather banner ──
+  const [navWeatherBanner, setNavWeatherBanner] = useState<{ msg: string; severe: boolean } | null>(null);
+  const hasShownWeatherWarning = useRef(false);
+  const navWeatherFadeAnim = useRef(new RNAnimated.Value(1)).current;
 
   // ── Overlay toggles ──
   const [fuelStationsOn, setFuelStationsOn] = useState(false);
@@ -988,6 +993,38 @@ export default function RideScreen() {
 
   const isNavigatingActive = navMode === 'navigating' || navMode === 'off_route' || navMode === 'recalculating';
 
+  // Fetch route weather once when navigation starts
+  useEffect(() => {
+    if (!isNavigatingActive || !activeRoute || hasShownWeatherWarning.current) return;
+    const coords = activeRoute.geometry.coordinates;
+    if (coords.length < 2) return;
+    fetchRouteWeather(coords)
+      .then(({ points, useCelsius }) => {
+        if (hasShownWeatherWarning.current) return;
+        if (!hasRouteWeatherConcern(points, useCelsius)) return;
+        const msg = getRouteWarningMessage(points, useCelsius);
+        if (!msg) return;
+        // Check severity
+        const severe = points.some((p) => p.weatherCode >= 5000 || p.temp < (useCelsius ? 2 : 35));
+        hasShownWeatherWarning.current = true;
+        navWeatherFadeAnim.setValue(1);
+        setNavWeatherBanner({ msg, severe });
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          RNAnimated.timing(navWeatherFadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }).start(() => {
+            setNavWeatherBanner(null);
+          });
+        }, 5000);
+      })
+      .catch(() => {});
+  }, [isNavigatingActive, activeRoute]);
+
+  // Reset warning flag when navigation ends
+  useEffect(() => {
+    if (!isNavigatingActive) hasShownWeatherWarning.current = false;
+  }, [isNavigatingActive]);
+
+
   return (
     <View style={[styles.root, { backgroundColor: theme.bg }]}>
       {/* ── Full-screen map ── */}
@@ -1156,6 +1193,14 @@ export default function RideScreen() {
           </Pressable>
         </View>}
 
+        {/* ── Nav weather warning banner ── */}
+        {navWeatherBanner && (
+          <RNAnimated.View style={[styles.navWeatherBanner, { backgroundColor: navWeatherBanner.severe ? theme.red : '#FF9800', opacity: navWeatherFadeAnim }]}>
+            <Feather name="alert-triangle" size={14} color="#fff" />
+            <Text style={styles.navWeatherBannerText}>{navWeatherBanner.msg}</Text>
+          </RNAnimated.View>
+        )}
+
         {/* ── Floating turn card (left side, during navigation) ── */}
         {isNavigatingActive && (
           <TurnCard
@@ -1163,13 +1208,6 @@ export default function RideScreen() {
             isOffRoute={navMode === 'off_route'}
             isRecalculating={navMode === 'recalculating'}
           />
-        )}
-
-        {/* ── Route weather strip (during navigation) ── */}
-        {isNavigatingActive && activeRoute && (
-          <View style={styles.navWeatherWrap}>
-            <RouteWeatherStrip coordinates={activeRoute.geometry.coordinates} compact />
-          </View>
         )}
 
         {/* ── Top header bar ── */}
@@ -1776,12 +1814,24 @@ const styles = StyleSheet.create({
   },
 
   // Navigation weather strip
-  navWeatherWrap: {
+  navWeatherBanner: {
     position: 'absolute',
-    top: 130,
-    left: 0,
-    right: 0,
+    top: 100,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     zIndex: 9985,
+  },
+  navWeatherBannerText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
 
   // Dropped pin

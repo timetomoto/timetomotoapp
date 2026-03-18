@@ -67,7 +67,7 @@ const PREFERENCE_PILLS: { key: RoutePreference; label: string }[] = [
   { key: 'fastest', label: 'FASTEST' },
   { key: 'scenic', label: 'SCENIC' },
   { key: 'no_highway', label: 'NO HWY' },
-  { key: 'offroad', label: 'OFFROAD' },
+  { key: 'offroad', label: 'BACK ROADS' },
 ];
 
 const SAVED_ROUTE_PILLS: { key: SavedRoutePill; label: string }[] = [
@@ -358,24 +358,53 @@ export default function RoutePreviewScreen({
               </Pressable>
             </View>
           ) : !isSavedRoute && routes.length > 1 ? (
-            <View style={st.routeCards}>
-              {routes.map((route, idx) => {
-                const active = selectedRouteIdx === idx;
-                const label = idx === 0 ? 'RECOMMENDED' : route.distanceMiles < routes[0].distanceMiles ? 'SHORTER' : route.durationSeconds < routes[0].durationSeconds ? 'FASTER' : `ALT ${idx}`;
-                return (
-                  <Pressable
-                    key={idx}
-                    style={[st.routeCard, { backgroundColor: active ? theme.red + '12' : theme.bgCard, borderColor: active ? theme.red : theme.border }]}
-                    onPress={() => setSelectedRouteIdx(idx)}
-                  >
-                    <Text style={[st.routeCardLabel, { color: active ? theme.red : theme.textMuted }]}>{label}</Text>
-                    <Text style={[st.routeCardDist, { color: theme.textPrimary }]}>{formatDistance(route.distanceMiles)}</Text>
-                    <Text style={[st.routeCardEta, { color: theme.textSecondary }]}>{formatDuration(route.durationSeconds)}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            (() => {
+              const rec = routes[0];
+              const meaningful: { idx: number; label: string }[] = [];
+
+              for (let i = 1; i < routes.length; i++) {
+                const durationDiff = (rec.durationSeconds - routes[i].durationSeconds) / rec.durationSeconds;
+                const distanceDiff = (rec.distanceMiles - routes[i].distanceMiles) / rec.distanceMiles;
+                // Only show if >5% different in either dimension
+                if (Math.abs(durationDiff) > 0.05 || Math.abs(distanceDiff) > 0.05) {
+                  const label = durationDiff > 0.05 ? 'FASTEST' : distanceDiff > 0.05 ? 'SHORTEST' : 'ALTERNATE';
+                  // Avoid duplicate labels
+                  if (!meaningful.some((m) => m.label === label)) {
+                    meaningful.push({ idx: i, label });
+                  }
+                }
+              }
+
+              const cards = [{ idx: 0, label: meaningful.length > 0 ? 'RECOMMENDED' : 'YOUR ROUTE' }, ...meaningful];
+
+              return (
+                <View style={cards.length > 1 ? st.routeCards : st.routeCardSingle}>
+                  {cards.map(({ idx, label }) => {
+                    const route = routes[idx];
+                    const active = selectedRouteIdx === idx;
+                    return (
+                      <Pressable
+                        key={idx}
+                        style={[st.routeCard, { backgroundColor: active ? theme.red + '12' : theme.bgCard, borderColor: active ? theme.red : theme.border }]}
+                        onPress={() => setSelectedRouteIdx(idx)}
+                      >
+                        <Text style={[st.routeCardLabel, { color: active ? theme.red : theme.textMuted }]}>{label}</Text>
+                        <Text style={[st.routeCardDist, { color: theme.textPrimary }]}>{formatDistance(route.distanceMiles)}</Text>
+                        <Text style={[st.routeCardEta, { color: theme.textSecondary }]}>{formatDuration(route.durationSeconds)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              );
+            })()
           ) : null}
+
+          {/* Back roads disclaimer */}
+          {!loading && !error && routePreference === 'offroad' && (
+            <Text style={[st.backRoadsNote, { color: theme.textMuted }]}>
+              Prefers smaller roads — ETA estimated
+            </Text>
+          )}
 
           {/* Route weather summary */}
           {!loading && !error && selectedRoute && (
@@ -416,7 +445,7 @@ export default function RoutePreviewScreen({
           {/* Bike selector */}
           {!loading && !error && bikes.length > 0 && (
             <View style={st.bikeSelector}>
-              <Text style={[st.bikeSelectorLabel, { color: theme.textSecondary }]}>RIDE WITH</Text>
+              <Text style={[st.bikeSelectorLabel, { color: theme.textSecondary }]}>RIDING</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.bikePills}>
                 {bikes.map((bike) => {
                   const active = bike.id === navBikeId;
@@ -542,11 +571,13 @@ const st = StyleSheet.create({
   tryAgainText: { fontSize: 13, fontWeight: '600' },
 
   routeCards: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 8 },
+  routeCardSingle: { paddingHorizontal: 16, paddingTop: 8 },
   routeCard: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center' },
   routeCardLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
   routeCardDist: { fontSize: 17, fontWeight: '700' },
   routeCardEta: { fontSize: 12, marginTop: 2 },
 
+  backRoadsNote: { fontSize: 11, paddingHorizontal: 20, paddingTop: 6 },
   weatherLine: { paddingHorizontal: 20, paddingVertical: 10 },
   weatherMsgRow: { flexDirection: 'row', alignItems: 'center' },
   weatherText: { fontSize: 13, lineHeight: 18 },

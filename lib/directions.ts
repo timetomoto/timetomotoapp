@@ -47,7 +47,9 @@ export async function fetchDirections(
   });
 
   // Apply route preference via avoid params
-  if (preference === 'no_highway' || preference === 'scenic') {
+  if (preference === 'scenic') {
+    params.set('exclude', 'motorway,ferry');
+  } else if (preference === 'no_highway') {
     params.set('exclude', 'motorway');
   } else if (preference === 'no_tolls') {
     params.set('exclude', 'toll');
@@ -94,11 +96,15 @@ export async function fetchDirections(
       };
     });
 
+    // Cycling profile returns bicycle ETAs — scale down for motorcycle on back roads
+    const rawDuration = r.duration ?? 0;
+    const adjustedDuration = profile === 'cycling' ? rawDuration / 3.5 : rawDuration;
+
     return {
       geometry: r.geometry as { type: 'LineString'; coordinates: [number, number][] },
       steps,
       distanceMiles: (r.distance ?? 0) / 1609.344,
-      durationSeconds: r.duration ?? 0,
+      durationSeconds: adjustedDuration,
     };
   });
 }
