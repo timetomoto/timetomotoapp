@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import DiscoverNews from '../../components/discover/DiscoverNews';
+import DiscoverNews from '../../components/trip/DiscoverNews';
 import WeatherContent from '../../components/weather/WeatherContent';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';

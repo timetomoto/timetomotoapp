@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import DiscoverRoutes from '../../components/discover/DiscoverRoutes';
-import TripPlanner from '../../components/discover/TripPlanner';
+import DiscoverRoutes from '../../components/trip/DiscoverRoutes';
+import TripPlanner from '../../components/trip/TripPlanner';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import { useTheme } from '../../lib/useTheme';
@@ -53,20 +53,20 @@ export default function DiscoverScreen() {
   const { theme } = useTheme();
   const [subTab, setSubTab] = useState<SubTab>('TRIP PLANNER');
   const [menuOpen, setMenuOpen] = useState(false);
-  const discoverReset = useTabResetStore((s) => s.discoverReset);
-  const pendingDiscoverSubTab = useTabResetStore((s) => s.pendingDiscoverSubTab);
-  const setPendingDiscoverSubTab = useTabResetStore((s) => s.setPendingDiscoverSubTab);
+  const tripReset = useTabResetStore((s) => s.tripReset);
+  const pendingTripSubTab = useTabResetStore((s) => s.pendingTripSubTab);
+  const setPendingTripSubTab = useTabResetStore((s) => s.setPendingTripSubTab);
 
   useEffect(() => {
-    if (discoverReset > 0) setSubTab('TRIP PLANNER');
-  }, [discoverReset]);
+    if (tripReset > 0) setSubTab('TRIP PLANNER');
+  }, [tripReset]);
 
   useEffect(() => {
-    if (pendingDiscoverSubTab === 'trip-planner') {
+    if (pendingTripSubTab === 'trip-planner') {
       setSubTab('TRIP PLANNER');
-      setPendingDiscoverSubTab(null);
+      setPendingTripSubTab(null);
     }
-  }, [pendingDiscoverSubTab]);
+  }, [pendingTripSubTab]);
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.bg }]} edges={['top']}>

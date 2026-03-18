@@ -397,22 +397,22 @@ interface TabResetState {
   rideReset: number;
   weatherReset: number;
   garageReset: number;
-  discoverReset: number;
+  tripReset: number;
   pendingWeatherSubTab: 'current' | 'ride-window' | null;
-  pendingDiscoverSubTab: 'trip-planner' | null;
-  resetTab: (tab: 'ride' | 'weather' | 'garage' | 'discover') => void;
+  pendingTripSubTab: 'trip-planner' | null;
+  resetTab: (tab: 'ride' | 'weather' | 'garage' | 'trip') => void;
   setPendingWeatherSubTab: (tab: 'current' | 'ride-window' | null) => void;
-  setPendingDiscoverSubTab: (tab: 'trip-planner' | null) => void;
+  setPendingTripSubTab: (tab: 'trip-planner' | null) => void;
 }
 
 export const useTabResetStore = create<TabResetState>((set) => ({
   rideReset: 0,
   weatherReset: 0,
   garageReset: 0,
-  discoverReset: 0,
+  tripReset: 0,
   pendingWeatherSubTab: null,
-  pendingDiscoverSubTab: null,
+  pendingTripSubTab: null,
   resetTab: (tab) => set((s) => ({ [`${tab}Reset`]: s[`${tab}Reset` as keyof TabResetState] as number + 1 })),
   setPendingWeatherSubTab: (tab) => set({ pendingWeatherSubTab: tab }),
-  setPendingDiscoverSubTab: (tab) => set({ pendingDiscoverSubTab: tab }),
+  setPendingTripSubTab: (tab) => set({ pendingTripSubTab: tab }),
 }));

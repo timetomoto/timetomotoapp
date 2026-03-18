@@ -50,7 +50,7 @@ export default function TabLayout() {
         })}
       />
       <Tabs.Screen
-        name="discover"
+        name="trip"
         options={{
           title: 'TRIP',
           tabBarIcon: ({ color, size }) => (
@@ -60,7 +60,7 @@ export default function TabLayout() {
         listeners={() => ({
           tabPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            resetTab('discover');
+            resetTab('trip');
           },
         })}
       />

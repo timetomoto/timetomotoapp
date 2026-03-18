@@ -1245,8 +1245,8 @@ export default function RideScreen() {
           <Pressable
             style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             onPress={() => {
-              useTabResetStore.getState().setPendingDiscoverSubTab('trip-planner');
-              router.navigate('/(tabs)/discover' as any);
+              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+              router.navigate('/(tabs)/trip' as any);
             }}
           >
             <Feather name="map" size={20} color={theme.textPrimary} />
@@ -1434,8 +1434,8 @@ export default function RideScreen() {
             onNavigateToRideWindow={() => {
               resetNavigation();
               setPendingWeatherSubTab('ride-window');
-              useTabResetStore.getState().setPendingDiscoverSubTab('trip-planner');
-              router.navigate('/(tabs)/discover' as any);
+              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+              router.navigate('/(tabs)/trip' as any);
             }}
             onTryDifferentRoute={() => {
               setIsSavedRoutePreview(false);
