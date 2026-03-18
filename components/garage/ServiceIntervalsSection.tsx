@@ -199,15 +199,13 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
         style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
         onPress={() => setCollapsed((p) => !p)}
       >
-        <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>SERVICE INTERVALS</Text>
-        <View style={s.collapseRight}>
-          {collapsed && itemCount > 0 && (
-            <View style={[s.countBadge, { backgroundColor: theme.red }]}>
-              <Text style={s.countText}>{itemCount}</Text>
-            </View>
-          )}
-          <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.textSecondary} />
-        </View>
+        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
+        <Text style={[s.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SERVICE INTERVALS</Text>
+        {collapsed && itemCount > 0 && (
+          <View style={[s.countBadge, { backgroundColor: theme.red }]}>
+            <Text style={s.countText}>{itemCount}</Text>
+          </View>
+        )}
       </Pressable>
 
       {!collapsed && (<View>

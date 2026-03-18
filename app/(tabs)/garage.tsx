@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -18,12 +19,64 @@ import ModificationsSection from '../../components/garage/ModificationsSection';
 import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSection';
 import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
+import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
+
+// ---------------------------------------------------------------------------
+// Draggable service section list
+// ---------------------------------------------------------------------------
+
+type ServiceSection = 'specs' | 'intervals' | 'bulletins';
+
+function ServiceSectionList({
+  bike,
+  order,
+  onReorder,
+}: {
+  bike: any;
+  order: ServiceSection[];
+  onReorder: (next: ServiceSection[]) => void;
+}) {
+  const { theme } = useTheme();
+
+  const renderItem = useCallback(({ item, drag, isActive }: RenderItemParams<ServiceSection>) => (
+    <View style={[{ backgroundColor: isActive ? theme.bgPanel : 'transparent' }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          {item === 'specs' && <SpecificationsSection bike={bike} />}
+          {item === 'intervals' && <ServiceIntervalsSection bike={bike} />}
+          {item === 'bulletins' && <ServiceBulletinsSection bike={bike} />}
+        </View>
+        <Pressable onLongPress={drag} delayLongPress={150} hitSlop={8} style={{ paddingTop: 14, paddingRight: 12 }}>
+          <Feather name="menu" size={16} color={theme.textMuted} />
+        </Pressable>
+      </View>
+      <View style={[{ height: 1, marginHorizontal: 16, backgroundColor: theme.border }]} />
+    </View>
+  ), [bike, theme]);
+
+  return (
+    <GestureHandlerRootView>
+      <DraggableFlatList
+        data={order}
+        keyExtractor={(item) => item}
+        renderItem={renderItem}
+        onDragEnd={({ data }) => onReorder(data)}
+        scrollEnabled={false}
+      />
+    </GestureHandlerRootView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
 
 export default function GarageScreen() {
   const { theme } = useTheme();
@@ -38,11 +91,26 @@ export default function GarageScreen() {
     if (garageReset > 0) setActiveSection('MAINTENANCE');
   }, [garageReset]);
 
+  const DEFAULT_SERVICE_ORDER: ServiceSection[] = ['specs', 'intervals', 'bulletins'];
+  const [serviceSectionOrder, setServiceSectionOrder] = useState<ServiceSection[]>(DEFAULT_SERVICE_ORDER);
+
+  const selectedBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
+
+  useEffect(() => {
+    if (!selectedBike) return;
+    AsyncStorage.getItem(`@ttm/service_section_order_${selectedBike.id}`).then((stored) => {
+      if (stored) {
+        try { setServiceSectionOrder(JSON.parse(stored)); } catch { setServiceSectionOrder(DEFAULT_SERVICE_ORDER); }
+      } else {
+        setServiceSectionOrder(DEFAULT_SERVICE_ORDER);
+      }
+    });
+  }, [selectedBike?.id]);
+
+
   useEffect(() => {
     fetchBikes(user?.id ?? 'local');
   }, [user]);
-
-  const selectedBike = bikes.find((b) => b.id === selectedBikeId);
 
   // Fetch Wikimedia default photo when no user-uploaded photo
   const [wikiPhotos, setWikiPhotos] = useState<Record<string, string>>({});
@@ -266,13 +334,14 @@ export default function GarageScreen() {
                 <ModificationsSection bikeId={selectedBike.id} userId={user?.id} />
               )}
               {activeSection === 'SERVICE' && selectedBike && (
-                <>
-                  <SpecificationsSection bike={selectedBike} />
-                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
-                  <ServiceIntervalsSection bike={selectedBike} />
-                  <View style={[styles.serviceDivider, { backgroundColor: theme.border }]} />
-                  <ServiceBulletinsSection bike={selectedBike} />
-                </>
+                <ServiceSectionList
+                  bike={selectedBike}
+                  order={serviceSectionOrder}
+                  onReorder={(next) => {
+                    setServiceSectionOrder(next);
+                    AsyncStorage.setItem(`@ttm/service_section_order_${selectedBike.id}`, JSON.stringify(next));
+                  }}
+                />
               )}
             </View>
           )}

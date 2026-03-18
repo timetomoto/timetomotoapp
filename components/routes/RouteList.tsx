@@ -55,6 +55,18 @@ function fmtDate(iso: string | null | undefined) {
 
 const UNCATEGORIZED = '__uncategorized__';
 const CATEGORY_ORDER_KEY = 'ttm_route_category_order';
+const ROUTE_SORT_KEY = (userId: string) => `@ttm/routes_sort_order_${userId}`;
+
+function applyPersistedOrder(routes: Route[], savedOrder: string[]): Route[] {
+  if (!savedOrder.length) return routes;
+  const orderMap = new Map(savedOrder.map((id, i) => [id, i]));
+  const ordered = [...routes].sort((a, b) => {
+    const aIdx = orderMap.get(a.id) ?? Infinity;
+    const bIdx = orderMap.get(b.id) ?? Infinity;
+    return aIdx - bIdx;
+  });
+  return ordered;
+}
 
 type SortMode = 'name' | 'distance' | 'elevation';
 const SORT_OPTIONS: { key: SortMode; label: string; icon: keyof typeof Feather.glyphMap }[] = [
@@ -360,18 +372,15 @@ function CategoryHeader({
       style={[
         styles.categoryHeader,
         { borderBottomColor: isExpanded ? theme.border : 'transparent' },
-        isDragging && {
-          backgroundColor: theme.bgCard,
-          shadowColor: '#000',
-          shadowOpacity: 0.4,
-          shadowRadius: 8,
-          elevation: 6,
-          opacity: 0.95,
-        },
       ]}
       onPress={onToggle}
-      onLongPress={onLongPress}
     >
+      <Feather
+        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+        size={16}
+        color={theme.textSecondary}
+        style={{ marginRight: 8 }}
+      />
       <Text style={[styles.categoryLabel, { color: theme.textSecondary }]}>
         {isUncategorized ? 'UNCATEGORIZED' : label.toUpperCase()}
       </Text>
@@ -383,19 +392,17 @@ function CategoryHeader({
         )}
         {!isUncategorized && (
           <>
-            <Pressable onPress={() => onRenameCategory(label)} hitSlop={8}>
+            <Pressable onPress={() => onRenameCategory(label)} hitSlop={6} style={{ padding: 4 }}>
               <Feather name="edit-2" size={12} color={theme.textMuted} />
             </Pressable>
-            <Pressable onPress={() => onDeleteCategory(label)} hitSlop={8}>
+            <Pressable onPress={() => onDeleteCategory(label)} hitSlop={6} style={{ padding: 4 }}>
               <Feather name="trash-2" size={12} color={theme.red} />
             </Pressable>
           </>
         )}
-        <Feather
-          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-          size={18}
-          color={theme.textSecondary}
-        />
+        <Pressable onLongPress={onLongPress} delayLongPress={150} hitSlop={6} style={{ padding: 4 }}>
+          <Feather name="menu" size={16} color={theme.textMuted} />
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -484,12 +491,14 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+  const [routeSortOrder, setRouteSortOrder] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name');
   const orderLoadedRef = useRef(false);
   const autoExpandedRef = useRef(false);
+  const userId = user?.id ?? 'local';
 
-  // Load persisted category order
+  // Load persisted category order + route sort order
   useEffect(() => {
     AsyncStorage.getItem(CATEGORY_ORDER_KEY).then((stored) => {
       if (stored) {
@@ -497,17 +506,23 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
       }
       orderLoadedRef.current = true;
     });
-  }, []);
+    AsyncStorage.getItem(ROUTE_SORT_KEY(userId)).then((stored) => {
+      if (stored) {
+        try { setRouteSortOrder(JSON.parse(stored)); } catch { /* ignore */ }
+      }
+    });
+  }, [userId]);
 
   const { bikes } = useGarageStore();
   const bikesById = new Map(bikes.map((b) => [b.id, b]));
 
   const query = searchQuery.trim().toLowerCase();
+  const sortedRoutes = routeSortOrder.length > 0 ? applyPersistedOrder(routes, routeSortOrder) : routes;
   const filteredRoutes = query
-    ? routes.filter((r) =>
+    ? sortedRoutes.filter((r) =>
         r.name.toLowerCase().includes(query) ||
         (r.category ?? '').toLowerCase().includes(query))
-    : routes;
+    : sortedRoutes;
   const savedRides = filteredRoutes.filter((r) => r.source === 'recorded');
   const otherRoutes = filteredRoutes.filter((r) => r.source !== 'recorded');
   const grouped = groupRoutes(otherRoutes);
@@ -636,7 +651,11 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
   const handleDragEnd = useCallback(({ data }: { data: string[] }) => {
     setCategoryOrder(data);
     AsyncStorage.setItem(CATEGORY_ORDER_KEY, JSON.stringify(data));
-  }, []);
+    // Persist route order based on new category arrangement
+    const allIds = data.flatMap((cat) => (grouped.get(cat) ?? []).map((r) => r.id));
+    setRouteSortOrder(allIds);
+    AsyncStorage.setItem(ROUTE_SORT_KEY(userId), JSON.stringify(allIds));
+  }, [grouped, userId]);
 
   const renderCategoryItem = useCallback(({ item, drag, isActive }: RenderItemParams<string>) => {
     const rawRoutes = grouped.get(item) ?? [];
@@ -647,7 +666,11 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
     if (query && rawRoutes.length === 0) return null;
 
     return (
-      <View style={styles.categorySection}>
+      <View style={[
+        styles.categoryCard,
+        { backgroundColor: theme.bgCard, borderColor: theme.border },
+        isActive && { shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+      ]}>
         <CategoryHeader
           label={item}
           count={rawRoutes.length}
@@ -658,18 +681,22 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
           onRenameCategory={handleRenameCategory}
           onDeleteCategory={handleDeleteCategory}
         />
-        {isExpanded && categoryRoutes.map((route) => (
-          <RouteCard
-            key={route.id}
-            route={route}
-            categories={allCategories}
-            onNavigate={() => onNavigate(route)}
-            onExport={() => handleExport(route)}
-            onDelete={() => handleDelete(route)}
-            onRename={() => handleRename(route)}
-            onMoveCategory={(cat) => handleMoveCategory(route, cat)}
-          />
-        ))}
+        {isExpanded && (
+          <View style={styles.categoryContent}>
+            {categoryRoutes.map((route) => (
+              <RouteCard
+                key={route.id}
+                route={route}
+                categories={allCategories}
+                onNavigate={() => onNavigate(route)}
+                onExport={() => handleExport(route)}
+                onDelete={() => handleDelete(route)}
+                onRename={() => handleRename(route)}
+                onMoveCategory={(cat) => handleMoveCategory(route, cat)}
+              />
+            ))}
+          </View>
+        )}
       </View>
     );
   }, [grouped, expandedCategories, allCategories, sortMode, onNavigate, query]);
@@ -681,9 +708,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
         keyExtractor={(item) => item}
         onDragEnd={handleDragEnd}
         renderItem={renderCategoryItem}
-        ItemSeparatorComponent={() => (
-          <View style={[styles.categoryDivider, { backgroundColor: theme.border }]} />
-        )}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         contentContainerStyle={styles.content}
         removeClippedSubviews={true}
         maxToRenderPerBatch={10}
@@ -694,7 +719,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
             {headerExtra}
 
             {/* Toolbar row: folder + import + search */}
-            {!loading && routes.length > 0 && (
+            {(
               <View style={styles.toolbarRow}>
                 {onNewCategory && (
                   <Pressable
@@ -783,7 +808,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
 
             {/* Divider between saved rides and route categories */}
             {showSavedRides && !loading && savedRides.length > 0 && otherRoutes.length > 0 && (
-              <View style={[styles.categoryDivider, { backgroundColor: theme.border }]} />
+              <View style={{ height: 1, marginHorizontal: 16, backgroundColor: theme.border }} />
             )}
           </>
         }
@@ -841,30 +866,34 @@ const styles = StyleSheet.create({
     padding: 0,
   },
 
-  categorySection: {
-    marginBottom: 0,
+  categoryCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  categoryDivider: {
-    height: 1,
-    marginHorizontal: 16,
+  categoryContent: {
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+    paddingTop: 4,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 12,
-    paddingTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   categoryHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginLeft: 8,
   },
   categoryLabel: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.7,
+    flex: 1,
   },
   categoryCountBadge: {
     minWidth: 20,
@@ -886,18 +915,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden',
   },
+
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 14,
-    paddingBottom: 8,
+    paddingBottom: 6,
   },
   cardName: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     letterSpacing: 0.2,
     marginRight: 8,
   },
@@ -913,7 +943,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    marginTop: 6,
+    paddingBottom: 14,
     gap: 8,
   },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -923,6 +954,7 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
+    marginTop: 2,
   },
   actionBtn: {
     flex: 1,

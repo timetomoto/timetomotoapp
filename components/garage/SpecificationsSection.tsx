@@ -542,15 +542,13 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
         style={[st.sectionHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
         onPress={() => setCollapsed((p) => !p)}
       >
-        <Text style={[st.sectionTitle, { color: theme.textSecondary }]}>SPECIFICATIONS</Text>
-        <View style={st.headerRight}>
-          {collapsed && specCount > 0 && (
-            <View style={[st.countBadge, { backgroundColor: theme.red }]}>
-              <Text style={st.countText}>{specCount}</Text>
-            </View>
-          )}
-          <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.textSecondary} />
-        </View>
+        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
+        <Text style={[st.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SPECIFICATIONS</Text>
+        {collapsed && specCount > 0 && (
+          <View style={[st.countBadge, { backgroundColor: theme.red }]}>
+            <Text style={st.countText}>{specCount}</Text>
+          </View>
+        )}
       </Pressable>
 
       {!collapsed && (

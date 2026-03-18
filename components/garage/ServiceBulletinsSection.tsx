@@ -216,15 +216,13 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
         style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
         onPress={() => setCollapsed((p) => !p)}
       >
-        <Text style={[s.sectionTitle, { color: theme.textSecondary }]}>SERVICE BULLETINS</Text>
-        <View style={s.collapseRight}>
-          {collapsed && totalCount > 0 && (
-            <View style={[s.countBadge, { backgroundColor: theme.red }]}>
-              <Text style={s.countText}>{totalCount}</Text>
-            </View>
-          )}
-          <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={18} color={theme.textSecondary} />
-        </View>
+        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
+        <Text style={[s.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SERVICE BULLETINS</Text>
+        {collapsed && totalCount > 0 && (
+          <View style={[s.countBadge, { backgroundColor: theme.red }]}>
+            <Text style={s.countText}>{totalCount}</Text>
+          </View>
+        )}
       </Pressable>
 
       {!collapsed && (<View>

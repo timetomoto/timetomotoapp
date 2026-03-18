@@ -24,6 +24,7 @@ import Mapbox, {
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useRouter } from 'expo-router';
@@ -1009,12 +1010,24 @@ export default function RideScreen() {
         hasShownWeatherWarning.current = true;
         navWeatherFadeAnim.setValue(1);
         setNavWeatherBanner({ msg, severe });
-        // Auto-dismiss after 5 seconds
+
+        // Alert — haptic + system notification sound
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Weather Alert',
+            body: msg,
+            sound: true,
+          },
+          trigger: null, // fire immediately
+        }).catch(() => {});
+
+        // Auto-dismiss after 10 seconds
         setTimeout(() => {
           RNAnimated.timing(navWeatherFadeAnim, { toValue: 0, duration: 500, useNativeDriver: true }).start(() => {
             setNavWeatherBanner(null);
           });
-        }, 5000);
+        }, 10000);
       })
       .catch(() => {});
   }, [isNavigatingActive, activeRoute]);
