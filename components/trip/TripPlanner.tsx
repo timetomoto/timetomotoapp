@@ -110,7 +110,7 @@ export default function TripPlanner() {
   const userId = user?.id ?? 'local';
   const cameraRef = useRef<Camera>(null);
   const isDark = theme.bg === darkTheme.bg;
-  const mapStyle = isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11';
+  const mapStyle = 'mapbox://styles/mapbox/outdoors-v12';
 
   // Map visibility — three-state panel
   // State 1 (off): map hidden, full panel
@@ -218,6 +218,12 @@ export default function TripPlanner() {
   const [toastMsg, setToastMsg] = useState('');
   const [importModalOpen, setImportModalOpen] = useState(false);
 
+  // Save modal state
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [saveCategory, setSaveCategory] = useState('Planned Rides');
+  const [saving, setSaving] = useState(false);
+
   // Keep routeGeojson ref in sync for toggleMap closure
   useEffect(() => { routeGeojsonRef.current = routeGeojson; }, [routeGeojson]);
 
@@ -239,29 +245,45 @@ export default function TripPlanner() {
 
   useEffect(() => { loadFavorites(userId).then(setFavorites); }, [userId]);
 
-  // Load routes if not already in store
+  // Load routes if not already in store (skip if no auth — 'local' is not a valid UUID)
   useEffect(() => {
-    if (savedRoutes.length > 0 || !userId) return;
+    if (savedRoutes.length > 0 || !user?.id) return;
     let cancelled = false;
     (async () => {
       setRoutesLoading(true);
-      await seedRoutes(userId).catch(() => {});
-      const fetched = await fetchUserRoutes(userId);
+      await seedRoutes(user.id).catch(() => {});
+      const fetched = await fetchUserRoutes(user.id);
       if (!cancelled) { setRoutes(fetched); setRoutesLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [user?.id]);
 
-  // Auto-set origin
+  // Auto-set origin + center camera on user location
   useEffect(() => {
+    // If stops already exist (returning with existing route), fit to them instead
+    if (origin || destination) return;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        const name = await reverseGeocodeLoc(loc.coords.latitude, loc.coords.longitude);
-        setOrigin({ name, lat: loc.coords.latitude, lng: loc.coords.longitude });
-      } catch {}
+        // Try instant cached position first
+        let coords: { latitude: number; longitude: number } | null = null;
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (lastKnown) {
+          coords = lastKnown.coords;
+        } else {
+          // Fallback to fresh position with timeout
+          const fresh = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          coords = fresh.coords;
+        }
+        if (coords) {
+          cameraRef.current?.setCamera({ centerCoordinate: [coords.longitude, coords.latitude], zoomLevel: 11, animationDuration: 500 });
+          const name = await reverseGeocodeLoc(coords.latitude, coords.longitude);
+          setOrigin({ name, lat: coords.latitude, lng: coords.longitude });
+        }
+      } catch {
+        // Fall back to default (Austin) — already set in Camera defaultSettings
+      }
     })();
   }, []);
 
@@ -497,14 +519,62 @@ export default function TripPlanner() {
     router.navigate('/(tabs)/ride' as any);
   }
 
-  async function handleSave() {
+  function openSaveModal() {
     if (!origin || !destination || !routeGeojson || !user) return;
-    const name = `${origin.name.split(',')[0] || 'Start'} → ${destination.name.split(',')[0] || 'End'}`;
+    const defaultName = `${origin.name.split(',')[0] || 'Start'} → ${destination.name.split(',')[0] || 'End'}`;
+    setSaveName(defaultName);
+    setSaveCategory('Planned Rides');
+    setSaveModalOpen(true);
+  }
+
+  function handlePickCategory() {
+    // Collect distinct categories from saved routes
+    const cats = new Set<string>();
+    cats.add('Planned Rides');
+    for (const r of savedRoutes) { if (r.category) cats.add(r.category); }
+    const catList = Array.from(cats);
+    const options = [...catList, '+ New Category', 'Cancel'];
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: options.length - 1, title: 'Select Category' },
+        (idx) => {
+          if (idx === options.length - 1) return; // Cancel
+          if (idx === options.length - 2) {
+            // + New Category
+            Alert.prompt('New Category', 'Enter a category name', (text) => {
+              if (text?.trim()) setSaveCategory(text.trim());
+            }, 'plain-text');
+          } else {
+            setSaveCategory(catList[idx]);
+          }
+        },
+      );
+    } else {
+      const buttons = catList.map((cat) => ({ text: cat, onPress: () => setSaveCategory(cat) }));
+      buttons.push({
+        text: '+ New Category',
+        onPress: () => {
+          Alert.prompt('New Category', 'Enter a category name', (text) => {
+            if (text?.trim()) setSaveCategory(text.trim());
+          }, 'plain-text');
+        },
+      });
+      buttons.push({ text: 'Cancel', onPress: () => {} });
+      Alert.alert('Select Category', undefined, buttons);
+    }
+  }
+
+  async function handleConfirmSave() {
+    if (!origin || !destination || !routeGeojson || !user || !saveName.trim()) return;
+    setSaving(true);
     const points = routeGeojson.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng, time: new Date().toISOString() }));
     try {
-      const s = await createRoute(user.id, name, points, routeDistance, 0, routeDuration, 'Planned Rides', 'planned');
-      if (s) { addRoute(s); showToast('Route saved to Planned Rides'); setSaved(true); }
+      const s = await createRoute(user.id, saveName.trim(), points, routeDistance, 0, routeDuration, saveCategory, 'planned');
+      if (s) { addRoute(s); showToast(`Route saved to ${saveCategory}`); setSaved(true); }
     } catch {}
+    setSaving(false);
+    setSaveModalOpen(false);
   }
 
   async function handleShare() {
@@ -885,7 +955,7 @@ export default function TripPlanner() {
             <Text style={st.navBtnText}>NAVIGATE</Text>
           </Pressable>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 0, paddingBottom: 0 }}>
-            <Pressable style={[st.secBtn, { borderColor: theme.border, flex: 1 }]} onPress={handleSave} disabled={saved}>
+            <Pressable style={[st.secBtn, { borderColor: theme.border, flex: 1 }]} onPress={openSaveModal} disabled={saved}>
               <Feather name={saved ? 'check' : 'bookmark'} size={14} color={saved ? theme.green : theme.textSecondary} />
               <Text style={[st.secBtnText, { color: saved ? theme.green : theme.textSecondary }]}>{saved ? 'SAVED' : 'SAVE'}</Text>
             </Pressable>
@@ -924,6 +994,53 @@ export default function TripPlanner() {
               </Pressable>
             )} ListEmptyComponent={<Text style={[st.emptyText, { color: theme.textMuted }]}>No saved routes yet.</Text>} />
           )}
+        </View>
+      </Modal>
+
+      {/* Save Route modal */}
+      <Modal visible={saveModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSaveModalOpen(false)}>
+        <View style={[st.importModal, { backgroundColor: theme.bgPanel }]}>
+          <View style={[st.importHeader, { borderBottomColor: theme.border }]}>
+            <Text style={[st.importTitle, { color: theme.textPrimary }]}>Save Route</Text>
+            <Pressable onPress={() => setSaveModalOpen(false)}><Feather name="x" size={22} color={theme.textSecondary} /></Pressable>
+          </View>
+          <View style={{ padding: 20, gap: 16 }}>
+            {/* Route name */}
+            <View style={{ gap: 6 }}>
+              <Text style={[st.sectionLabel, { color: theme.textSecondary }]}>ROUTE NAME</Text>
+              <TextInput
+                style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary, paddingVertical: 12 }]}
+                value={saveName}
+                onChangeText={setSaveName}
+                placeholder="Enter route name"
+                placeholderTextColor={theme.textMuted}
+                autoFocus
+              />
+            </View>
+            {/* Category */}
+            <View style={{ gap: 6 }}>
+              <Text style={[st.sectionLabel, { color: theme.textSecondary }]}>CATEGORY</Text>
+              <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border, paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between' }]} onPress={handlePickCategory}>
+                <Text style={{ fontSize: 14, color: theme.textPrimary }}>{saveCategory}</Text>
+                <Feather name="chevron-down" size={16} color={theme.textMuted} />
+              </Pressable>
+            </View>
+            {/* Route summary */}
+            {routeGeojson && (
+              <Text style={{ fontSize: 12, color: theme.textMuted }}>
+                {routeDistance.toFixed(1)} mi · {Math.floor(routeDuration / 3600)}h {Math.floor((routeDuration % 3600) / 60)}m
+              </Text>
+            )}
+            {/* Save button */}
+            <Pressable
+              style={[st.navBtn, { backgroundColor: theme.red, opacity: saving || !saveName.trim() ? 0.5 : 1 }]}
+              onPress={handleConfirmSave}
+              disabled={saving || !saveName.trim()}
+            >
+              {saving ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="bookmark" size={16} color="#fff" />}
+              <Text style={st.navBtnText}>{saving ? 'SAVING...' : 'SAVE ROUTE'}</Text>
+            </Pressable>
+          </View>
         </View>
       </Modal>
 

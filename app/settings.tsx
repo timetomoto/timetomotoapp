@@ -148,20 +148,22 @@ export default function SettingsScreen() {
   // Load persisted prefs
   useEffect(() => {
     (async () => {
-      const [rideStart, weather, emergency, dist, temp, capacity] = await Promise.all([
-        AsyncStorage.getItem('ttm_notif_ride_start'),
-        AsyncStorage.getItem('ttm_notif_weather'),
-        AsyncStorage.getItem('ttm_notif_emergency'),
-        AsyncStorage.getItem('ttm_units_distance'),
-        AsyncStorage.getItem('ttm_units_temp'),
-        AsyncStorage.getItem('ttm_units_capacity'),
-      ]);
-      if (rideStart !== null) setNotifRideStart(rideStart === 'true');
-      if (weather !== null) setNotifWeather(weather === 'true');
-      if (emergency !== null) setNotifEmergency(emergency === 'true');
-      if (dist === 'miles' || dist === 'kilometers') setDistanceUnit(dist);
-      if (temp === 'fahrenheit' || temp === 'celsius') setTempUnit(temp);
-      if (capacity === 'gallons' || capacity === 'liters') setCapacityUnit(capacity);
+      try {
+        const [rideStart, weather, emergency, dist, temp, capacity] = await Promise.all([
+          AsyncStorage.getItem('ttm_notif_ride_start'),
+          AsyncStorage.getItem('ttm_notif_weather'),
+          AsyncStorage.getItem('ttm_notif_emergency'),
+          AsyncStorage.getItem('ttm_units_distance'),
+          AsyncStorage.getItem('ttm_units_temp'),
+          AsyncStorage.getItem('ttm_units_capacity'),
+        ]);
+        if (rideStart !== null) setNotifRideStart(rideStart === 'true');
+        if (weather !== null) setNotifWeather(weather === 'true');
+        if (emergency !== null) setNotifEmergency(emergency === 'true');
+        if (dist === 'miles' || dist === 'kilometers') setDistanceUnit(dist);
+        if (temp === 'fahrenheit' || temp === 'celsius') setTempUnit(temp);
+        if (capacity === 'gallons' || capacity === 'liters') setCapacityUnit(capacity);
+      } catch (e) { console.error('settings load failed:', e); }
     })();
   }, []);
 

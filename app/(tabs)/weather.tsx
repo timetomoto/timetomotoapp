@@ -582,7 +582,7 @@ export default function WeatherScreen() {
 
   // Load recents on mount
   useEffect(() => {
-    loadRecents().then(setRecents);
+    loadRecents().then(setRecents).catch((e) => console.error('loadRecents failed:', e));
   }, [userId]);
 
   // Is current location a favorite?

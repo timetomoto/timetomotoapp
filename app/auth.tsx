@@ -61,12 +61,17 @@ export default function AuthScreen() {
     if (mode === 'signup') { setSuccessMsg('Check your email to confirm your account.'); return; }
 
     // After successful sign-in, check onboarding and navigate directly
-    const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
-    if (onboarded === 'done') {
-      setOnboardingDone(true);
-      router.replace('/(tabs)/ride');
-    } else {
-      setOnboardingDone(false);
+    try {
+      const onboarded = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (onboarded === 'done') {
+        setOnboardingDone(true);
+        router.replace('/(tabs)/ride');
+      } else {
+        setOnboardingDone(false);
+        router.replace('/onboarding');
+      }
+    } catch (e) {
+      console.error('auth onboarding key read failed:', e);
       router.replace('/onboarding');
     }
   }

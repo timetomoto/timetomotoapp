@@ -342,12 +342,14 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
 
       // Edit existing bike
       if (editBike.user_id === 'local') {
-        const stored = await AsyncStorage.getItem('ttm_bikes_local');
-        const bikes = stored ? JSON.parse(stored) : [];
-        const updated = bikes.map((b: Bike) => b.id === editBike.id ? { ...b, ...fields } : b);
-        await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify(updated));
-        setSaving(false);
-        updateBike({ ...editBike, ...fields });
+        try {
+          const stored = await AsyncStorage.getItem('ttm_bikes_local');
+          const bikes = stored ? JSON.parse(stored) : [];
+          const updated = bikes.map((b: Bike) => b.id === editBike.id ? { ...b, ...fields } : b);
+          await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify(updated));
+          setSaving(false);
+          updateBike({ ...editBike, ...fields });
+        } catch (e) { console.error('local bike edit failed:', e); setSaving(false); }
       } else {
         const { error: dbError } = await supabase
           .from('bikes')
@@ -399,11 +401,13 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
         avg_mpg: null,
         created_at: new Date().toISOString(),
       };
-      const stored = await AsyncStorage.getItem('ttm_bikes_local');
-      const existing = stored ? JSON.parse(stored) : [];
-      await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify([newBike, ...existing]));
-      setSaving(false);
-      addBike(newBike);
+      try {
+        const stored = await AsyncStorage.getItem('ttm_bikes_local');
+        const existing = stored ? JSON.parse(stored) : [];
+        await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify([newBike, ...existing]));
+        setSaving(false);
+        addBike(newBike);
+      } catch (e) { console.error('local bike save failed:', e); setSaving(false); }
     }
 
     handleClose();

@@ -104,7 +104,7 @@ export default function GarageScreen() {
       } else {
         setServiceSectionOrder(DEFAULT_SERVICE_ORDER);
       }
-    });
+    }).catch((e) => console.error('garage storage read failed:', e));
   }, [selectedBike?.id]);
 
 

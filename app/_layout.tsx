@@ -52,7 +52,7 @@ function AuthGuard() {
     );
     AsyncStorage.getItem(ONBOARDING_KEY).then((v) => {
       if (mounted) setOnboardingDone(v === 'done');
-    });
+    }).catch((e) => console.error('onboarding key read failed:', e));
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
