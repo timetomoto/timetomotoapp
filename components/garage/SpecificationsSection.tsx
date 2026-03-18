@@ -282,8 +282,21 @@ ${fieldList}`;
       const json = await resp.json();
       const raw: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       if (!raw.trim()) continue;
-      const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+      // Strip markdown fences and clean malformed JSON
+      let cleaned = raw
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/gi, '')
+        .trim();
+      // Remove trailing commas before } or ]
+      cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
       if (!cleaned) continue;
+      // Bail if response isn't JSON
+      if (!cleaned.startsWith('{') && !cleaned.startsWith('[')) {
+        console.error('[Specs] Gemini response is not JSON:', cleaned.slice(0, 200));
+        continue;
+      }
+
       const parsed = JSON.parse(cleaned);
       const result: Partial<BikeSpecs> = {};
       for (const [key, value] of Object.entries(parsed)) {
