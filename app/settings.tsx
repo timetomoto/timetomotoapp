@@ -47,9 +47,28 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        thumbColor={value ? theme.toggleThumbOn : theme.toggleThumbOff}
-        trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor="#C7C7CC"
       />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Plain row (non-interactive / coming soon)
+// ---------------------------------------------------------------------------
+
+function PlainRow({ label, subtitle, muted }: { label: string; subtitle?: string; muted?: boolean }) {
+  const { theme } = useTheme();
+  return (
+    <View style={[styles.row, { borderBottomColor: theme.border }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, { color: muted ? theme.textMuted : theme.textPrimary }]}>{label}</Text>
+        {!!subtitle && (
+          <Text style={[styles.rowSubtitle, { color: theme.textMuted }]}>{subtitle}</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -96,24 +115,6 @@ function SegmentedRow<T extends string>({
             </Pressable>
           );
         })}
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Plain row (non-interactive / coming soon)
-// ---------------------------------------------------------------------------
-
-function PlainRow({ label, subtitle, muted }: { label: string; subtitle?: string; muted?: boolean }) {
-  const { theme } = useTheme();
-  return (
-    <View style={[styles.row, { borderBottomColor: theme.border }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.rowLabel, { color: muted ? theme.textMuted : theme.textPrimary }]}>{label}</Text>
-        {!!subtitle && (
-          <Text style={[styles.rowSubtitle, { color: theme.textMuted }]}>{subtitle}</Text>
-        )}
       </View>
     </View>
   );
@@ -232,6 +233,38 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* UNITS */}
+        <SectionHeader label="UNITS" />
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
+          <SegmentedRow
+            label="DISTANCE"
+            options={[
+              { key: 'miles', label: 'MILES' },
+              { key: 'kilometers', label: 'KM' },
+            ]}
+            value={distanceUnit}
+            onChange={setDist}
+          />
+          <SegmentedRow
+            label="TEMPERATURE"
+            options={[
+              { key: 'fahrenheit', label: '°F' },
+              { key: 'celsius', label: '°C' },
+            ]}
+            value={tempUnit}
+            onChange={setTemp}
+          />
+          <SegmentedRow
+            label="CAPACITY"
+            options={[
+              { key: 'gallons', label: 'GALLONS' },
+              { key: 'liters', label: 'LITERS' },
+            ]}
+            value={capacityUnit}
+            onChange={setCapacity}
+          />
+        </View>
+
         {/* Dark: SAFETY then NOTIFICATIONS — Light: NOTIFICATIONS then SAFETY */}
         {isDark ? (
           <>
@@ -277,8 +310,9 @@ export default function SettingsScreen() {
                 <Switch
                   value={false}
                   onValueChange={() => {}}
-                  thumbColor={theme.toggleThumbOff}
-                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#C7C7CC"
                 />
               </View>
               <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
@@ -307,8 +341,9 @@ export default function SettingsScreen() {
                 <Switch
                   value={false}
                   onValueChange={() => {}}
-                  thumbColor={theme.toggleThumbOff}
-                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#C7C7CC"
                 />
               </View>
               <View style={{ borderBottomWidth: 1, borderBottomColor: theme.border }}>
@@ -364,38 +399,6 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
-
-        {/* UNITS */}
-        <SectionHeader label="UNITS" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
-          <SegmentedRow
-            label="DISTANCE"
-            options={[
-              { key: 'miles', label: 'MILES' },
-              { key: 'kilometers', label: 'KM' },
-            ]}
-            value={distanceUnit}
-            onChange={setDist}
-          />
-          <SegmentedRow
-            label="TEMPERATURE"
-            options={[
-              { key: 'fahrenheit', label: '°F' },
-              { key: 'celsius', label: '°C' },
-            ]}
-            value={tempUnit}
-            onChange={setTemp}
-          />
-          <SegmentedRow
-            label="CAPACITY"
-            options={[
-              { key: 'gallons', label: 'GALLONS' },
-              { key: 'liters', label: 'LITERS' },
-            ]}
-            value={capacityUnit}
-            onChange={setCapacity}
-          />
-        </View>
 
         {/* WEATHER */}
         <SectionHeader label="WEATHER" />

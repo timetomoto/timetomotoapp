@@ -192,8 +192,9 @@ export default function MapControlDrawer({
             <Switch
               value={weatherOn}
               onValueChange={onToggleWeather}
-              trackColor={{ false: '#9E9E9E', true: '#5B9BD5' }}
-              thumbColor={theme.white}
+              trackColor={{ false: theme.toggleTrackOff, true: '#5B9BD5' }}
+              thumbColor={weatherOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+              ios_backgroundColor={theme.toggleTrackOff}
             />
           </View>
         </View>
@@ -220,8 +221,9 @@ export default function MapControlDrawer({
             <Switch
               value={fuelOn}
               onValueChange={onToggleFuel}
-              trackColor={{ false: '#9E9E9E', true: '#FFD600' }}
-              thumbColor={theme.white}
+              trackColor={{ false: theme.toggleTrackOff, true: '#FFD600' }}
+              thumbColor={fuelOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+              ios_backgroundColor={theme.toggleTrackOff}
               disabled={fuelLoading}
             />
           </View>
@@ -249,8 +251,9 @@ export default function MapControlDrawer({
             <Switch
               value={foodOn}
               onValueChange={onToggleFood}
-              trackColor={{ false: '#9E9E9E', true: '#FF6B35' }}
-              thumbColor={theme.white}
+              trackColor={{ false: theme.toggleTrackOff, true: '#FF6B35' }}
+              thumbColor={foodOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+              ios_backgroundColor={theme.toggleTrackOff}
               disabled={foodLoading}
             />
           </View>

@@ -19,6 +19,7 @@ export interface Route {
   source?: string | null;
   recorded_at?: string | null;
   bike_id?: string | null;
+  departure_time?: string | null;
   created_at: string;
 }
 
@@ -57,7 +58,7 @@ export async function fetchUserRoutes(userId: string): Promise<Route[]> {
   try {
     const { data, error } = await supabase
       .from('saved_routes')
-      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, source, recorded_at, bike_id, created_at')
+      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, source, recorded_at, bike_id, departure_time, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -87,6 +88,7 @@ export async function createRoute(
   category?: string | null,
   source: string = 'recorded',
   bikeId?: string | null,
+  departureTime?: string | null,
 ): Promise<Route | null> {
   const recordedAt = source === 'recorded' ? new Date().toISOString() : null;
   try {
@@ -103,6 +105,7 @@ export async function createRoute(
         source,
         recorded_at: recordedAt,
         bike_id: bikeId ?? null,
+        departure_time: departureTime ?? null,
       })
       .select()
       .single();

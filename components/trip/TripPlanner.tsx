@@ -116,13 +116,13 @@ export default function TripPlanner() {
   // State 1 (off): map hidden, full panel
   // State 2 (compact): map 55%, panel compact (stops only)
   // State 3 (expanded): map 30%, panel expanded (weather + conditions)
-  const MAP_H_COMPACT = SCREEN_H * 0.55;
-  const MAP_H_EXPANDED = SCREEN_H * 0.30;
+  const MAP_H_COMPACT = SCREEN_H * 0.30 + 200;
+  const MAP_H_EXPANDED = SCREEN_H * 0.55;
   const [mapVisible, setMapVisible] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const mapHeightAnim = useRef(new Animated.Value(0)).current;
   const mapOpacity = mapHeightAnim.interpolate({
-    inputRange: [0, MAP_H_EXPANDED * 0.5, MAP_H_EXPANDED],
+    inputRange: [0, MAP_H_COMPACT * 0.5, MAP_H_COMPACT],
     outputRange: [0, 0, 1],
     extrapolate: 'clamp',
   });
@@ -135,13 +135,13 @@ export default function TripPlanner() {
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
       onPanResponderRelease: (_, g) => {
-        if (g.dy < -40 && !panelExpandedRef.current) {
-          // Swipe up → expand panel (shrink map)
+        if (g.dy > 40 && !panelExpandedRef.current) {
+          // Swipe down → expand map (grow map, shrink panel)
           panelExpandedRef.current = true;
           setPanelExpanded(true);
           Animated.spring(mapHeightAnim, { toValue: MAP_H_EXPANDED, useNativeDriver: false, tension: 80, friction: 14 }).start();
-        } else if (g.dy > 40 && panelExpandedRef.current) {
-          // Swipe down → compact panel (grow map)
+        } else if (g.dy < -40 && panelExpandedRef.current) {
+          // Swipe up → compact map (shrink map, grow panel)
           panelExpandedRef.current = false;
           setPanelExpanded(false);
           Animated.spring(mapHeightAnim, { toValue: MAP_H_COMPACT, useNativeDriver: false, tension: 80, friction: 14 }).start();
@@ -570,7 +570,7 @@ export default function TripPlanner() {
     setSaving(true);
     const points = routeGeojson.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng, time: new Date().toISOString() }));
     try {
-      const s = await createRoute(user.id, saveName.trim(), points, routeDistance, 0, routeDuration, saveCategory, 'planned');
+      const s = await createRoute(user.id, saveName.trim(), points, routeDistance, 0, routeDuration, saveCategory, 'planned', null, departure.toISOString());
       if (s) { addRoute(s); showToast(`Route saved to ${saveCategory}`); setSaved(true); }
     } catch {}
     setSaving(false);
@@ -612,7 +612,7 @@ export default function TripPlanner() {
     <View style={{ flex: 1 }}>
       {/* Map — absolute, always mounted, fades in/out */}
       <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: mapHeightAnim, opacity: mapOpacity, overflow: 'hidden' }} pointerEvents={mapVisible ? 'auto' : 'none'}>
-        <View style={{ height: MAP_H_COMPACT }}>
+        <View style={{ height: MAP_H_EXPANDED }}>
         <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onPress={handleMapPress}>
           <Camera ref={cameraRef} defaultSettings={{ centerCoordinate: AUSTIN, zoomLevel: 9 }} />
           {origin && (
@@ -656,6 +656,25 @@ export default function TripPlanner() {
             <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
           </View>
         )}
+
+        {/* Map toggle + Import row — pinned, never scrolls */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.bgCard, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginTop: mapVisible ? 4 : 12, marginBottom: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Switch
+              value={mapVisible}
+              onValueChange={toggleMap}
+              trackColor={{ false: '#C7C7CC', true: theme.red }}
+              thumbColor="#FFFFFF"
+              ios_backgroundColor="#C7C7CC"
+            />
+            <Text style={{ fontSize: 12, color: theme.textSecondary }}>{mapVisible ? 'Hide map' : 'Show map'}</Text>
+          </View>
+          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 4 }} onPress={() => setImportModalOpen(true)}>
+            <Feather name="bookmark" size={13} color={theme.textSecondary} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Import from Routes</Text>
+          </Pressable>
+        </View>
+
         <ScrollView style={[st.panel, { backgroundColor: theme.bgPanel }]} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
@@ -687,12 +706,6 @@ export default function TripPlanner() {
           ) : (
             /* Fields mode */
             <View style={{ padding: 16, gap: 10 }}>
-              {/* Map toggle row */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Switch value={mapVisible} onValueChange={toggleMap} trackColor={{ false: theme.border, true: theme.red }} thumbColor="#fff" />
-                <Text style={{ fontSize: 12, color: theme.textSecondary }}>{mapVisible ? 'Hide map' : 'Show map'}</Text>
-              </View>
-
               {/* Origin */}
               <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('origin')}>
                 <View style={[st.dot, { backgroundColor: theme.green }]} />
@@ -734,25 +747,19 @@ export default function TripPlanner() {
                 {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
               </Pressable>
 
-              {/* Add stop + Import */}
-              <View style={{ flexDirection: 'row', gap: 16 }}>
+              {/* Add Stop | Reverse */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 }}>
                 <Pressable style={st.addStop} onPress={() => { setWaypoints((p) => [...p, { name: 'New Stop', lat: 0, lng: 0 }]); setActiveField(waypoints.length); }}>
-                  <Feather name="plus" size={14} color={theme.textSecondary} />
+                  <Feather name="plus" size={13} color={theme.textSecondary} />
                   <Text style={[st.addStopText, { color: theme.textSecondary }]}>Add Stop</Text>
                 </Pressable>
-                <Pressable style={st.addStop} onPress={() => setImportModalOpen(true)}>
-                  <Feather name="bookmark" size={14} color={theme.textSecondary} />
-                  <Text style={[st.addStopText, { color: theme.textSecondary }]}>Import from My Routes</Text>
-                </Pressable>
+                {origin && destination && (
+                  <Pressable style={st.addStop} onPress={handleReverse}>
+                    <Feather name="repeat" size={13} color={theme.textSecondary} />
+                    <Text style={[st.addStopText, { color: theme.textSecondary }]}>Reverse</Text>
+                  </Pressable>
+                )}
               </View>
-
-              {/* Reverse */}
-              {origin && destination && (
-                <Pressable style={st.reverseBtn} onPress={handleReverse}>
-                  <Feather name="repeat" size={14} color={theme.textSecondary} />
-                  <Text style={[st.reverseBtnText, { color: theme.textSecondary }]}>Reverse route</Text>
-                </Pressable>
-              )}
 
               {/* Route summary */}
               {routeGeojson && (
@@ -1074,9 +1081,7 @@ const st = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   fieldText: { flex: 1, fontSize: 14, fontWeight: '500' },
   addStop: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 4 },
-  addStopText: { fontSize: 13, fontWeight: '600' },
-  reverseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
-  reverseBtnText: { fontSize: 12, fontWeight: '600' },
+  addStopText: { fontSize: 12, fontWeight: '600' },
   summaryCard: { borderWidth: 1, borderRadius: 10, padding: 14, alignItems: 'center' },
   summaryText: { fontSize: 15, fontWeight: '700' },
   departureCard: { borderWidth: 1, borderRadius: 10, padding: 12 },

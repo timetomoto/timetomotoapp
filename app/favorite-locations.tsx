@@ -357,8 +357,9 @@ export default function FavoriteLocationsScreen() {
                 <Switch
                   value={makeHome}
                   onValueChange={setMakeHome}
-                  thumbColor={makeHome ? theme.toggleThumbOn : theme.toggleThumbOff}
-                  trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#C7C7CC"
                 />
               </View>
             )}

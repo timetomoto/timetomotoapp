@@ -984,7 +984,7 @@ export default function RideScreen() {
   // Overlay GeoJSON (imported/navigating route)
   const overlayGeoJson = overlayPoints && overlayPoints.length >= 2
     ? routeGeoJson(overlayPoints)
-    : EMPTY_LINE;
+    : null;
 
   // Map style — respect theme for standard, always use correct style for others
   const activeMapStyle = (() => {
@@ -1099,7 +1099,7 @@ export default function RideScreen() {
           )}
 
           {/* ── Fuel stations ── */}
-          {fuelStationsGeoJsonData && fuelStationsOn && (
+          {mapStyleReady && fuelStationsGeoJsonData && fuelStationsOn && (
             <ShapeSource
               id="fuel-stations-src"
               shape={fuelStationsGeoJsonData}
@@ -1125,7 +1125,7 @@ export default function RideScreen() {
           )}
 
           {/* ── Food places ── */}
-          {foodPlacesGeoJsonData && foodOn && (
+          {mapStyleReady && foodPlacesGeoJsonData && foodOn && (
             <ShapeSource
               id="food-places-src"
               shape={foodPlacesGeoJsonData}
@@ -1151,7 +1151,7 @@ export default function RideScreen() {
           )}
 
           {/* ── Saved / imported route overlay ── */}
-          {mapStyleReady && (
+          {mapStyleReady && overlayGeoJson && (
             <ShapeSource id="overlay-route" shape={overlayGeoJson}>
               <LineLayer
                 id="overlay-route-line"
@@ -1166,8 +1166,8 @@ export default function RideScreen() {
           )}
 
           {/* ── Navigation route layer (rendered above overlay) ── */}
-          {mapStyleReady && (
-            <ShapeSource id="nav-route-src" shape={navRouteGeojson ?? EMPTY_LINE}>
+          {mapStyleReady && navRouteGeojson && (
+            <ShapeSource id="nav-route-src" shape={navRouteGeojson}>
               <LineLayer
                 id="nav-route-line"
                 style={{ lineColor: theme.red, lineWidth: 5, lineOpacity: 0.95 }}
@@ -1176,7 +1176,7 @@ export default function RideScreen() {
           )}
 
           {/* ── Live GPS track ── */}
-          {liveTrackGeoJson && (
+          {mapStyleReady && liveTrackGeoJson && (
             <ShapeSource id="live-track" shape={liveTrackGeoJson}>
               <LineLayer
                 id="live-track-line"

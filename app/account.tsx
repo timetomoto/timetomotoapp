@@ -74,8 +74,9 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        thumbColor={value ? theme.toggleThumbOn : theme.toggleThumbOff}
-        trackColor={{ false: theme.toggleTrackOff, true: theme.toggleTrackOn }}
+        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor="#C7C7CC"
       />
     </View>
   );

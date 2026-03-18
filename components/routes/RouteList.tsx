@@ -54,6 +54,19 @@ function fmtDate(iso: string | null | undefined) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function routeDateLabel(route: Route): string | null {
+  const src = route.source;
+  if (src === 'planned') {
+    const parts: string[] = [];
+    if (route.departure_time) parts.push(`Departure: ${fmtDate(route.departure_time)}`);
+    parts.push(`Saved: ${fmtDate(route.created_at)}`);
+    return parts.join('  ·  ');
+  }
+  if (src === 'recorded') return `Recorded: ${fmtDate(route.recorded_at || route.created_at)}`;
+  if (src === 'imported') return `Imported: ${fmtDate(route.created_at)}`;
+  return route.created_at ? `Added: ${fmtDate(route.created_at)}` : null;
+}
+
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 
 /** Thumbnail with error fallback */
@@ -288,6 +301,10 @@ function RouteCard({
         ) : null;
       })()}
 
+      {routeDateLabel(route) && (
+        <Text style={{ fontSize: 11, color: theme.textMuted, paddingHorizontal: 16, paddingVertical: 6 }}>{routeDateLabel(route)}</Text>
+      )}
+
       <View style={[styles.cardActions, { borderTopColor: theme.cardDivider }]}>
         <Pressable style={styles.actionBtn} onPress={onNavigate}>
           <Feather name="navigation" size={13} color={theme.red} />
@@ -297,6 +314,43 @@ function RouteCard({
         <Pressable style={styles.actionBtn} onPress={() => shareRoute(route)}>
           <Feather name="share-2" size={13} color={theme.textSecondary} />
           <Text style={[styles.actionText, { color: theme.textSecondary }]}>SHARE</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compact list row
+// ---------------------------------------------------------------------------
+
+function RouteListRow({
+  route,
+  onNavigate,
+}: {
+  route: Route;
+  onNavigate: () => void;
+}) {
+  const { theme } = useTheme();
+  const dur = fmtDuration(route.duration_seconds);
+  const dateLabel = routeDateLabel(route);
+
+  return (
+    <View style={[styles.listRow, { borderBottomColor: theme.border }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.listRowName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
+        <Text style={[styles.listRowStats, { color: theme.textSecondary }]}>
+          {fmtMiles(route.distance_miles)} mi | {fmtEle(route.elevation_gain_ft)} ft{dur ? ` | ${dur}` : ''}
+        </Text>
+        {dateLabel && <Text style={{ fontSize: 10, color: theme.textMuted, marginTop: 2 }}>{dateLabel}</Text>}
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <Pressable onPress={() => shareRoute(route)} hitSlop={8}>
+          <Feather name="share-2" size={14} color={theme.textSecondary} />
+        </Pressable>
+        <Pressable style={[styles.listNavBtn, { borderColor: theme.red }]} onPress={onNavigate}>
+          <Feather name="navigation" size={12} color={theme.red} />
+          <Text style={[styles.listNavText, { color: theme.red }]}>GO</Text>
         </Pressable>
       </View>
     </View>
@@ -556,7 +610,22 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
   const [routeSortOrder, setRouteSortOrder] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('name');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const orderLoadedRef = useRef(false);
+
+  // Load/save view mode preference
+  useEffect(() => {
+    if (!user?.id) return;
+    AsyncStorage.getItem(`@ttm/routes_view_mode_${user.id}`).then((v) => {
+      if (v === 'grid' || v === 'list') setViewMode(v);
+    }).catch(() => {});
+  }, [user?.id]);
+
+  function toggleViewMode() {
+    const next = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(next);
+    if (user?.id) AsyncStorage.setItem(`@ttm/routes_view_mode_${user.id}`, next).catch(() => {});
+  }
   const autoExpandedRef = useRef(false);
   const userId = user?.id ?? 'local';
 
@@ -754,22 +823,29 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
           <View style={styles.categoryContent}>
             {categoryRoutes.map((route, idx) => (
               <View key={route.id} style={idx === 0 ? { marginTop: 5 } : undefined}>
-              <RouteCard
-                route={route}
-                categories={allCategories}
-                onNavigate={() => onNavigate(route)}
-                onExport={() => handleExport(route)}
-                onDelete={() => handleDelete(route)}
-                onRename={() => handleRename(route)}
-                onMoveCategory={(cat) => handleMoveCategory(route, cat)}
-              />
+                {viewMode === 'grid' ? (
+                  <RouteCard
+                    route={route}
+                    categories={allCategories}
+                    onNavigate={() => onNavigate(route)}
+                    onExport={() => handleExport(route)}
+                    onDelete={() => handleDelete(route)}
+                    onRename={() => handleRename(route)}
+                    onMoveCategory={(cat) => handleMoveCategory(route, cat)}
+                  />
+                ) : (
+                  <RouteListRow
+                    route={route}
+                    onNavigate={() => onNavigate(route)}
+                  />
+                )}
               </View>
             ))}
           </View>
         )}
       </View>
     );
-  }, [grouped, expandedCategories, allCategories, sortMode, onNavigate, query]);
+  }, [grouped, expandedCategories, allCategories, sortMode, onNavigate, query, viewMode]);
 
   return (
     <GestureHandlerRootView style={[styles.root, { backgroundColor: theme.bg }]}>
@@ -830,6 +906,9 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
                     </Pressable>
                   )}
                 </View>
+                <Pressable style={[styles.toolbarIconBtn, { borderColor: theme.border, backgroundColor: viewMode === 'grid' ? theme.bgCard : undefined }]} onPress={toggleViewMode} hitSlop={4}>
+                  <Feather name={viewMode === 'grid' ? 'grid' : 'list'} size={14} color={viewMode === 'grid' ? theme.textPrimary : theme.textSecondary} />
+                </Pressable>
               </View>
             )}
 
@@ -844,7 +923,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
                 <Feather name="map" size={32} color={theme.border} />
                 <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>No routes yet</Text>
                 <Text style={[styles.emptyDetail, { color: theme.textSecondary }]}>
-                  Import a GPX file or record a ride to get started.
+                  Import a GPX file under Routes, record a ride, or plan a trip to get started.
                 </Text>
               </View>
             )}
@@ -1029,6 +1108,35 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   actionDivider: { width: 1, marginVertical: 8 },
+
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  listRowName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  listRowStats: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  listNavBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  listNavText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 
   emptyState: {
     alignItems: 'center',

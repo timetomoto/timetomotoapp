@@ -54,7 +54,7 @@ export default function TabLayout() {
         options={{
           title: 'TRIP',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="compass" size={size} color={color} accessibilityLabel="Trip tab" />
+            <Feather name="map" size={size} color={color} accessibilityLabel="Trip tab" />
           ),
         }}
         listeners={() => ({
