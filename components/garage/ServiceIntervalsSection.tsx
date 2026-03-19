@@ -125,9 +125,9 @@ If the model name is ambiguous use the closest known variant and note it in assu
 // Component
 // ---------------------------------------------------------------------------
 
-export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
+export default function ServiceIntervalsSection({ bike, onCountChange }: { bike: Bike; onCountChange?: (n: number) => void }) {
   const { theme } = useTheme();
-  const [collapsed, setCollapsed] = useState(true);
+  const collapsed = false; // controlled by parent garage section
   const [result, setResult]   = useState<CachedResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -192,23 +192,11 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
 
   const itemCount = result?.items?.length ?? 0;
 
+  useEffect(() => { onCountChange?.(itemCount); }, [itemCount]);
+
   return (
     <View style={s.root}>
-      {/* Collapsible header */}
-      <Pressable
-        style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
-        onPress={() => setCollapsed((p) => !p)}
-      >
-        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
-        <Text style={[s.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SERVICE INTERVALS</Text>
-        {collapsed && itemCount > 0 && (
-          <View style={[s.countBadge, { backgroundColor: theme.red }]}>
-            <Text style={s.countText}>{itemCount}</Text>
-          </View>
-        )}
-      </Pressable>
-
-      {!collapsed && (<View>
+      <View>
       {/* Action row */}
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
@@ -290,7 +278,7 @@ export default function ServiceIntervalsSection({ bike }: { bike: Bike }) {
           )}
         </>
       )}
-      </View>)}
+      </View>
     </View>
   );
 }

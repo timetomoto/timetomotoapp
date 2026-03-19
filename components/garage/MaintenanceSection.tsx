@@ -203,7 +203,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
 // MaintenanceSection
 // ---------------------------------------------------------------------------
 
-export default function MaintenanceSection({ bikeId, userId }: { bikeId: string; userId?: string }) {
+export default function MaintenanceSection({ bikeId, userId, onCountChange }: { bikeId: string; userId?: string; onCountChange?: (n: number) => void }) {
   const { theme } = useTheme();
   const [records, setRecords]     = useState<MaintenanceRecord[]>([]);
   const [sortKey, setSortKey]     = useState<SortKey>('date_desc');
@@ -214,6 +214,8 @@ export default function MaintenanceSection({ bikeId, userId }: { bikeId: string;
   useEffect(() => {
     loadMaintenance(bikeId, userId).then(setRecords);
   }, [bikeId]);
+
+  useEffect(() => { onCountChange?.(records.length); }, [records.length]);
 
   const sorted = sortRecords(records, sortKey);
 
@@ -250,7 +252,7 @@ export default function MaintenanceSection({ bikeId, userId }: { bikeId: string;
     <View style={st.root}>
       {/* Header */}
       <View style={st.sectionHeader}>
-        <Text style={[st.sectionTitle, { color: theme.textSecondary }]}>MAINTENANCE</Text>
+        <View style={{ flex: 1 }} />
         <View style={st.headerActions}>
           <Pressable onPress={() => setShowSort(!showSort)} hitSlop={8} style={st.iconBtn}>
             <Feather name="sliders" size={16} color={theme.textSecondary} />

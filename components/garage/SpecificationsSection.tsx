@@ -466,9 +466,9 @@ function SpecRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function SpecificationsSection({ bike }: { bike: Bike }) {
+export default function SpecificationsSection({ bike, onCountChange }: { bike: Bike; onCountChange?: (n: number) => void }) {
   const { theme } = useTheme();
-  const [collapsed, setCollapsed] = useState(true);
+  const collapsed = false; // controlled by parent garage section
   const [specs, setSpecs] = useState<BikeSpecs>(bike.specs ?? {});
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupDone, setLookupDone] = useState(specs.specsLookedUp === true);
@@ -567,23 +567,10 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
     (r) => r.getValue(specs) !== '\u2014',
   ).length;
 
+  useEffect(() => { onCountChange?.(specCount); }, [specCount]);
+
   return (
     <View style={st.root}>
-      {/* Collapsible header */}
-      <Pressable
-        style={[st.sectionHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
-        onPress={() => setCollapsed((p) => !p)}
-      >
-        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
-        <Text style={[st.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SPECIFICATIONS</Text>
-        {collapsed && specCount > 0 && (
-          <View style={[st.countBadge, { backgroundColor: theme.red }]}>
-            <Text style={st.countText}>{specCount}</Text>
-          </View>
-        )}
-      </Pressable>
-
-      {!collapsed && (
         <View>
           {/* Action row with refresh button */}
           <View style={st.actionRow}>
@@ -638,7 +625,6 @@ export default function SpecificationsSection({ bike }: { bike: Bike }) {
 
           {/* Empty hint — removed, moved to top */}
         </View>
-      )}
     </View>
   );
 }

@@ -163,9 +163,9 @@ function ComplaintCard({ complaint }: { complaint: NHTSAComplaint }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
+export default function ServiceBulletinsSection({ bike, onCountChange }: { bike: Bike; onCountChange?: (n: number) => void }) {
   const { theme } = useTheme();
-  const [collapsed, setCollapsed] = useState(true);
+  const collapsed = false; // controlled by parent garage section
   const { results, loading, fetchBulletins, clearCache } = useServiceBulletinsStore();
 
   const year  = String(bike.year ?? '');
@@ -179,6 +179,8 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
   const hasResults = result != null && (result.recalls.length > 0 || result.complaints.length > 0);
   const isEmpty    = result != null && result.recalls.length === 0 && result.complaints.length === 0;
   const totalCount = result ? result.recalls.length + result.complaints.length : 0;
+
+  useEffect(() => { onCountChange?.(totalCount); }, [totalCount]);
 
   // Auto-check on first expand if no cached data
   const hasTriggered = useRef(false);
@@ -211,21 +213,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
 
   return (
     <View style={s.root}>
-      {/* ── Collapsible section header ── */}
-      <Pressable
-        style={[s.collapseHeader, { borderBottomColor: collapsed ? 'transparent' : theme.border }]}
-        onPress={() => setCollapsed((p) => !p)}
-      >
-        <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={16} color={theme.textSecondary} style={{ marginRight: 8 }} />
-        <Text style={[s.sectionTitle, { color: theme.textSecondary, flex: 1 }]}>SERVICE BULLETINS</Text>
-        {collapsed && totalCount > 0 && (
-          <View style={[s.countBadge, { backgroundColor: theme.red }]}>
-            <Text style={s.countText}>{totalCount}</Text>
-          </View>
-        )}
-      </Pressable>
-
-      {!collapsed && (<View>
+      <View>
       {/* ── Action button row ── */}
       <View style={s.headerRow}>
         <View style={s.headerLeft}>
@@ -325,7 +313,7 @@ export default function ServiceBulletinsSection({ bike }: { bike: Bike }) {
           Data from NHTSA (nhtsa.gov) — official U.S. government vehicle safety database
         </Text>
       )}
-      </View>)}
+      </View>
     </View>
   );
 }

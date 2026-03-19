@@ -27,23 +27,6 @@ import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 
 // ---------------------------------------------------------------------------
-// Service section list (fixed order)
-// ---------------------------------------------------------------------------
-
-function ServiceSectionList({ bike }: { bike: any }) {
-  const { theme } = useTheme();
-  return (
-    <View>
-      <SpecificationsSection bike={bike} />
-      <View style={{ height: 1, marginHorizontal: 16, backgroundColor: theme.border }} />
-      <ServiceIntervalsSection bike={bike} />
-      <View style={{ height: 1, marginHorizontal: 16, backgroundColor: theme.border }} />
-      <ServiceBulletinsSection bike={bike} />
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main screen
 // ---------------------------------------------------------------------------
 
@@ -54,13 +37,45 @@ export default function GarageScreen() {
   const [showAddBike, setShowAddBike] = useState(false);
   const [editingBike, setEditingBike] = useState<typeof bikes[0] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'MAINTENANCE' | 'MODS' | 'SERVICE'>('MAINTENANCE');
   const garageReset = useTabResetStore((s) => s.garageReset);
-  useEffect(() => {
-    if (garageReset > 0) setActiveSection('MAINTENANCE');
-  }, [garageReset]);
+
+  // Collapsible sections — default: maintenance expanded, rest collapsed
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ maintenance: true });
 
   const selectedBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
+
+  // Load/save expanded state
+  useEffect(() => {
+    if (!selectedBike) return;
+    AsyncStorage.getItem(`@ttm/garage_sections_${selectedBike.id}`).then((stored) => {
+      if (stored) {
+        try { setExpandedSections(JSON.parse(stored)); } catch { /* ignore */ }
+      } else {
+        setExpandedSections({ maintenance: true });
+      }
+    }).catch(() => {});
+  }, [selectedBike?.id]);
+
+  // Section counts for badges
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
+  function updateCount(key: string, n: number) {
+    setSectionCounts((prev) => prev[key] === n ? prev : { ...prev, [key]: n });
+  }
+
+  function toggleSection(key: string) {
+    setExpandedSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (selectedBike) {
+        AsyncStorage.setItem(`@ttm/garage_sections_${selectedBike.id}`, JSON.stringify(next)).catch(() => {});
+      }
+      return next;
+    });
+  }
+
+  // Reset to maintenance on tab reset
+  useEffect(() => {
+    if (garageReset > 0) setExpandedSections({ maintenance: true });
+  }, [garageReset]);
 
 
   useEffect(() => {
@@ -206,7 +221,7 @@ export default function GarageScreen() {
           )}
 
           {/* Selected bike card */}
-          {selectedBike && (
+          {selectedBike && (<>
             <View style={[styles.bikeCard, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
               {/* Bike profile photo */}
               {bikePhotoUri ? (
@@ -266,35 +281,34 @@ export default function GarageScreen() {
                 </View>
               </View>
 
-              {/* Section tabs */}
-              <View style={[styles.sectionRow, { borderBottomColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
-                {(['MAINTENANCE', 'MODS', 'SERVICE'] as const).map((s, i, arr) => (
-                  <Pressable
-                    key={s}
-                    style={[
-                      styles.sectionTab,
-                      { borderRightColor: theme.border },
-                      i === arr.length - 1 && { borderRightWidth: 0 },
-                      activeSection === s && { borderBottomWidth: 2, borderBottomColor: theme.red },
-                    ]}
-                    onPress={() => setActiveSection(s)}
-                  >
-                    <Text style={[styles.sectionTabText, { color: activeSection === s ? theme.red : theme.textSecondary }]}>{s}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {activeSection === 'MAINTENANCE' && selectedBike && (
-                <MaintenanceSection bikeId={selectedBike.id} userId={user?.id} />
-              )}
-              {activeSection === 'MODS' && selectedBike && (
-                <ModificationsSection bikeId={selectedBike.id} userId={user?.id} />
-              )}
-              {activeSection === 'SERVICE' && selectedBike && (
-                <ServiceSectionList bike={selectedBike} />
-              )}
             </View>
-          )}
+
+            {/* Collapsible sections */}
+                {[
+                  { key: 'maintenance', label: 'MAINTENANCE LOG', content: <MaintenanceSection bikeId={selectedBike.id} userId={user?.id} onCountChange={(n: number) => updateCount('maintenance', n)} /> },
+                  { key: 'mods', label: 'MODIFICATIONS', content: <ModificationsSection bikeId={selectedBike.id} userId={user?.id} onCountChange={(n: number) => updateCount('mods', n)} /> },
+                  { key: 'specs', label: 'SPECIFICATIONS', content: <SpecificationsSection bike={selectedBike} onCountChange={(n: number) => updateCount('specs', n)} /> },
+                  { key: 'intervals', label: 'SERVICE INTERVALS', content: <ServiceIntervalsSection bike={selectedBike} onCountChange={(n: number) => updateCount('intervals', n)} /> },
+                  { key: 'bulletins', label: 'SERVICE BULLETINS', content: <ServiceBulletinsSection bike={selectedBike} onCountChange={(n: number) => updateCount('bulletins', n)} /> },
+                ].map(({ key, label, content }) => {
+                  const open = !!expandedSections[key];
+                  const count = sectionCounts[key] ?? 0;
+                  return (
+                    <View key={key} style={[styles.sectionCard, { borderColor: theme.border, backgroundColor: theme.bgCard }]}>
+                      <Pressable style={[styles.sectionHeader, { borderBottomColor: open ? theme.border : 'transparent' }]} onPress={() => toggleSection(key)}>
+                        <Feather name={open ? 'chevron-down' : 'chevron-right'} size={14} color={theme.textSecondary} />
+                        <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginLeft: 8 }]}>{label}</Text>
+                        {count > 0 && (
+                          <View style={[styles.countBadge, { backgroundColor: theme.red }]}>
+                            <Text style={styles.countBadgeText}>{count}</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                      {open && <View style={styles.sectionContent}>{content}</View>}
+                    </View>
+                  );
+                })}
+          </>)}
         </ScrollView>
       )}
 
@@ -385,7 +399,8 @@ const styles = StyleSheet.create({
 
   // Scroll
   scrollContent: {
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     paddingBottom: 40,
   },
 
@@ -426,6 +441,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
+    marginBottom: 16,
   },
   bikeCardHeader: {
     flexDirection: 'row',
@@ -496,20 +512,43 @@ const styles = StyleSheet.create({
   },
 
   // Section tabs
-  sectionRow: {
+  sectionCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+    alignSelf: 'stretch',
+  },
+  sectionHeader: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-  },
-  sectionTab: {
-    flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
-    borderRightWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sectionTabText: {
-    fontSize: 10,
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 1,
+    letterSpacing: 0.7,
+    flex: 1,
+  },
+  sectionContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    paddingTop: 0,
+  },
+  countBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  countBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
 });
