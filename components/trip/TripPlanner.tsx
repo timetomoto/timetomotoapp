@@ -109,6 +109,7 @@ export default function TripPlanner() {
   const MAP_H_COMPACT = SCREEN_H * 0.30 + 160;
   const MAP_H_EXPANDED = SCREEN_H * 0.55;
   const [mapVisible, setMapVisible] = useState(false);
+  const [mapStyleReady, setMapStyleReady] = useState(false);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const mapHeightAnim = useRef(new Animated.Value(0)).current;
   const mapOpacity = mapHeightAnim.interpolate({
@@ -504,7 +505,12 @@ export default function TripPlanner() {
   function selectResult(loc: Loc) {
     if (activeField === 'origin') setOrigin(loc);
     else if (activeField === 'destination') setDestination(loc);
-    else if (typeof activeField === 'number') setWaypoints((p) => p.map((w, i) => i === activeField ? loc : w));
+    else if (typeof activeField === 'number') {
+      setWaypoints((p) => {
+        if (activeField >= p.length) return [...p, loc]; // new stop
+        return p.map((w, i) => i === activeField ? loc : w); // edit existing
+      });
+    }
     setActiveField(null);
     setQuery('');
     setResults([]);
@@ -615,7 +621,7 @@ export default function TripPlanner() {
       {/* Map — absolute, always mounted, fades in/out */}
       <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: mapHeightAnim, opacity: mapOpacity, overflow: 'hidden' }} pointerEvents={mapVisible ? 'auto' : 'none'}>
         <View style={{ height: MAP_H_EXPANDED }}>
-        <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onPress={handleMapPress}>
+        <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onPress={handleMapPress} onDidFinishLoadingStyle={() => setMapStyleReady(true)} onWillStartLoadingMap={() => setMapStyleReady(false)}>
           <Camera ref={cameraRef} defaultSettings={{ centerCoordinate: AUSTIN, zoomLevel: 9 }} />
           {origin && (
             <PointAnnotation id="tp-origin" coordinate={[origin.lng, origin.lat]} draggable onDragStart={() => handleMarkerDragStart('origin')} onDrag={(e: any) => handleMarkerDrag('origin', e)} onDragEnd={(e: any) => handleMarkerDragEnd('origin', e)}>
@@ -638,7 +644,7 @@ export default function TripPlanner() {
               </Pressable>
             </PointAnnotation>
           ))}
-          {routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
+          {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
         </MapView>
         {routeLoading && <View style={st.mapOverlay}><ActivityIndicator size="small" color={theme.red} /></View>}
         {/* Fit route button */}
@@ -751,7 +757,7 @@ export default function TripPlanner() {
 
               {/* Add Stop | Reverse */}
               <View style={st.actionsRow}>
-                <Pressable style={st.addStop} onPress={() => { setWaypoints((p) => [...p, { name: 'New Stop', lat: 0, lng: 0 }]); setActiveField(waypoints.length); }}>
+                <Pressable style={st.addStop} onPress={() => { setActiveField(waypoints.length); }}>
                   <Feather name="plus" size={13} color={theme.textSecondary} />
                   <Text style={[st.addStopText, { color: theme.textSecondary }]}>Add Stop</Text>
                 </Pressable>
