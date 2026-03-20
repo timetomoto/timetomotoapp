@@ -291,6 +291,7 @@ export default function RoutePreviewScreen({
       onRequestClose={onCancel}
     >
       <View style={[st.root, { backgroundColor: theme.bgPanel }]}>
+        <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
         {/* Header */}
         <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: theme.border }]}>
           <View style={{ width: 40 }} />

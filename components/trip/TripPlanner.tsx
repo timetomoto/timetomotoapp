@@ -989,6 +989,7 @@ export default function TripPlanner() {
       {/* Import modal */}
       <Modal visible={importModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setImportModalOpen(false)}>
         <View style={[st.importModal, { backgroundColor: theme.bgPanel }]}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
           <View style={[st.importHeader, { borderBottomColor: theme.border }]}>
             <Text style={[st.importTitle, { color: theme.textPrimary }]}>Import from Routes</Text>
             <Pressable onPress={() => setImportModalOpen(false)}><Feather name="x" size={22} color={theme.textSecondary} /></Pressable>
@@ -1015,6 +1016,7 @@ export default function TripPlanner() {
       {/* Save Route modal */}
       <Modal visible={saveModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSaveModalOpen(false)}>
         <View style={[st.importModal, { backgroundColor: theme.bgPanel }]}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
           <View style={[st.importHeader, { borderBottomColor: theme.border }]}>
             <Text style={[st.importTitle, { color: theme.textPrimary }]}>Save Route</Text>
             <Pressable onPress={() => setSaveModalOpen(false)}><Feather name="x" size={22} color={theme.textSecondary} /></Pressable>

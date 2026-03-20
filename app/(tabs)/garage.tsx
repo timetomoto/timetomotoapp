@@ -164,7 +164,7 @@ export default function GarageScreen() {
       </View>
 
       {loading ? (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} scrollIndicatorInsets={{ bottom: 40 }}>
           <BikeCardSkeleton />
           <View style={{ height: 16 }} />
           <BikeCardSkeleton />
@@ -189,7 +189,7 @@ export default function GarageScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} scrollIndicatorInsets={{ bottom: 40 }}>
           {/* Bike selector chips */}
           {bikes.length > 1 && (
             <ScrollView

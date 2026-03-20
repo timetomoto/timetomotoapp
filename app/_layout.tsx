@@ -3,7 +3,10 @@
 import '../lib/backgroundTasks';
 
 import { useEffect, useRef, useState } from 'react';
+import { LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+
+LogBox.ignoreLogs(['InteractionManager has been deprecated']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './onboarding';
 import { StatusBar } from 'expo-status-bar';
@@ -44,11 +47,21 @@ function AuthGuard() {
     let mounted = true;
     supabase.auth.refreshSession().then(({ data: { session } }) => {
       if (mounted) { setSession(session); setSessionChecked(true); }
-    }).catch(() => {
+    }).catch(async () => {
+      // Stale token — sign out cleanly
+      try { await supabase.auth.signOut(); } catch {}
       if (mounted) { setSession(null); setSessionChecked(true); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => { setSession(session); setSessionChecked(true); },
+      (event, session) => {
+        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+          setSession(null);
+          setSessionChecked(true);
+        } else {
+          setSession(session);
+          setSessionChecked(true);
+        }
+      },
     );
     AsyncStorage.getItem(ONBOARDING_KEY).then((v) => {
       if (mounted) setOnboardingDone(v === 'done');

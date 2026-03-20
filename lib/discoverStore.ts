@@ -1,34 +1,8 @@
 import { create } from 'zustand';
-import { XMLParser } from 'fast-xml-parser';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type NewsCategory =
-  | 'all'
-  | 'adv'
-  | 'sport'
-  | 'touring'
-  | 'cruiser'
-  | 'gear'
-  | 'safety'
-  | 'moto_news'
-  | 'events';
-
-export interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  url: string;
-  imageUrl: string | null;
-  publishedAt: Date;
-  source: string;
-  category: NewsCategory;
-}
-
-
 
 export interface RoadCondition {
   id: string;
@@ -39,195 +13,6 @@ export interface RoadCondition {
   lat: number;
   lng: number;
   reportedAt: Date;
-}
-
-// ---------------------------------------------------------------------------
-// RSS sources
-// ---------------------------------------------------------------------------
-
-const NEWS_SOURCES = [
-  { name: 'Motorcyclist Online', url: 'https://www.motorcyclistonline.com/feed/', category: 'moto_news' as NewsCategory },
-  { name: 'Cycle World', url: 'https://www.cycleworld.com/rss/all.xml/', category: 'moto_news' as NewsCategory },
-  { name: 'RideApart', url: 'https://www.rideapart.com/rss/', category: 'moto_news' as NewsCategory },
-  { name: 'Asphalt & Rubber', url: 'https://www.asphaltandrubber.com/feed/', category: 'moto_news' as NewsCategory },
-  { name: 'MCN — Motorcycle News', url: 'https://www.motorcyclenews.com/rss/', category: 'moto_news' as NewsCategory },
-  { name: 'RevZilla Common Tread', url: 'https://www.revzilla.com/common-tread/feed', category: 'gear' as NewsCategory },
-  { name: 'Rider Magazine', url: 'https://ridermagazine.com/feed/', category: 'touring' as NewsCategory },
-  { name: 'Motorcycle Cruiser', url: 'https://www.motorcyclecruiser.com/feed/', category: 'cruiser' as NewsCategory },
-  { name: 'ADVRider News', url: 'https://www.advrider.com/category/news/feed/', category: 'adv' as NewsCategory },
-  { name: 'ADVMoto', url: 'https://adventuremotorcycle.com/feed', category: 'adv' as NewsCategory },
-  { name: 'Adventure Rider Radio', url: 'https://feeds.transistor.fm/adventure-rider-radio', category: 'adv' as NewsCategory },
-  { name: 'BikeEXIF', url: 'https://www.bikeexif.com/feed', category: 'moto_news' as NewsCategory },
-  { name: 'Return of the Cafe Racers', url: 'https://www.returnofthecaferacers.com/feed/', category: 'moto_news' as NewsCategory },
-];
-
-// ---------------------------------------------------------------------------
-// Auto-categorization
-// ---------------------------------------------------------------------------
-
-const CATEGORY_KEYWORDS: Record<string, string[]> = {
-  safety: ['recall', 'nhtsa', 'crash', 'safety', 'warning', 'injury', 'death', 'fire', 'defect', 'accident', 'fatality'],
-  events: ['rally', 'event', 'festival', 'show', 'expo', 'bike week', 'bike fest', 'sturgis', 'daytona', 'laconia', 'thunder beach', 'lone star rally', 'republic of texas', 'rot rally', 'moto jam', 'iron butt', 'distinguished gentleman', 'toy run', 'motogp', 'moto gp', 'wsbk', 'ama', 'race', 'championship', 'supercross', 'enduro gp'],
-  gear: ['helmet', 'jacket', 'boots', 'gloves', 'gear', 'luggage', 'suit', 'apparel', 'protection', 'airbag', 'hi-viz', 'riding pants', 'base layer', 'intercom', 'camera mount'],
-  sport: ['supersport', 'superbike', 'sportbike', 'track day', 'circuit', 'cbr', 'gsxr', 'r1', 'r6', 'zx-', 'naked', 'streetfighter', 'cafe racer', 'custom', 'hypermotard', 'duke', 'speed triple'],
-  touring: ['touring', 'long distance', 'road trip', 'bagger', 'gold wing', 'k1600', 'pan america', 'multistrada', 'tracer', 'concours', 'versys', 'nt1100', 'rt', 'lt'],
-  cruiser: ['cruiser', 'harley', 'indian', 'chopper', 'bobber', 'softail', 'sportster', 'v-twin', 'thunderbird', 'boulevard', 'vulcan', 'shadow', 'rebel', 'scout', 'chief', 'dark horse'],
-  adv: ['adventure', 'offroad', 'off-road', 'dual sport', 'gravel', 'trail', 'bdr', 'backcountry', 'overlanding', 'adv', 'dirt', 'enduro', 'scrambler', 'gs ', 'africa twin', 'tiger', 'tenere', 'ktm adventure', 'tuareg'],
-  moto_news: ['review', 'new model', 'launch', 'first ride', 'test ride', 'announced', 'revealed', 'preview', '2025', '2026', '2027'],
-};
-
-const CATEGORY_PRIORITY: string[] = [
-  'safety', 'events', 'gear', 'sport', 'touring', 'cruiser', 'adv', 'moto_news',
-];
-
-function categorize(item: NewsItem): NewsCategory {
-  const text = (item.title + ' ' + item.summary).toLowerCase();
-  for (const cat of CATEGORY_PRIORITY) {
-    if (CATEGORY_KEYWORDS[cat].some((kw) => text.includes(kw))) {
-      return cat as NewsCategory;
-    }
-  }
-  return item.category;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function decodeHtmlEntities(text: string): string {
-  if (!text) return '';
-  return text
-    // Named entities
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&mdash;/g, '\u2014')
-    .replace(/&ndash;/g, '\u2013')
-    .replace(/&lsquo;/g, '\u2018')
-    .replace(/&rsquo;/g, '\u2019')
-    .replace(/&ldquo;/g, '\u201C')
-    .replace(/&rdquo;/g, '\u201D')
-    .replace(/&hellip;/g, '\u2026')
-    // Decimal numeric entities &#NNN;
-    .replace(/&#(\d+);/g, (_, dec) =>
-      String.fromCharCode(parseInt(dec, 10))
-    )
-    // Hex numeric entities &#xHHH;
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) =>
-      String.fromCharCode(parseInt(hex, 16))
-    )
-    // Strip any remaining HTML tags
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-function truncate(text: string, max = 180): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max).replace(/\s+\S*$/, '') + '…';
-}
-
-function parseDate(raw: string | undefined): Date {
-  if (!raw) return new Date(0);
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? new Date(0) : d;
-}
-
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + ch;
-    hash |= 0;
-  }
-  return 'n_' + Math.abs(hash).toString(36);
-}
-
-function extractImage(item: any): string | null {
-  // <media:content url="...">
-  const media = item['media:content'] ?? item['media:thumbnail'];
-  if (media) {
-    const url = typeof media === 'string' ? media : media?.['@_url'];
-    if (url) return url;
-  }
-  // <enclosure url="..." type="image/...">
-  const enc = item.enclosure;
-  if (enc) {
-    const url = enc?.['@_url'];
-    const type = enc?.['@_type'] ?? '';
-    if (url && type.startsWith('image')) return url;
-    if (url && /\.(jpg|jpeg|png|webp|gif)/i.test(url)) return url;
-  }
-  // Try to extract first image from content
-  const content = item['content:encoded'] ?? item.description ?? item.summary ?? '';
-  const imgMatch = String(content).match(/<img[^>]+src=["']([^"']+)["']/);
-  if (imgMatch?.[1]) return imgMatch[1];
-  return null;
-}
-
-async function fetchSource(
-  source: (typeof NEWS_SOURCES)[number],
-): Promise<NewsItem[]> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const res = await fetch(source.url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'timetomoto/1.0' },
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-    const parsed = parser.parse(xml);
-
-    const channel = parsed?.rss?.channel ?? parsed?.feed;
-    if (!channel) return [];
-
-    const rawItems: any[] = Array.isArray(channel.item)
-      ? channel.item
-      : channel.item
-        ? [channel.item]
-        : Array.isArray(channel.entry)
-          ? channel.entry
-          : channel.entry
-            ? [channel.entry]
-            : [];
-
-    return rawItems.map((item: any): NewsItem => {
-      const url: string =
-        (typeof item.link === 'string' ? item.link : item.link?.['#text'] ?? item.link?.['@_href']) ?? '';
-      const rawSummary: string =
-        item.description ?? item.summary ?? item['content:encoded'] ?? item.content?.['#text'] ?? '';
-      const summary = truncate(decodeHtmlEntities(String(rawSummary)));
-      const title = decodeHtmlEntities(String(item.title ?? ''));
-      const pubDate = item.pubDate ?? item.published ?? item.updated ?? item['dc:date'];
-      const imageUrl = extractImage(item);
-
-      const newsItem: NewsItem = {
-        id: simpleHash(url || `${source.name}-${title}`),
-        source: source.name,
-        category: source.category,
-        title,
-        summary,
-        url,
-        imageUrl,
-        publishedAt: parseDate(String(pubDate ?? '')),
-      };
-
-      // Auto-categorize
-      newsItem.category = categorize(newsItem);
-
-      return newsItem;
-    });
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -491,27 +276,12 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 }
 
 // ---------------------------------------------------------------------------
-// Windy Webcams fetcher
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
-const CACHE_MS = 30 * 60 * 1000;
 const CONDITIONS_CACHE_MS = 10 * 60 * 1000;
 
 interface DiscoverStore {
-  // News
-  newsItems: NewsItem[];
-  newsLoading: boolean;
-  newsError: string | null;
-  newsLastFetched: number | null;
-  activeNewsFilter: NewsCategory;
-  fetchNews: () => Promise<void>;
-  setNewsFilter: (cat: NewsCategory) => void;
-
   // Conditions
   conditions: RoadCondition[];
   conditionsLoading: boolean;
@@ -521,70 +291,9 @@ interface DiscoverStore {
   fetchConditions: (lat: number, lng: number) => Promise<void>;
   setConditionsFilter: (filter: string) => void;
   setConditionsLocation: (loc: { lat: number; lng: number; name: string } | null) => void;
-
 }
 
 export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
-  // News
-  newsItems: [],
-  newsLoading: false,
-  newsError: null,
-  newsLastFetched: null,
-  activeNewsFilter: 'all',
-
-  fetchNews: async () => {
-    const { newsLastFetched } = get();
-    // In-memory cache hit
-    if (newsLastFetched && Date.now() - newsLastFetched < CACHE_MS) return;
-
-    // Check AsyncStorage cache
-    try {
-      const cached = await AsyncStorage.getItem('@ttm/news_cache');
-      if (cached) {
-        const { items, ts } = JSON.parse(cached);
-        if (ts && Date.now() - ts < CACHE_MS && items?.length > 0) {
-          const hydrated = items.map((item: any) => ({ ...item, publishedAt: new Date(item.publishedAt) }));
-          set({ newsItems: hydrated, newsLastFetched: ts, newsLoading: false });
-          return;
-        }
-      }
-    } catch {}
-
-    set({ newsLoading: true, newsError: null });
-
-    const results = await Promise.allSettled(NEWS_SOURCES.map(fetchSource));
-    const all: NewsItem[] = [];
-    for (const r of results) {
-      if (r.status === 'fulfilled') all.push(...r.value);
-    }
-
-    if (all.length === 0) {
-      set({ newsLoading: false, newsError: 'Could not load news. Check your connection.' });
-      return;
-    }
-
-    // Deduplicate by URL
-    const seen = new Set<string>();
-    const unique = all.filter((item) => {
-      if (!item.url || seen.has(item.url)) return false;
-      seen.add(item.url);
-      return true;
-    });
-
-    // Sort newest first
-    unique.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
-
-    const now = Date.now();
-    set({ newsItems: unique, newsLastFetched: now, newsLoading: false });
-
-    // Persist to AsyncStorage
-    try {
-      await AsyncStorage.setItem('@ttm/news_cache', JSON.stringify({ items: unique, ts: now }));
-    } catch {}
-  },
-
-  setNewsFilter: (activeNewsFilter) => set({ activeNewsFilter }),
-
   // Conditions
   conditions: [],
   conditionsLoading: false,
@@ -609,5 +318,4 @@ export const useDiscoverStore = create<DiscoverStore>((set, get) => ({
 
   setConditionsFilter: (activeConditionsFilter) => set({ activeConditionsFilter }),
   setConditionsLocation: (conditionsLocation) => set({ conditionsLocation }),
-
 }));

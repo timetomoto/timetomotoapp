@@ -1303,34 +1303,38 @@ export default function RideScreen() {
 
         {/* ── RIDE & RECORD button (idle, no nav, no recording) ── */}
         {!isNavigatingActive && !isRecording && (
-          <Pressable
-            style={[styles.endNavBtn, { backgroundColor: theme.green }]}
-            onPress={() => setShowChecklist(true)}
-          >
-            <Feather name="play-circle" size={22} color={theme.white} />
-            <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
-          </Pressable>
+          <View style={styles.endNavBtnWrap}>
+            <Pressable
+              style={[styles.endNavBtn, { backgroundColor: theme.green }]}
+              onPress={() => setShowChecklist(true)}
+            >
+              <Feather name="play-circle" size={22} color={theme.white} />
+              <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
+            </Pressable>
+          </View>
         )}
 
         {/* ── END RIDE button (navigating and/or recording) ── */}
         {(isNavigatingActive || isRecording) && (
-          <Pressable
-            style={[styles.endNavBtn, { backgroundColor: theme.red, bottom: isNavigatingActive ? END_BUTTON_BOTTOM : END_BUTTON_BOTTOM }]}
-            onPress={() => {
-              if (isNavigatingActive) {
-                setNavRouteGeojson(null);
-                resetNavigation();
-              }
-              if (isRecording) {
-                handleStopRequested();
-              } else {
-                handleLocateMe();
-              }
-            }}
-          >
-            <Feather name="x" size={18} color={theme.white} />
-            <Text style={styles.endNavBtnText}>END RIDE</Text>
-          </Pressable>
+          <View style={styles.endNavBtnWrap}>
+            <Pressable
+              style={[styles.endNavBtn, { backgroundColor: theme.red }]}
+              onPress={() => {
+                if (isNavigatingActive) {
+                  setNavRouteGeojson(null);
+                  resetNavigation();
+                }
+                if (isRecording) {
+                  handleStopRequested();
+                } else {
+                  handleLocateMe();
+                }
+              }}
+            >
+              <Feather name="x" size={18} color={theme.white} />
+              <Text style={styles.endNavBtnText}>END RIDE</Text>
+            </Pressable>
+          </View>
         )}
 
         {/* Place detail panel (fuel / food) */}
@@ -1653,10 +1657,14 @@ const styles = StyleSheet.create({
   },
 
   // End navigation button
-  endNavBtn: {
+  endNavBtnWrap: {
     position: 'absolute',
     bottom: END_BUTTON_BOTTOM,
-    right: END_BUTTON_RIGHT,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  endNavBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1674,7 +1682,7 @@ const styles = StyleSheet.create({
   // Stats bar
   statsBar: {
     position: 'absolute',
-    bottom: 29,
+    bottom: 138,
     left: 16,
     right: 16,
     flexDirection: 'row',

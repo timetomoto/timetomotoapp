@@ -90,9 +90,8 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={fm.overlay}>
-        <View style={[fm.sheet, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+        <View style={[fm.sheet, { flex: 1, backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
           <View style={[fm.handle, { backgroundColor: theme.border }]} />
           <View style={fm.header}>
             <Text style={[fm.heading, { color: theme.textPrimary }]}>{editing ? 'EDIT DOCUMENT' : 'ADD DOCUMENT'}</Text>
@@ -152,7 +151,6 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
             </Pressable>
           </ScrollView>
         </View>
-      </View>
     </Modal>
   );
 }
@@ -301,7 +299,7 @@ export default function DocumentsSection({ bikeId, userId }: { bikeId: string; u
 
 const fm = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40, maxHeight: '90%' },
+  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   heading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },

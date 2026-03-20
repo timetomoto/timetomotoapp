@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -67,9 +67,9 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDiscard}>
       <KeyboardAvoidingView
-        style={s.overlay}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[s.sheet, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
