@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingVertical: 16,
     paddingHorizontal: 12,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
 
   // Bike selector chips

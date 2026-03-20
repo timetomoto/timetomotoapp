@@ -683,7 +683,7 @@ export default function TripPlanner() {
           </Pressable>
         </View>
 
-        <ScrollView style={[st.panel, { backgroundColor: theme.bgPanel }]} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <ScrollView style={[st.panel, { backgroundColor: theme.bgPanel }]} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>

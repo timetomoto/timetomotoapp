@@ -1751,7 +1751,19 @@ const SEED_ROUTES: SeedRoute[] = [
   { name: "Arizona BDR", category: "Backcountry Discovery Routes", points: ARIZONA_BDR_POINTS },
 ];
 
+let seedingInProgress = false;
+
 export async function seedRoutes(userId: string): Promise<void> {
+  if (seedingInProgress) return;
+  seedingInProgress = true;
+  try {
+    await _seedRoutesInner(userId);
+  } finally {
+    seedingInProgress = false;
+  }
+}
+
+async function _seedRoutesInner(userId: string): Promise<void> {
   const existing = await fetchUserRoutes(userId);
   const existingByName = new Map(existing.map((r) => [r.name, r]));
 

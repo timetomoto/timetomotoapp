@@ -949,7 +949,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
 
 const styles = StyleSheet.create({
   root:    { flex: 1 },
-  content: { padding: 20, paddingBottom: 80 },
+  content: { padding: 20, paddingBottom: 120 },
 
   toolbarRow: {
     flexDirection: 'row',
