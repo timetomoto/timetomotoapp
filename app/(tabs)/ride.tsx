@@ -48,10 +48,11 @@ import PlaceDetailPanel, { type PlaceDetail } from '../../components/ride/PlaceD
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import TimetomotoLogo from '../../components/common/TimetomotoLogo';
-import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT, END_BUTTON_BOTTOM, END_BUTTON_RIGHT } from '../../lib/headerLayout';
+import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT } from '../../lib/headerLayout';
 import { darkTheme } from '../../lib/theme';
 import { addFavorite } from '../../lib/favorites';
 import { useTheme } from '../../lib/useTheme';
+import Svg, { Circle, Polygon as SvgPolygon, Text as SvgText } from 'react-native-svg';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMeters } from '../../lib/directions';
 import MapControlDrawer from '../../components/ride/MapControlDrawer';
@@ -59,7 +60,7 @@ import SearchSheet from '../../components/ride/SearchSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
 import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type RouteWeatherPoint } from '../../lib/routeWeather';
-import NavigationStatsBar from '../../components/ride/NavigationStatsBar';
+import StatsBar from '../../components/ride/StatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
 // ---------------------------------------------------------------------------
@@ -147,19 +148,15 @@ const wl = StyleSheet.create({
 function RecordScreen({
   onStopRequested,
   elapsedSeconds,
-  onBikeSelected,
 }: {
   onStopRequested: () => void;
   elapsedSeconds: number;
-  onBikeSelected?: (bikeId: string | null) => void;
 }) {
   const { theme } = useTheme();
-  const { user } = useAuthStore();
   const {
-    isRecording, setRecording, isMonitoring, lastKnownLocation,
+    isRecording,
     shareToken, shareActive, setShareToken, setShareActive,
     checkInActive, checkInDeadline, checkInNotifId, clearCheckIn,
-    setCheckIn, emergencyContacts,
   } = useSafetyStore();
 
   // Check-in countdown
@@ -189,45 +186,6 @@ function RecordScreen({
     return `${secs}s`;
   }
 
-  // ── START ride ──
-  async function handleStart(cfg: RideConfig) {
-    onBikeSelected?.(cfg.bikeId ?? null);
-    setRecording(true);
-
-    // Live share
-    if (cfg.shareEnabled && user) {
-      try {
-        const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
-        const token = await startShare(user.id, loc.lat, loc.lng);
-        setShareToken(token);
-        setShareActive(true);
-        await Clipboard.setStringAsync(shareUrl(token));
-        await startBackgroundLocation();
-      } catch {
-        // Non-fatal — ride continues without share
-      }
-    }
-
-    // Check-in timer
-    if (cfg.checkInMinutes) {
-      const deadline = Date.now() + cfg.checkInMinutes * 60_000;
-      let notifId: string | null = null;
-      try {
-        await Notifications.requestPermissionsAsync();
-        const id = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '⏰ timetomoto check-in due',
-            body: `Check in by ${new Date(deadline).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} or your contacts will be alerted.`,
-            sound: true,
-          },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(deadline) },
-        });
-        notifId = id;
-      } catch {}
-      setCheckIn(deadline, notifId);
-    }
-  }
-
   // ── STOP ride — delegate to parent which handles save sheet ──
   async function handleStop() {
     // End share & check-in before showing save sheet
@@ -253,12 +211,9 @@ function RecordScreen({
     clearCheckIn();
   }
 
-  // ── PRE-RIDE view ──
-  if (!isRecording) {
-    return <PreRideChecklist onStart={handleStart} />;
-  }
-
   // ── ACTIVE RIDE view — transparent overlay on top of the map ──
+  if (!isRecording) return null;
+
   return (
     <View style={{ flex: 1 }} pointerEvents="box-none">
       {/* Status badges — share / check-in only (crash badge is already on the map header) */}
@@ -298,43 +253,6 @@ function RecordScreen({
 }
 
 // ---------------------------------------------------------------------------
-// Stats overlay (shown on MAP tab while recording)
-// ---------------------------------------------------------------------------
-
-function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: boolean; elapsedSeconds: number; speedMph: number }) {
-  const { theme } = useTheme();
-  const { recordedPoints } = useSafetyStore();
-
-  function formatHMS(s: number) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-  }
-
-  const miles = isRecording ? calcDistance(recordedPoints) : 0;
-
-  return (
-    <View style={[styles.statsBar, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{Math.round(speedMph)}</Text>
-        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MPH</Text>
-      </View>
-      <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{miles < 10 ? miles.toFixed(1) : Math.round(miles)}</Text>
-        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MILES</Text>
-      </View>
-      <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-      <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{formatHMS(elapsedSeconds)}</Text>
-        <Text style={[styles.statLabel, { color: theme.textSecondary }]}>TIME</Text>
-      </View>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main RideScreen
 // ---------------------------------------------------------------------------
 
@@ -352,6 +270,7 @@ export default function RideScreen() {
   }, [user?.id]);
   const {
     isRecording, setRecording,
+    isRidePaused, setRidePaused,
     recordedPoints, clearRecordedPoints,
     lastKnownLocation,
   } = useSafetyStore();
@@ -574,6 +493,39 @@ export default function RideScreen() {
   const mapRef       = useRef<Mapbox.MapView>(null);
   const cameraRef    = useRef<Mapbox.Camera>(null);
   const [mapStyleReady, setMapStyleReady] = useState(false);
+
+  // ── Compass / map orientation ──
+  type MapOrientation = 'north-up' | 'track-up';
+  const [mapOrientation, setMapOrientation] = useState<MapOrientation>('north-up');
+  const [deviceHeading, setDeviceHeading] = useState(0);
+
+  useEffect(() => {
+    let sub: Location.LocationSubscription;
+    Location.watchHeadingAsync((h) => {
+      const newHeading = h.trueHeading > 0 ? h.trueHeading : h.magHeading;
+      setDeviceHeading(newHeading);
+      if (mapOrientation === 'track-up') {
+        cameraRef.current?.setCamera({
+          heading: newHeading,
+          animationMode: 'none',
+          animationDuration: 0,
+        });
+      }
+    }).then((s) => { sub = s; });
+    return () => { sub?.remove(); };
+  }, [mapOrientation]);
+
+  function toggleOrientation() {
+    const next = mapOrientation === 'north-up' ? 'track-up' : 'north-up';
+    setMapOrientation(next);
+    if (next === 'north-up') {
+      cameraRef.current?.setCamera({
+        heading: 0,
+        animationMode: 'easeTo',
+        animationDuration: 300,
+      });
+    }
+  }
   const userIsPanning = useRef(false);
   const panResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingBikeIdRef = useRef<string | null>(null);
@@ -587,8 +539,10 @@ export default function RideScreen() {
       elapsedRef.current = 0;
       setElapsedSeconds(0);
       elapsedTimer.current = setInterval(() => {
-        elapsedRef.current += 1;
-        setElapsedSeconds(elapsedRef.current);
+        if (!useSafetyStore.getState().isRidePaused) {
+          elapsedRef.current += 1;
+          setElapsedSeconds(elapsedRef.current);
+        }
       }, 1000);
     } else {
       clearInterval(elapsedTimer.current!);
@@ -862,10 +816,77 @@ export default function RideScreen() {
     }
   }, [pendingSearchDest]);
 
+  // ── Start ride (called from pre-ride checklist modal) ──
+  async function handleStartRide(cfg: RideConfig) {
+    recordingBikeIdRef.current = cfg.bikeId ?? null;
+    setShowChecklist(false);
+    setRecording(true);
+    setRidePaused(false);
+
+    // Live share
+    if (cfg.shareEnabled && user) {
+      try {
+        const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+        const token = await startShare(user.id, loc.lat, loc.lng);
+        useSafetyStore.getState().setShareToken(token);
+        useSafetyStore.getState().setShareActive(true);
+        await Clipboard.setStringAsync(shareUrl(token));
+        await startBackgroundLocation();
+      } catch {
+        // Non-fatal — ride continues without share
+      }
+    }
+
+    // Check-in timer
+    if (cfg.checkInMinutes) {
+      const deadline = Date.now() + cfg.checkInMinutes * 60_000;
+      let notifId: string | null = null;
+      try {
+        await Notifications.requestPermissionsAsync();
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '\u23f0 timetomoto check-in due',
+            body: `Check in by ${new Date(deadline).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} or your contacts will be alerted.`,
+            sound: true,
+          },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(deadline) },
+        });
+        notifId = id;
+      } catch {}
+      useSafetyStore.getState().setCheckIn(deadline, notifId);
+    }
+  }
+
   // Dismiss checklist when recording starts
   useEffect(() => {
     if (isRecording) setShowChecklist(false);
   }, [isRecording]);
+
+  // ── Ride guard: prevent starting a new ride/nav while one is active ──
+  function guardRideStart(): boolean {
+    if (isRecording || isNavigatingActive) {
+      Alert.alert(
+        isNavigatingActive ? 'Navigation In Progress' : 'Ride In Progress',
+        isNavigatingActive
+          ? 'You are currently navigating. End navigation before starting a new one.'
+          : 'You have an active ride in progress. What would you like to do?',
+        isNavigatingActive
+          ? [{ text: 'OK' }]
+          : [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'End & Save Current Ride', onPress: () => handleStopRequested() },
+              { text: 'End Without Saving', style: 'destructive', onPress: () => handleDiscardRide() },
+            ],
+      );
+      return true; // blocked
+    }
+    return false;
+  }
+
+  // ── Pause / resume toggle ──
+  function togglePause() {
+    setRidePaused(!isRidePaused);
+  }
 
   // Stop requested: clean up share/check-in, show save sheet
   function handleStopRequested() {
@@ -892,6 +913,7 @@ export default function RideScreen() {
       Alert.alert('Not enough data', 'Not enough GPS data to save this ride. Try riding for longer next time.');
       clearRecordedPoints();
       setRecording(false);
+      setRidePaused(false);
       setShowSaveSheet(false);
       useSafetyStore.getState().clearSessionOverrides();
       return;
@@ -914,6 +936,7 @@ export default function RideScreen() {
     }
     clearRecordedPoints();
     setRecording(false);
+    setRidePaused(false);
     setShowSaveSheet(false);
     useSafetyStore.getState().clearSessionOverrides();
   }
@@ -922,6 +945,7 @@ export default function RideScreen() {
   function handleDiscardRide() {
     clearRecordedPoints();
     setRecording(false);
+    setRidePaused(false);
     setShowSaveSheet(false);
     useSafetyStore.getState().clearSessionOverrides();
   }
@@ -1053,10 +1077,7 @@ export default function RideScreen() {
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           styleURL={activeMapStyle}
-          compassEnabled
-          compassPosition={{ top: Platform.OS === 'ios' ? 102 : 62, right: 12 }}
-          // @ts-expect-error compassViewStyle exists at runtime but missing from types
-          compassViewStyle={{ opacity: 0.7 }}
+          compassEnabled={false}
           scaleBarEnabled={false}
           attributionEnabled={false}
           logoEnabled={false}
@@ -1200,19 +1221,6 @@ export default function RideScreen() {
           )}
         </MapView>
 
-        {/* ── Recenter / locate me button (below compass) ── */}
-        {!drawerOpen && !searchSheetOpen && !showChecklist && <View style={styles.locateBtnWrap} pointerEvents="box-none">
-          <Pressable
-            style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
-            hitSlop={8}
-            onPress={() => {
-              handleLocateMe();
-            }}
-          >
-            <Feather name="crosshair" size={23} color={theme.textSecondary} />
-          </Pressable>
-        </View>}
-
         {/* ── Nav weather warning banner ── */}
         {navWeatherBanner && (
           <RNAnimated.View style={[styles.navWeatherBanner, { backgroundColor: navWeatherBanner.severe ? theme.red : '#FF9800', opacity: navWeatherFadeAnim }]}>
@@ -1242,7 +1250,7 @@ export default function RideScreen() {
             <View style={{ flex: 1 }} />
           </>
           <Pressable
-            style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+            style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border, marginTop: 0 }]}
             onPress={() => setSearchSheetOpen(true)}
           >
             <Feather name="search" size={20} color={theme.textPrimary} />
@@ -1278,18 +1286,65 @@ export default function RideScreen() {
           <Feather name="layers" size={20} color={theme.textPrimary} />
         </Pressable>
 
+        {/* ── Compass / heading buttons (Garmin-style) ── */}
+        <View style={styles.compassWrap}>
+          {/* Compass rose — only visible in track-up mode */}
+          {mapOrientation === 'track-up' && (
+            <Pressable
+              onPress={toggleOrientation}
+              style={[styles.compassBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border, marginBottom: 8 }]}
+            >
+              <Svg width={28} height={28} viewBox="0 0 44 44">
+                <Circle cx="22" cy="22" r="20" fill="transparent" stroke={theme.border} strokeWidth={1.5} />
+                <SvgPolygon points="22,6 18,20 22,17 26,20" fill={theme.red} />
+                <SvgPolygon points="22,38 18,24 22,27 26,24" fill={theme.textMuted} />
+                <SvgText x="22" y="13" textAnchor="middle" fontSize="6" fontWeight="bold" fill={theme.red}>N</SvgText>
+              </Svg>
+            </Pressable>
+          )}
+
+          {/* Navigation arrow — always visible, rotates with heading in north-up mode */}
+          <Pressable
+            onPress={toggleOrientation}
+            style={[
+              styles.compassBtn,
+              { backgroundColor: theme.mapOverlayBg, borderColor: theme.border },
+              mapOrientation === 'track-up' && { backgroundColor: theme.red, borderColor: theme.red },
+            ]}
+          >
+            <View style={{ transform: [{ rotate: mapOrientation === 'north-up' ? `${-deviceHeading}deg` : '0deg' }] }}>
+              <Feather
+                name="navigation"
+                size={22}
+                color={mapOrientation === 'track-up' ? theme.white : theme.textPrimary}
+              />
+            </View>
+          </Pressable>
+        </View>
+
         {/* Weather legend — bottom-left when weather is on */}
         {weatherOn && <WeatherLegend />}
 
         {/* ── Stats bar: navigation stats or recording stats (hidden in free ride) ── */}
         {isNavigatingActive ? (
-          <NavigationStatsBar
-            speedMph={speedMph}
-            eta={eta}
-            remainingMiles={remainingDistanceMiles}
-          />
+          <StatsBar stats={[
+            { value: String(Math.round(speedMph)), label: 'MPH' },
+            { value: eta ? eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '--:--', label: 'ETA' },
+            { value: remainingDistanceMiles < 0.1 ? '< 0.1' : remainingDistanceMiles < 10 ? remainingDistanceMiles.toFixed(1) : String(Math.round(remainingDistanceMiles)), label: 'MI LEFT' },
+          ]} />
         ) : isRecording ? (
-          <StatsOverlay isRecording={isRecording} elapsedSeconds={elapsedSeconds} speedMph={speedMph} />
+          <StatsBar stats={(() => {
+            const miles = calcDistance(recordedPoints);
+            const h = Math.floor(elapsedSeconds / 3600);
+            const m = Math.floor((elapsedSeconds % 3600) / 60);
+            const sec = elapsedSeconds % 60;
+            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            return [
+              { value: String(Math.round(speedMph)), label: 'MPH' },
+              { value: miles < 10 ? miles.toFixed(1) : String(Math.round(miles)), label: 'MILES' },
+              { value: time, label: 'TIME' },
+            ];
+          })()} />
         ) : null}
 
         {/* ── RIDE & RECORD button (idle, no nav, no recording) ── */}
@@ -1297,7 +1352,9 @@ export default function RideScreen() {
           <View style={styles.endNavBtnWrap}>
             <Pressable
               style={[styles.endNavBtn, { backgroundColor: theme.green }]}
-              onPress={() => setShowChecklist(true)}
+              onPress={() => {
+                if (!guardRideStart()) setShowChecklist(true);
+              }}
             >
               <Feather name="play-circle" size={22} color={theme.white} />
               <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
@@ -1305,26 +1362,45 @@ export default function RideScreen() {
           </View>
         )}
 
-        {/* ── END RIDE button (navigating and/or recording) ── */}
+        {/* ── PAUSE + END RIDE buttons (navigating and/or recording) ── */}
         {(isNavigatingActive || isRecording) && (
           <View style={styles.endNavBtnWrap}>
-            <Pressable
-              style={[styles.endNavBtn, { backgroundColor: theme.red }]}
-              onPress={() => {
-                if (isNavigatingActive) {
-                  setNavRouteGeojson(null);
-                  resetNavigation();
-                }
-                if (isRecording) {
-                  handleStopRequested();
-                } else {
-                  handleLocateMe();
-                }
-              }}
-            >
-              <Feather name="x" size={18} color={theme.white} />
-              <Text style={styles.endNavBtnText}>END RIDE</Text>
-            </Pressable>
+            <View style={styles.rideControlRow}>
+              {isRecording && (
+                <Pressable
+                  style={[styles.pauseBtn, { backgroundColor: isRidePaused ? theme.green : theme.textMuted }]}
+                  onPress={togglePause}
+                >
+                  <Feather name={isRidePaused ? 'play' : 'pause'} size={18} color={theme.white} />
+                  <Text style={styles.pauseBtnText}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
+                </Pressable>
+              )}
+              <Pressable
+                style={[styles.endNavBtn, { backgroundColor: theme.red }]}
+                onPress={() => {
+                  if (isNavigatingActive) {
+                    setNavRouteGeojson(null);
+                    resetNavigation();
+                  }
+                  if (isRecording) {
+                    handleStopRequested();
+                  } else {
+                    handleLocateMe();
+                  }
+                }}
+              >
+                <Feather name="x" size={18} color={theme.white} />
+                <Text style={styles.endNavBtnText}>END RIDE</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* ── Paused indicator ── */}
+        {isRidePaused && isRecording && (
+          <View style={[styles.pausedBadge, { backgroundColor: theme.red }]}>
+            <Feather name="pause" size={12} color={theme.white} />
+            <Text style={styles.pausedBadgeText}>PAUSED</Text>
           </View>
         )}
 
@@ -1481,27 +1557,16 @@ export default function RideScreen() {
         )}
       </View>
 
-      {/* ── Pre-ride checklist (triggered from RECORD button on map) ── */}
-      {showChecklist && !isRecording && (
-        <SafeAreaView edges={['top']} style={[styles.subScreen, { backgroundColor: theme.bg }]}>
-          <View style={[styles.recordHeader, { borderBottomColor: theme.border }]}>
-            <Pressable onPress={() => setShowChecklist(false)} style={{ padding: 4 }}>
-              <Feather name="x" size={22} color={theme.textSecondary} />
-            </Pressable>
-            <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
-              </View>
-            </View>
-            <View style={{ width: 40 }} />
-          </View>
-          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
-        </SafeAreaView>
-      )}
+      {/* ── Pre-ride checklist modal ── */}
+      <PreRideChecklist
+        visible={showChecklist && !isRecording}
+        onClose={() => setShowChecklist(false)}
+        onStart={handleStartRide}
+      />
       {/* ── Active recording overlay on map ── */}
       {isRecording && (
         <SafeAreaView edges={['top', 'bottom']} style={styles.recordMapOverlay} pointerEvents="box-none">
-          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} onBikeSelected={(id) => { recordingBikeIdRef.current = id; }} />
+          <RecordScreen onStopRequested={handleStopRequested} elapsedSeconds={elapsedSeconds} />
         </SafeAreaView>
       )}
 
@@ -1560,37 +1625,6 @@ const styles = StyleSheet.create({
 
   mapContainer: { ...StyleSheet.absoluteFillObject },
 
-  // Recenter button wrapper + button (aligned below compass)
-  locateBtnWrap: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 60,
-    zIndex: 9999,
-    elevation: 20,
-  },
-  locateBtn: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 209 : 169,
-    right: 14,
-    width: 37,
-    height: 37,
-    borderRadius: 18.5,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Top header bar over map
-  recordHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: (HEADER_HEIGHT - 40) / 2,
-    borderBottomWidth: 1,
-  },
   mapHeader: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 46 : 6,
@@ -1637,7 +1671,7 @@ const styles = StyleSheet.create({
   // Map control icon (layers button)
   mapControlIcon: {
     position: 'absolute',
-    bottom: 138,
+    bottom: 88,
     right: 12,
     width: 44,
     height: 44,
@@ -1647,6 +1681,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Compass orientation toggle
+  compassWrap: {
+    position: 'absolute',
+    bottom: 141,
+    right: 12,
+    alignItems: 'center',
+  },
+  compassBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   // End navigation button
   endNavBtnWrap: {
     position: 'absolute',
@@ -1669,25 +1723,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
-
-  // Stats bar
-  statsBar: {
-    position: 'absolute',
-    bottom: END_BUTTON_BOTTOM,
-    left: 16,
-    right: 16,
+  rideControlRow: {
     flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 10,
+    alignItems: 'center',
+    gap: 12,
   },
-  statItem:  { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
-  statLabel: { fontSize: 10, letterSpacing: 0.5, marginTop: 2 },
-  statDivider: { width: 1, marginVertical: 4 },
-
-  // Checklist overlay
-  subScreen: { flex: 1 },
+  pauseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 26,
+    paddingHorizontal: 17,
+    paddingVertical: 12,
+  },
+  pauseBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  pausedBadge: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 70,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  pausedBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
 
   // Record screen — transparent map overlay (when recording)
   recordMapOverlay: {

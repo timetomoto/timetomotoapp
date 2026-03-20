@@ -29,7 +29,7 @@ import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore, useRoutesStore } from '../../lib/store';
+import { useAuthStore, useRoutesStore, useSafetyStore } from '../../lib/store';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 import { fetchDirections } from '../../lib/directions';
@@ -519,7 +519,20 @@ export default function TripPlanner() {
 
   function handleNavigate() {
     if (!destination) return;
-    useNavigationStore.getState().setPendingSearchDest(destination);
+    const { isRecording } = useSafetyStore.getState();
+    const navStore = useNavigationStore.getState();
+    const isNav = navStore.mode === 'navigating' || navStore.mode === 'off_route' || navStore.mode === 'recalculating';
+    if (isRecording || isNav) {
+      Alert.alert(
+        isNav ? 'Navigation In Progress' : 'Ride In Progress',
+        isNav
+          ? 'You are currently navigating. End navigation before starting a new one.'
+          : 'You have an active ride recording. End the ride before starting navigation.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+    navStore.setPendingSearchDest(destination);
     router.navigate('/(tabs)/ride' as any);
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -103,19 +104,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 // PreRideChecklist
 // ---------------------------------------------------------------------------
 
-const PRE_RIDE_COL1 = [
-  'Check tire pressure',
-  'Check brakes and controls',
-  'Check chain condition',
-];
-
-const PRE_RIDE_COL2 = [
-  'Check lights and signals',
-  'Check gear and helmet',
-  'Check fuel level',
-];
-
-export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfig) => void }) {
+export default function PreRideChecklist({ visible, onClose, onStart }: { visible: boolean; onClose: () => void; onStart: (cfg: RideConfig) => void }) {
   const { theme } = useTheme();
   const {
     isMonitoring, setMonitoring, shareActive,
@@ -228,15 +217,29 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
   const contactsOk = emergencyContacts.length > 0;
 
   return (
-    <ScrollView
-      style={[s.root, { backgroundColor: theme.bg }]}
-      contentContainerStyle={s.content}
-      showsVerticalScrollIndicator={false}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
     >
-      <Text style={[s.heading, { color: theme.textSecondary }]}>PRE-RIDE CHECK</Text>
+      <View style={[s.root, { backgroundColor: theme.bg }]}>
+        {/* Drag handle */}
+        <View style={[s.dragHandle, { backgroundColor: theme.border }]} />
+        {/* Header row */}
+        <View style={s.header}>
+          <Text style={[s.headerTitle, { color: theme.textPrimary }]}>BEFORE YOU RIDE</Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Feather name="x" size={22} color={theme.textPrimary} />
+          </Pressable>
+        </View>
+      <ScrollView
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* ── Bike selector ── */}
-      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>SELECT BIKE</Text>
+      <Text style={[s.sectionLabel, { color: theme.textSecondary, marginTop: 0 }]}>SELECT BIKE</Text>
       {bikes.length === 0 ? (
         <View style={[s.emptyCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <Text style={[s.emptyText, { color: theme.textSecondary }]}>
@@ -272,29 +275,6 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
           ))}
         </ScrollView>
       )}
-
-      {/* ── Static pre-ride reminders ── */}
-      <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>REMINDERS</Text>
-      <View style={[s.remindersCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <View style={s.remindersColumns}>
-          <View style={s.remindersCol}>
-            {PRE_RIDE_COL1.map((reminder, i) => (
-              <View key={i} style={s.reminderRow}>
-                <Feather name="check" size={9} color={theme.textSecondary} />
-                <Text style={[s.reminderText, { color: theme.textSecondary }]}>{reminder}</Text>
-              </View>
-            ))}
-          </View>
-          <View style={s.remindersCol}>
-            {PRE_RIDE_COL2.map((reminder, i) => (
-              <View key={i} style={s.reminderRow}>
-                <Feather name="check" size={9} color={theme.textSecondary} />
-                <Text style={[s.reminderText, { color: theme.textSecondary }]}>{reminder}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
 
       {/* ── RIDE SETTINGS ── */}
       <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>RIDE SETTINGS</Text>
@@ -385,7 +365,7 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
       {(() => {
         const alertsActive = crashOn || shareEnabled || checkInOn;
         return (
-          <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, !alertsActive && { opacity: 0.4 }]}>
+          <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border, marginBottom: 24 }, !alertsActive && { opacity: 0.4 }]}>
             <CheckRow
               icon="users"
               title="WHO TO NOTIFY"
@@ -468,6 +448,8 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
         <Text style={s.startBtnText}>START & RECORD RIDE</Text>
       </Pressable>
     </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -477,26 +459,40 @@ export default function PreRideChecklist({ onStart }: { onStart: (cfg: RideConfi
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: 14, paddingBottom: 60 },
-
-  heading: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 8,
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 8,
+    marginBottom: 4,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
+  },
+  content: { padding: 14, paddingBottom: 60 },
 
   sectionLabel: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.7,
-    marginBottom: 5,
-    marginTop: 2,
+    marginBottom: 12,
+    marginTop: 20,
   },
 
   // Bike selector
-  bikeChipRow: { marginBottom: 8 },
-  bikeChipContent: { gap: 6, paddingHorizontal: 2 },
+  bikeChipRow: { marginBottom: 10 },
+  bikeChipContent: { gap: 8, paddingHorizontal: 2 },
   bikeChip: {
     borderWidth: 1,
     borderRadius: 20,
@@ -512,41 +508,14 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   emptyText: { fontSize: 11, lineHeight: 16 },
-
-  // Static reminders
-  remindersCard: {
-    borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  remindersColumns: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  remindersCol: {
-    flex: 1,
-    gap: 4,
-  },
-  reminderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  reminderText: {
-    fontSize: 10,
-    lineHeight: 14,
-    flex: 1,
-  },
 
   card: {
     borderWidth: 1,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 10,
     overflow: 'hidden',
   },
   divider: { height: 1, marginHorizontal: 12 },
@@ -647,10 +616,5 @@ const s = StyleSheet.create({
   contactPillText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  overrideLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    marginRight: 6,
   },
 });

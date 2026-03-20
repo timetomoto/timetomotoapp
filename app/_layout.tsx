@@ -98,7 +98,7 @@ function SafetyService() {
     checkInActive, checkInDeadline, checkInNotifId, clearCheckIn,
     emergencyContacts, lastKnownLocation,
     setShareToken, setShareActive, setRecording,
-    isRecording, addRecordedPoint,
+    isRecording, isRidePaused, addRecordedPoint,
   } = useSafetyStore();
   const { user } = useAuthStore();
 
@@ -203,6 +203,8 @@ function SafetyService() {
         Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 0 },
           (loc) => {
+            updateLocation(loc.coords.latitude, loc.coords.longitude);
+            if (useSafetyStore.getState().isRidePaused) return;
             const pt: TrackPoint = {
               lat:  loc.coords.latitude,
               lng:  loc.coords.longitude,
@@ -210,7 +212,6 @@ function SafetyService() {
               time: new Date(loc.timestamp).toISOString(),
             };
             addRecordedPoint(pt);
-            updateLocation(loc.coords.latitude, loc.coords.longitude);
           },
         ).then((sub) => { trackSub.current = sub; });
       });

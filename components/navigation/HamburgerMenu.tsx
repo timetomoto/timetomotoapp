@@ -156,14 +156,14 @@ export default function HamburgerMenu({ open, onClose }: Props) {
         {/* Menu items */}
         <View style={styles.menuList}>
           <MenuItem
-            icon="settings"
-            label="SETTINGS"
-            onPress={() => navigate('/settings')}
-          />
-          <MenuItem
             icon="user"
             label="MY ACCOUNT"
             onPress={() => navigate('/account')}
+          />
+          <MenuItem
+            icon="settings"
+            label="SETTINGS"
+            onPress={() => navigate('/settings')}
           />
 
           {/* Divider */}

@@ -36,6 +36,7 @@ interface SafetyState {
   checkInNotifId: string | null;    // scheduled notification identifier
 
   // GPS track recording
+  isRidePaused: boolean;
   recordedPoints: TrackPoint[];
 
   // Session-only overrides (not persisted)
@@ -52,6 +53,7 @@ interface SafetyState {
   setShareActive: (v: boolean) => void;
   setCheckIn: (deadline: number, notifId: string | null) => void;
   clearCheckIn: () => void;
+  setRidePaused: (v: boolean) => void;
   addRecordedPoint: (p: TrackPoint) => void;
   clearRecordedPoints: () => void;
   setCrashDetectionOverride: (v: boolean) => void;
@@ -72,6 +74,7 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   checkInDeadline: null,
   checkInActive: false,
   checkInNotifId: null,
+  isRidePaused: false,
   recordedPoints: [],
   crashDetectionOverride: false,
   locationSharingOverride: false,
@@ -99,6 +102,8 @@ export const useSafetyStore = create<SafetyState>((set) => ({
 
   clearCheckIn: () =>
     set({ checkInDeadline: null, checkInActive: false, checkInNotifId: null }),
+
+  setRidePaused: (isRidePaused) => set({ isRidePaused }),
 
   addRecordedPoint: (p) =>
     set((s) => ({ recordedPoints: [...s.recordedPoints, p] })),
