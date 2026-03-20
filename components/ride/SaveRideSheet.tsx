@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -67,12 +68,13 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onDiscard}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={[s.sheet, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onDiscard}>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onDiscard} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+        <View style={[s.sheet, { maxHeight: Dimensions.get('window').height * 0.75, backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <View style={[s.handle, { backgroundColor: theme.border }]} />
 
           <Text style={[s.title, { color: theme.textPrimary }]}>SAVE THIS RIDE?</Text>
@@ -135,6 +137,7 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

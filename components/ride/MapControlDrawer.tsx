@@ -1,13 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
   ActivityIndicator,
-  Animated,
+  Dimensions,
+  Modal,
+  PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 
@@ -32,6 +36,9 @@ interface Props {
   onToggleFood: () => void;
 }
 
+const SCREEN_H = Dimensions.get('window').height;
+const PANEL_MAX_H = SCREEN_H * 0.75;
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -51,48 +58,16 @@ export default function MapControlDrawer({
   onToggleFood,
 }: Props) {
   const { theme } = useTheme();
-  const translateX = useRef(new Animated.Value(280)).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const [panelMounted, setPanelMounted] = useState(visible);
+  const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    if (visible) {
-      setPanelMounted(true);
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          damping: 22,
-          stiffness: 200,
-          mass: 0.8,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: 280,
-          useNativeDriver: true,
-          damping: 22,
-          stiffness: 200,
-          mass: 0.8,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        if (finished) setPanelMounted(false);
-      });
-    }
-  }, [visible]);
-
-  if (!panelMounted) return null;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 50) onClose();
+      },
+    })
+  ).current;
 
   const MAP_STYLE_OPTIONS: { key: MapStyleOption; label: string; icon: string }[] = [
     { key: 'standard', label: 'Standard', icon: 'map' },
@@ -102,165 +77,108 @@ export default function MapControlDrawer({
   ];
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
-      {/* Backdrop */}
-      <Animated.View
-        style={[styles.backdrop, { opacity: backdropOpacity }]}
-        pointerEvents={visible ? 'auto' : 'none'}
-      >
-        <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
-      </Animated.View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      <View style={s.overlay}>
+        {/* Tap top area to dismiss */}
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
 
-      {/* Drawer panel */}
-      <Animated.View
-        style={[
-          styles.drawer,
-          {
-            backgroundColor: theme.bgPanel,
-            borderLeftColor: theme.border,
-            transform: [{ translateX }],
-          },
-        ]}
-      >
-        {/* Header */}
-        <View style={[styles.drawerHeader, { borderBottomColor: theme.border }]}>
-          <Text style={[styles.drawerTitle, { color: theme.textPrimary }]}>MAP CONTROLS</Text>
-          <Pressable onPress={onClose} style={styles.closeBtn}>
-            <Feather name="x" size={18} color={theme.textMuted} />
+        {/* Panel */}
+        <View style={[s.panel, { backgroundColor: theme.bgPanel, paddingBottom: insets.bottom + 16 }]}>
+          {/* Drag handle */}
+          <View {...panResponder.panHandlers}>
+            <View style={[s.handle, { backgroundColor: theme.border }]} />
+          </View>
+
+          {/* Close button */}
+          <Pressable onPress={onClose} style={s.closeBtn}>
+            <Feather name="x" size={20} color={theme.textMuted} />
           </Pressable>
-        </View>
 
-        {/* Section: BASE MAPS */}
-        <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>BASE MAPS</Text>
-        {MAP_STYLE_OPTIONS.map((opt) => {
-          const active = mapStyle === opt.key;
-          return (
-            <Pressable
-              key={opt.key}
-              style={[styles.row, { borderBottomColor: theme.border }]}
-              onPress={() => onChangeMapStyle(opt.key)}
-            >
-              <Feather
-                name={opt.icon as any}
-                size={16}
-                color={active ? theme.red : theme.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.rowLabel,
-                  { color: active ? theme.textPrimary : theme.textSecondary },
-                ]}
-              >
-                {opt.label}
-              </Text>
-              <View style={styles.rowRight}>
-                <View
-                  style={[
-                    styles.radioOuter,
-                    {
-                      borderColor: active ? theme.red : theme.border,
-                    },
-                  ]}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            {/* Section: BASE MAPS */}
+            <Text style={[s.sectionHeader, { color: theme.textMuted }]}>BASE MAPS</Text>
+            {MAP_STYLE_OPTIONS.map((opt) => {
+              const active = mapStyle === opt.key;
+              return (
+                <Pressable
+                  key={opt.key}
+                  style={[s.row, { borderBottomColor: theme.border }]}
+                  onPress={() => onChangeMapStyle(opt.key)}
                 >
-                  {active && (
-                    <View style={[styles.radioInner, { backgroundColor: theme.red }]} />
-                  )}
-                </View>
+                  <Feather name={opt.icon as any} size={16} color={active ? theme.red : theme.textSecondary} />
+                  <Text style={[s.rowLabel, { color: active ? theme.textPrimary : theme.textSecondary }]}>{opt.label}</Text>
+                  <View style={s.rowRight}>
+                    <View style={[s.radioOuter, { borderColor: active ? theme.red : theme.border }]}>
+                      {active && <View style={[s.radioInner, { backgroundColor: theme.red }]} />}
+                    </View>
+                  </View>
+                </Pressable>
+              );
+            })}
+
+            {/* Section: LAYERS */}
+            <Text style={[s.sectionHeader, { color: theme.textMuted }]}>LAYERS</Text>
+
+            <View style={[s.row, { borderBottomColor: theme.border }]}>
+              <Feather name="cloud" size={16} color={weatherOn ? '#5B9BD5' : theme.textSecondary} />
+              <Text style={[s.rowLabel, { color: weatherOn ? theme.textPrimary : theme.textSecondary }]}>Weather</Text>
+              <View style={s.rowRight}>
+                <Switch
+                  value={weatherOn}
+                  onValueChange={onToggleWeather}
+                  trackColor={{ false: theme.toggleTrackOff, true: '#5B9BD5' }}
+                  thumbColor={weatherOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+                  ios_backgroundColor={theme.toggleTrackOff}
+                />
               </View>
-            </Pressable>
-          );
-        })}
+            </View>
 
-        {/* Section: LAYERS */}
-        <Text style={[styles.sectionHeader, { color: theme.textMuted }]}>LAYERS</Text>
+            <View style={[s.row, { borderBottomColor: theme.border }]}>
+              {fuelLoading ? (
+                <ActivityIndicator size="small" color="#FFD600" />
+              ) : (
+                <Feather name="droplet" size={16} color={fuelOn ? '#FFD600' : theme.textSecondary} />
+              )}
+              <Text style={[s.rowLabel, { color: fuelOn ? theme.textPrimary : theme.textSecondary }]}>Fuel Stations</Text>
+              <View style={s.rowRight}>
+                <Switch
+                  value={fuelOn}
+                  onValueChange={onToggleFuel}
+                  trackColor={{ false: theme.toggleTrackOff, true: '#FFD600' }}
+                  thumbColor={fuelOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+                  ios_backgroundColor={theme.toggleTrackOff}
+                  disabled={fuelLoading}
+                />
+              </View>
+            </View>
 
-        <View style={[styles.row, { borderBottomColor: theme.border }]}>
-          <Feather
-            name="cloud"
-            size={16}
-            color={weatherOn ? '#5B9BD5' : theme.textSecondary}
-          />
-          <Text
-            style={[
-              styles.rowLabel,
-              { color: weatherOn ? theme.textPrimary : theme.textSecondary },
-            ]}
-          >
-            Weather
-          </Text>
-          <View style={styles.rowRight}>
-            <Switch
-              value={weatherOn}
-              onValueChange={onToggleWeather}
-              trackColor={{ false: theme.toggleTrackOff, true: '#5B9BD5' }}
-              thumbColor={weatherOn ? theme.toggleThumbOn : theme.toggleThumbOff}
-              ios_backgroundColor={theme.toggleTrackOff}
-            />
-          </View>
+            <View style={[s.row, { borderBottomColor: theme.border }]}>
+              {foodLoading ? (
+                <ActivityIndicator size="small" color="#FF6B35" />
+              ) : (
+                <Feather name="coffee" size={16} color={foodOn ? '#FF6B35' : theme.textSecondary} />
+              )}
+              <Text style={[s.rowLabel, { color: foodOn ? theme.textPrimary : theme.textSecondary }]}>Food</Text>
+              <View style={s.rowRight}>
+                <Switch
+                  value={foodOn}
+                  onValueChange={onToggleFood}
+                  trackColor={{ false: theme.toggleTrackOff, true: '#FF6B35' }}
+                  thumbColor={foodOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+                  ios_backgroundColor={theme.toggleTrackOff}
+                  disabled={foodLoading}
+                />
+              </View>
+            </View>
+          </ScrollView>
         </View>
-
-        <View style={[styles.row, { borderBottomColor: theme.border }]}>
-          {fuelLoading ? (
-            <ActivityIndicator size="small" color="#FFD600" />
-          ) : (
-            <Feather
-              name="droplet"
-              size={16}
-              color={fuelOn ? '#FFD600' : theme.textSecondary}
-            />
-          )}
-          <Text
-            style={[
-              styles.rowLabel,
-              { color: fuelOn ? theme.textPrimary : theme.textSecondary },
-            ]}
-          >
-            Fuel Stations
-          </Text>
-          <View style={styles.rowRight}>
-            <Switch
-              value={fuelOn}
-              onValueChange={onToggleFuel}
-              trackColor={{ false: theme.toggleTrackOff, true: '#FFD600' }}
-              thumbColor={fuelOn ? theme.toggleThumbOn : theme.toggleThumbOff}
-              ios_backgroundColor={theme.toggleTrackOff}
-              disabled={fuelLoading}
-            />
-          </View>
-        </View>
-
-        <View style={[styles.row, { borderBottomColor: theme.border }]}>
-          {foodLoading ? (
-            <ActivityIndicator size="small" color="#FF6B35" />
-          ) : (
-            <Feather
-              name="coffee"
-              size={16}
-              color={foodOn ? '#FF6B35' : theme.textSecondary}
-            />
-          )}
-          <Text
-            style={[
-              styles.rowLabel,
-              { color: foodOn ? theme.textPrimary : theme.textSecondary },
-            ]}
-          >
-            Food
-          </Text>
-          <View style={styles.rowRight}>
-            <Switch
-              value={foodOn}
-              onValueChange={onToggleFood}
-              trackColor={{ false: theme.toggleTrackOff, true: '#FF6B35' }}
-              thumbColor={foodOn ? theme.toggleThumbOn : theme.toggleThumbOff}
-              ios_backgroundColor={theme.toggleTrackOff}
-              disabled={foodLoading}
-            />
-          </View>
-        </View>
-
-      </Animated.View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -268,40 +186,29 @@ export default function MapControlDrawer({
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  container: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 9998,
-    elevation: 19,
+const s = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  panel: {
+    maxHeight: PANEL_MAX_H,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
-  drawer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: 280,
-    borderLeftWidth: 1,
-    paddingTop: 60,
-  },
-  drawerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
     marginBottom: 8,
   },
-  drawerTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
   closeBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    zIndex: 10,
     padding: 4,
   },
   sectionHeader: {
@@ -316,28 +223,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
   rowLabel: {
     flex: 1,
     fontSize: 14,
+    fontWeight: '500',
   },
   rowRight: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   radioOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 });
