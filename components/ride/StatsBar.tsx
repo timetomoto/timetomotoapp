@@ -72,12 +72,12 @@ export default function StatsBar({ stats }: StatsBarProps) {
 const styles = StyleSheet.create({
   bar: {
     position: 'absolute',
-    left: '10%',
-    right: '10%',
+    left: '3%',
+    right: '3%',
     flexDirection: 'row',
     borderWidth: 1,
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -104,12 +104,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   value: {
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: '700',
     letterSpacing: 0.3,
   },
   label: {
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 0.5,
     marginTop: 2,
   },

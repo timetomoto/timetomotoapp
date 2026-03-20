@@ -3,9 +3,10 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { useRoutesStore, useAuthStore } from '../../lib/store';
+import { useRoutesStore, useAuthStore, useSafetyStore } from '../../lib/store';
 import { fetchUserRoutes, seedRoutes, createRoute, type Route } from '../../lib/routes';
 import { parseGpx, calcDistance, calcElevationGain } from '../../lib/gpx';
+import { useNavigationStore } from '../../lib/navigationStore';
 import RouteList from '../routes/RouteList';
 
 export default function DiscoverRoutes() {
@@ -32,6 +33,19 @@ export default function DiscoverRoutes() {
   }, [authLoading, user?.id]);
 
   function handleNavigate(route: Route) {
+    const { isRecording } = useSafetyStore.getState();
+    const navStore = useNavigationStore.getState();
+    const isNav = navStore.mode === 'navigating' || navStore.mode === 'off_route' || navStore.mode === 'recalculating';
+    if (isRecording || isNav) {
+      Alert.alert(
+        'Ride In Progress',
+        isNav
+          ? 'Go back to the RIDE screen to STOP navigation before starting a new one.'
+          : 'Go back to the RIDE screen to STOP your recording before starting navigation.',
+        [{ text: 'OK', style: 'cancel' }],
+      );
+      return;
+    }
     setPendingNavigateRoute(route);
     router.navigate('/(tabs)/ride');
   }

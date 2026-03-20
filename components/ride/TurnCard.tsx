@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NavStep } from '../../lib/navigationStore';
 import { useTheme } from '../../lib/useTheme';
 
@@ -68,6 +69,7 @@ function formatStepDistance(miles: number): string {
 
 export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const translateX = useRef(new Animated.Value(-300)).current;
   const [collapsed, setCollapsed] = useState(false);
   const [cardVisible, setCardVisible] = useState(false);
@@ -195,7 +197,7 @@ export default function TurnCard({ step, isOffRoute, isRecalculating }: Props) {
     <Animated.View
       style={[
         styles.wrapper,
-        { transform: [{ translateX }] },
+        { bottom: insets.bottom + 283, transform: [{ translateX }] },
       ]}
     >
       {/* Card body */}
@@ -255,8 +257,6 @@ const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
     left: CARD_LEFT,
-    top: '50%',
-    marginTop: 140,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 9990,

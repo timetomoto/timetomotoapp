@@ -889,17 +889,11 @@ export default function RideScreen() {
   function guardRideStart(): boolean {
     if (isRecording || isNavigatingActive) {
       Alert.alert(
-        isNavigatingActive ? 'Navigation In Progress' : 'Ride In Progress',
+        'Ride In Progress',
         isNavigatingActive
-          ? 'You are currently navigating. End navigation before starting a new one.'
-          : 'You have an active ride in progress. What would you like to do?',
-        isNavigatingActive
-          ? [{ text: 'OK' }]
-          : [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'End & Save Current Ride', onPress: () => handleStopRequested() },
-              { text: 'End Without Saving', style: 'destructive', onPress: () => handleDiscardRide() },
-            ],
+          ? 'Go back to the RIDE screen to STOP navigation before starting a new one.'
+          : 'Go back to the RIDE screen to STOP your recording before starting navigation.',
+        [{ text: 'OK', style: 'cancel' }],
       );
       return true; // blocked
     }
@@ -1284,17 +1278,17 @@ export default function RideScreen() {
         <Pressable
           style={[
             styles.crashToggle,
-            { backgroundColor: isMonitoring ? theme.green + '26' : theme.mapOverlayBg, borderColor: isMonitoring ? theme.green : theme.border },
+            { backgroundColor: isMonitoring ? theme.green + 'CC' : theme.mapOverlayBg, borderColor: isMonitoring ? theme.green : theme.border },
           ]}
           onPress={() => setMonitoring(!isMonitoring)}
         >
-          <Feather name="shield" size={16} color={isMonitoring ? theme.green : theme.textSecondary} />
+          <Feather name="shield" size={16} color={isMonitoring ? theme.white : theme.textSecondary} />
           <View>
-            <Text style={[styles.crashToggleText, { color: isMonitoring ? theme.green : theme.textSecondary }]}>
+            <Text style={[styles.crashToggleText, { color: isMonitoring ? theme.white : theme.textSecondary }]}>
               {isMonitoring ? 'CRASH ON' : 'CRASH OFF'}
             </Text>
             {selectedBike && (
-              <Text style={[styles.crashToggleBike, { color: isMonitoring ? theme.green + '99' : theme.textSecondary }]}>
+              <Text style={[styles.crashToggleBike, { color: isMonitoring ? theme.white : theme.textSecondary }]}>
                 {bikeLabel(selectedBike).length > 13 ? bikeLabel(selectedBike).slice(0, 13) + '…' : bikeLabel(selectedBike)}
               </Text>
             )}
@@ -1372,10 +1366,10 @@ export default function RideScreen() {
                 label: 'TIME',
                 customValue: () => (
                   <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 22, fontWeight: '700', color: theme.textPrimary, letterSpacing: 1 }}>
+                    <Text style={{ fontSize: 25, fontWeight: '700', color: theme.textPrimary, letterSpacing: 1 }}>
                       {hStr}:{mStr}
                     </Text>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textPrimary, marginBottom: 5, marginLeft: 2 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary, marginBottom: 5, marginLeft: 2 }}>
                       :{sStr}
                     </Text>
                   </View>
@@ -1715,7 +1709,7 @@ const styles = StyleSheet.create({
   // Map control icon (layers button)
   mapControlIcon: {
     position: 'absolute',
-    bottom: 88,
+    top: Platform.OS === 'ios' ? 110 : 90,
     right: 12,
     width: 44,
     height: 44,
@@ -1728,7 +1722,7 @@ const styles = StyleSheet.create({
   // Compass orientation toggle
   compassWrap: {
     position: 'absolute',
-    bottom: 141,
+    bottom: 100,
     right: 12,
     alignItems: 'center',
   },

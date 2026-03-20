@@ -524,11 +524,11 @@ export default function TripPlanner() {
     const isNav = navStore.mode === 'navigating' || navStore.mode === 'off_route' || navStore.mode === 'recalculating';
     if (isRecording || isNav) {
       Alert.alert(
-        isNav ? 'Navigation In Progress' : 'Ride In Progress',
+        'Ride In Progress',
         isNav
-          ? 'You are currently navigating. End navigation before starting a new one.'
-          : 'You have an active ride recording. End the ride before starting navigation.',
-        [{ text: 'OK' }],
+          ? 'Go back to the RIDE screen to STOP navigation before starting a new one.'
+          : 'Go back to the RIDE screen to STOP your recording before starting navigation.',
+        [{ text: 'OK', style: 'cancel' }],
       );
       return;
     }
