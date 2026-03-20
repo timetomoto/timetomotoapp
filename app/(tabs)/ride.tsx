@@ -317,17 +317,17 @@ function StatsOverlay({ isRecording, elapsedSeconds, speedMph }: { isRecording: 
   return (
     <View style={[styles.statsBar, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{Math.round(speedMph)}</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{Math.round(speedMph)}</Text>
         <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MPH</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{miles < 10 ? miles.toFixed(1) : Math.round(miles)}</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{miles < 10 ? miles.toFixed(1) : Math.round(miles)}</Text>
         <Text style={[styles.statLabel, { color: theme.textSecondary }]}>MILES</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: theme.textPrimary }]} numberOfLines={1} adjustsFontSizeToFit>{formatHMS(elapsedSeconds)}</Text>
+        <Text style={[styles.statValue, { color: theme.textPrimary }]}>{formatHMS(elapsedSeconds)}</Text>
         <Text style={[styles.statLabel, { color: theme.textSecondary }]}>TIME</Text>
       </View>
     </View>
@@ -1235,21 +1235,12 @@ export default function RideScreen() {
           <HamburgerButton onPress={() => setMenuOpen(true)} />
           <>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 45 }}>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
               </View>
             </View>
             <View style={{ flex: 1 }} />
           </>
-          <Pressable
-            style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
-            onPress={() => {
-              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
-              router.navigate('/(tabs)/trip' as any);
-            }}
-          >
-            <Feather name="map" size={20} color={theme.textPrimary} />
-          </Pressable>
           <Pressable
             style={[styles.headerIconBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
             onPress={() => setSearchSheetOpen(true)}
@@ -1498,7 +1489,7 @@ export default function RideScreen() {
               <Feather name="x" size={22} color={theme.textSecondary} />
             </Pressable>
             <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingRight: 45 }}>
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <TimetomotoLogo width={LOGO_WIDTH} height={LOGO_HEIGHT} />
               </View>
             </View>
@@ -1659,7 +1650,7 @@ const styles = StyleSheet.create({
   // End navigation button
   endNavBtnWrap: {
     position: 'absolute',
-    bottom: END_BUTTON_BOTTOM,
+    bottom: 138,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -1682,19 +1673,17 @@ const styles = StyleSheet.create({
   // Stats bar
   statsBar: {
     position: 'absolute',
-    bottom: 138,
-    width: '67%',
-    alignSelf: 'center',
-    left: '16.5%',
+    bottom: END_BUTTON_BOTTOM,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
     borderWidth: 1,
     borderRadius: 8,
     paddingVertical: 10,
   },
-  statItem:  { flex: 1, alignItems: 'center', overflow: 'hidden' },
-  statValue: { fontSize: 18, fontWeight: '700', letterSpacing: 0.3 },
-  statLabel: { fontSize: 9, letterSpacing: 0.5, marginTop: 2 },
+  statItem:  { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 22, fontWeight: '700', letterSpacing: 0.3 },
+  statLabel: { fontSize: 10, letterSpacing: 0.5, marginTop: 2 },
   statDivider: { width: 1, marginVertical: 4 },
 
   // Checklist overlay
