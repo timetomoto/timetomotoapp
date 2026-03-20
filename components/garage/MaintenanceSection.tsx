@@ -112,7 +112,8 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
         <View style={[fm.sheet, { flex: 1, backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
           <View style={[fm.handle, { backgroundColor: theme.border }]} />
           <View style={fm.header}>
-            <Text style={[fm.heading, { color: theme.textPrimary }]}>{editing ? 'EDIT RECORD' : 'ADD RECORD'}</Text>
+            <View style={{ width: 20 }} />
+            <Text style={[fm.heading, { color: theme.textPrimary, flex: 1, textAlign: 'center' }]}>{editing ? 'Edit Maintenance Item' : 'Add Maintenance Item'}</Text>
             <Pressable onPress={onClose} hitSlop={8}><Feather name="x" size={20} color={theme.textSecondary} /></Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>

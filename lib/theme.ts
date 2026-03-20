@@ -82,7 +82,7 @@ export const sandTheme: Theme = {
   border:          '#C8B48A',
   textPrimary:     '#1A0F00',
   textSecondary:   '#3D2B10',
-  textMuted:       '#6B4F2E',
+  textMuted:       '#4A3518',
   red:             '#E53935',
   green:           '#4CAF50',
   teal:            '#00897B',

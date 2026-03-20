@@ -269,7 +269,7 @@ function RouteCard({
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
+    <View style={[styles.card, { backgroundColor: theme.bg, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <Text style={[styles.cardName, { color: theme.textPrimary }]} numberOfLines={1}>{route.name}</Text>
       </View>
@@ -349,7 +349,7 @@ function SavedRideCard({
   const dateStr = fmtDate(route.recorded_at ?? route.created_at);
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
+    <View style={[styles.card, { backgroundColor: theme.bg, borderColor: theme.border, marginHorizontal: 8 }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}>
       <View style={styles.cardHeader}>
         <View style={srStyles.nameRow}>
           <View style={srStyles.recBadge}>
@@ -944,6 +944,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 12,
     paddingTop: 8,
+    gap: 10,
   },
   categoryHeader: {
     flexDirection: 'row',
