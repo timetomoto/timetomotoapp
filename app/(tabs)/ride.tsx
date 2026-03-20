@@ -52,7 +52,7 @@ import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT } from '../../lib/headerLayout';
 import { darkTheme } from '../../lib/theme';
 import { addFavorite } from '../../lib/favorites';
 import { useTheme } from '../../lib/useTheme';
-import Svg, { Circle, Polygon as SvgPolygon, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Polygon as SvgPolygon, Rect as SvgRect, Text as SvgText } from 'react-native-svg';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { fetchDirections, distanceToRouteMeters, findNextStepIndex, haversineMeters } from '../../lib/directions';
 import MapControlDrawer from '../../components/ride/MapControlDrawer';
@@ -83,6 +83,29 @@ const MAP_STYLES: Record<MapStyle, string> = {
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
 
+
+// ---------------------------------------------------------------------------
+// Ride control SVG icons (filled)
+// ---------------------------------------------------------------------------
+
+const PlayIcon = () => (
+  <Svg width={40} height={40} viewBox="0 0 40 40">
+    <SvgPolygon points="10,6 10,34 34,20" fill="white" />
+  </Svg>
+);
+
+const PauseIcon = () => (
+  <Svg width={40} height={40} viewBox="0 0 40 40">
+    <SvgRect x="8" y="6" width="10" height="28" fill="white" rx="2" />
+    <SvgRect x="22" y="6" width="10" height="28" fill="white" rx="2" />
+  </Svg>
+);
+
+const StopIcon = () => (
+  <Svg width={40} height={40} viewBox="0 0 40 40">
+    <SvgRect x="8" y="8" width="24" height="24" fill="white" rx="2" />
+  </Svg>
+);
 
 // ---------------------------------------------------------------------------
 // Weather legend overlay
@@ -1337,12 +1360,27 @@ export default function RideScreen() {
             const miles = calcDistance(recordedPoints);
             const h = Math.floor(elapsedSeconds / 3600);
             const m = Math.floor((elapsedSeconds % 3600) / 60);
-            const sec = elapsedSeconds % 60;
-            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            const s = elapsedSeconds % 60;
+            const hStr = h.toString().padStart(2, '0');
+            const mStr = m.toString().padStart(2, '0');
+            const sStr = s.toString().padStart(2, '0');
             return [
               { value: String(Math.round(speedMph)), label: 'MPH' },
               { value: miles < 10 ? miles.toFixed(1) : String(Math.round(miles)), label: 'MILES' },
-              { value: time, label: 'TIME' },
+              {
+                value: '',
+                label: 'TIME',
+                customValue: () => (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: theme.textPrimary, letterSpacing: 1 }}>
+                      {hStr}:{mStr}
+                    </Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textPrimary, marginBottom: 5, marginLeft: 2 }}>
+                      :{sStr}
+                    </Text>
+                  </View>
+                ),
+              },
             ];
           })()} />
         ) : null}
@@ -1350,15 +1388,17 @@ export default function RideScreen() {
         {/* ── RIDE & RECORD button (idle, no nav, no recording) ── */}
         {!isNavigatingActive && !isRecording && (
           <View style={styles.endNavBtnWrap}>
-            <Pressable
-              style={[styles.endNavBtn, { backgroundColor: theme.green }]}
-              onPress={() => {
-                if (!guardRideStart()) setShowChecklist(true);
-              }}
-            >
-              <Feather name="play-circle" size={22} color={theme.white} />
-              <Text style={styles.endNavBtnText}>RIDE & RECORD</Text>
-            </Pressable>
+            <View style={styles.rideBtnCol}>
+              <Pressable
+                style={[styles.rideCircleBtn, { backgroundColor: theme.green }]}
+                onPress={() => {
+                  if (!guardRideStart()) setShowChecklist(true);
+                }}
+              >
+                <PlayIcon />
+              </Pressable>
+              <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>START & RECORD</Text>
+            </View>
           </View>
         )}
 
@@ -1367,31 +1407,35 @@ export default function RideScreen() {
           <View style={styles.endNavBtnWrap}>
             <View style={styles.rideControlRow}>
               {isRecording && (
-                <Pressable
-                  style={[styles.pauseBtn, { backgroundColor: isRidePaused ? theme.green : theme.textMuted }]}
-                  onPress={togglePause}
-                >
-                  <Feather name={isRidePaused ? 'play' : 'pause'} size={18} color={theme.white} />
-                  <Text style={styles.pauseBtnText}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
-                </Pressable>
+                <View style={styles.rideBtnCol}>
+                  <Pressable
+                    style={[styles.pauseCircleBtn, isRidePaused && styles.resumeCircleBtn]}
+                    onPress={togglePause}
+                  >
+                    {isRidePaused ? <PlayIcon /> : <PauseIcon />}
+                  </Pressable>
+                  <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
+                </View>
               )}
-              <Pressable
-                style={[styles.endNavBtn, { backgroundColor: theme.red }]}
-                onPress={() => {
-                  if (isNavigatingActive) {
-                    setNavRouteGeojson(null);
-                    resetNavigation();
-                  }
-                  if (isRecording) {
-                    handleStopRequested();
-                  } else {
-                    handleLocateMe();
-                  }
-                }}
-              >
-                <Feather name="x" size={18} color={theme.white} />
-                <Text style={styles.endNavBtnText}>END RIDE</Text>
-              </Pressable>
+              <View style={styles.rideBtnCol}>
+                <Pressable
+                  style={[styles.endCircleBtn, { backgroundColor: theme.red }]}
+                  onPress={() => {
+                    if (isNavigatingActive) {
+                      setNavRouteGeojson(null);
+                      resetNavigation();
+                    }
+                    if (isRecording) {
+                      handleStopRequested();
+                    } else {
+                      handleLocateMe();
+                    }
+                  }}
+                >
+                  <StopIcon />
+                </Pressable>
+                <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>STOP</Text>
+              </View>
             </View>
           </View>
         )}
@@ -1704,42 +1748,64 @@ const styles = StyleSheet.create({
   // End navigation button
   endNavBtnWrap: {
     position: 'absolute',
-    bottom: 138,
+    bottom: 107,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
-  endNavBtn: {
-    flexDirection: 'row',
+  rideCircleBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
-    gap: 6,
-    borderRadius: 26,
-    paddingHorizontal: 17,
-    paddingVertical: 12,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  endNavBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.3,
+  endCircleBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  pauseCircleBtn: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FF9800',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  resumeCircleBtn: {
+    backgroundColor: '#4CAF50',
   },
   rideControlRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 20,
   },
-  pauseBtn: {
-    flexDirection: 'row',
+  rideBtnCol: {
     alignItems: 'center',
     gap: 6,
-    borderRadius: 26,
-    paddingHorizontal: 17,
-    paddingVertical: 12,
   },
-  pauseBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+  rideBtnLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
     letterSpacing: 0.3,
   },
   pausedBadge: {

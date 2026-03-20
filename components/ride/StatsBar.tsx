@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafetyStore } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
 
-type Stat = { value: string; label: string };
+type Stat = { value: string; label: string; customValue?: () => React.ReactNode };
 
 interface StatsBarProps {
   stats: Stat[];
@@ -60,7 +60,7 @@ export default function StatsBar({ stats }: StatsBarProps) {
         <View key={stat.label} style={styles.itemWrap}>
           {i > 0 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
           <View style={styles.item}>
-            <Text style={[styles.value, { color: theme.textPrimary }]}>{stat.value}</Text>
+            {stat.customValue ? stat.customValue() : <Text style={[styles.value, { color: theme.textPrimary }]}>{stat.value}</Text>}
             <Text style={[styles.label, { color: theme.textSecondary }]}>{stat.label}</Text>
           </View>
         </View>

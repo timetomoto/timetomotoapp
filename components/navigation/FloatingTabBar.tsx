@@ -19,7 +19,7 @@ export default function FloatingTabBar() {
   const { theme } = useTheme();
 
   return (
-    <View style={[s.wrapper, { bottom: insets.bottom + 8 }]} pointerEvents="box-none">
+    <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
       <View style={[s.pill, { backgroundColor: theme.bgCard }]}>
         {TABS.map((tab) => {
           const isActive = pathname.includes(tab.name);
