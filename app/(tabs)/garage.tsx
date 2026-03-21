@@ -312,21 +312,25 @@ export default function GarageScreen() {
         </ScrollView>
       )}
 
-      {/* Add Bike Bottom Sheet */}
-      {showAddBike && (
-        <AddBikeModal onClose={() => {
+      {/* Add Bike Modal — always mounted, visibility controlled */}
+      <AddBikeModal
+        visible={showAddBike}
+        onClose={() => {
           setShowAddBike(false);
           fetchBikes(user?.id ?? 'local');
-        }} />
-      )}
+        }}
+      />
 
-      {/* Edit Bike Bottom Sheet */}
-      {editingBike && (
-        <AddBikeModal bike={editingBike} defaultPhotoUrl={wikiPhoto} onClose={() => {
+      {/* Edit Bike Modal */}
+      <AddBikeModal
+        visible={!!editingBike}
+        bike={editingBike ?? undefined}
+        defaultPhotoUrl={wikiPhoto}
+        onClose={() => {
           setEditingBike(null);
           fetchBikes(user?.id ?? 'local');
-        }} />
-      )}
+        }}
+      />
 
       {/* Hamburger menu */}
       <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -13,7 +12,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,7 +58,6 @@ const YEARS = Array.from(
   (_, i) => String(CURRENT_YEAR - i),
 );
 
-const SHEET_HEIGHT = 700;
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -276,16 +273,15 @@ export function BikeTypeSelector({ value, onChange }: { value: BikeType | null; 
 // ---------------------------------------------------------------------------
 
 interface Props {
+  visible: boolean;
   onClose: () => void;
   bike?: import('../../lib/store').Bike; // edit mode when provided
   defaultPhotoUrl?: string | null; // wiki/default photo (not user-uploaded)
 }
 
-export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl }: Props) {
+export default function AddBikeModal({ visible, onClose, bike: editBike, defaultPhotoUrl }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const { user } = useAuthStore();
   const { addBike, updateBike } = useGarageStore();
@@ -343,35 +339,23 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
     return () => { controller.abort(); clearTimeout(timer); };
   }, [make, model, year]);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        damping: 20,
-        stiffness: 200,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+  function resetForm() {
+    setYear(String(CURRENT_YEAR));
+    setMake('');
+    setModel('');
+    setBikeType(null);
+    setNickname('');
+    setOdometer('');
+    setFuelCap('');
+    setCapUnit('gallons');
+    setPhotoUrl(null);
+    setError(null);
+    setFuelAutoFilled(false);
+    fuelManuallySet.current = false;
+  }
 
   function handleClose() {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: SHEET_HEIGHT,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => onClose());
+    onClose();
   }
 
   // The display photo: user upload takes priority, then wiki default
@@ -517,32 +501,28 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
       } catch (e) { console.error('local bike save failed:', e); setSaving(false); }
     }
 
+    if (!isEdit) resetForm();
     handleClose();
   }
 
   return (
-    <Modal transparent animationType="none" onRequestClose={handleClose}>
-      {/* Backdrop */}
-      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
-        <TouchableWithoutFeedback onPress={handleClose}>
-          <View style={StyleSheet.absoluteFillObject} />
-        </TouchableWithoutFeedback>
-      </Animated.View>
-
-      {/* Sheet */}
-      <Animated.View
-        style={[
-          styles.sheet,
-          {
-            backgroundColor: theme.bgPanel,
-            borderColor: theme.border,
-            paddingBottom: insets.bottom + 16,
-          },
-          { transform: [{ translateY: slideAnim }] },
-        ]}
-      >
-        {/* Handle */}
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <View style={[styles.sheet, { backgroundColor: theme.bgPanel, paddingBottom: insets.bottom + 16 }]}>
+        {/* Drag handle */}
         <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
+
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{isEdit ? 'Edit Bike' : 'Add Bike'}</Text>
+          <Pressable onPress={handleClose} hitSlop={8}>
+            <Feather name="x" size={22} color={theme.textPrimary} />
+          </Pressable>
+        </View>
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -552,14 +532,6 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={[styles.heading, { color: theme.textPrimary }]}>{isEdit ? 'EDIT BIKE' : 'ADD BIKE'}</Text>
-              <Pressable onPress={handleClose} style={styles.cancelBtn}>
-                <Text style={[styles.cancelText, { color: theme.textSecondary }]}>CANCEL</Text>
-              </Pressable>
-            </View>
-
             {/* Photo section — only show in edit mode */}
             {isEdit && (
               <View style={[styles.photoSection, { borderColor: theme.border }]}>
@@ -657,7 +629,7 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
-      </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -667,43 +639,33 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
   sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderTopWidth: 1,
-    maxHeight: '90%',
+    flex: 1,
   },
   handleBar: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
     alignSelf: 'center',
-    marginTop: 12,
+    marginTop: 8,
     marginBottom: 4,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center',
   },
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    marginBottom: 4,
-  },
-  heading: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 1.2,
   },
   photoSection: {
     borderWidth: 1,
@@ -736,12 +698,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.3,
-  },
-  cancelBtn: { paddingHorizontal: 4 },
-  cancelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.7,
   },
   label: {
     fontSize: 10,
