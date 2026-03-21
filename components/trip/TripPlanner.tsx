@@ -396,10 +396,11 @@ export default function TripPlanner() {
     const geom = e.geometry as any;
     if (!geom?.coordinates) return;
     const [lng, lat] = geom.coordinates;
-    // Update coordinate immediately for visual feedback
-    if (type === 'origin') { if (origin) setOrigin({ ...origin, lat, lng }); }
-    else if (type === 'destination') { if (destination) setDestination({ ...destination, lat, lng }); }
-    else if (typeof type === 'number') setWaypoints(waypoints.map((w, i) => i === type ? { ...w, lat, lng } : w));
+    // Update coordinate immediately for visual feedback — read store directly to avoid re-render loop
+    const store = useTripPlannerStore.getState();
+    if (type === 'origin') { if (store.tripOrigin) setOrigin({ ...store.tripOrigin, lat, lng }); }
+    else if (type === 'destination') { if (store.tripDestination) setDestination({ ...store.tripDestination, lat, lng }); }
+    else if (typeof type === 'number') setWaypoints(store.tripWaypoints.map((w, i) => i === type ? { ...w, lat, lng } : w));
     // Debounced route fetch while dragging
     if (dragRouteDebounceRef.current) clearTimeout(dragRouteDebounceRef.current);
     dragRouteDebounceRef.current = setTimeout(async () => {

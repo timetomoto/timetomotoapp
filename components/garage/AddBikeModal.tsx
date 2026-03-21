@@ -301,6 +301,24 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState<string | null>(null);
   const [fuelAutoFilled, setFuelAutoFilled] = useState(false);
+
+  // Sync form fields when editBike changes (modal is always mounted)
+  useEffect(() => {
+    if (editBike) {
+      setYear(editBike.year ? String(editBike.year) : String(CURRENT_YEAR));
+      setMake(editBike.make ?? '');
+      setModel(editBike.model ?? '');
+      setBikeType(editBike.bike_type ?? null);
+      setNickname(editBike.nickname ?? '');
+      setOdometer(editBike.odometer ? String(editBike.odometer) : '');
+      setFuelCap(editBike.fuelCapacity ? String(editBike.fuelCapacity) : '');
+      setCapUnit(editBike.fuelCapacityUnit ?? 'gallons');
+      setPhotoUrl(editBike.photo_url ?? null);
+      setError(null);
+      setFuelAutoFilled(false);
+      fuelManuallySet.current = true; // don't auto-fill when editing
+    }
+  }, [editBike?.id]);
   const fuelManuallySet = useRef(false);
 
   useEffect(() => {
