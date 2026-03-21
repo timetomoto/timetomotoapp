@@ -172,6 +172,7 @@ export default function TripPlanner() {
   // Road conditions UI
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
   const [conditionsLoading, setConditionsLoading] = useState(false);
+  const [conditionFilter, setConditionFilter] = useState<'all' | 'construction' | 'hazard' | 'closure'>('all');
 
   // Date picker UI
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -901,19 +902,26 @@ export default function TripPlanner() {
 
               {/* Road conditions — hidden in compact map mode */}
               {routeGeojson && (() => {
-                // Pre-compute mile markers for conditions
-                const conditionsWithMiles = conditions.map((c) => {
+                const SIXTY_DAYS = 60 * 86_400_000;
+                // Filter to last 60 days
+                const recentConditions = conditions.filter((c) => Date.now() - new Date(c.reportedAt).getTime() < SIXTY_DAYS);
+                // Pre-compute mile markers
+                const conditionsWithMiles = recentConditions.map((c) => {
                   const { distanceKm, offsetKm } = getRouteMileMarker(routeGeojson.coordinates, c.lat, c.lng);
                   const distVal = weatherUseMiles ? distanceKm * 0.621371 : distanceKm;
-                  const isNear = offsetKm > 2; // > 2km from route = "Near"
+                  const isNear = offsetKm > 2;
                   return { ...c, mileMarker: distVal, isNear };
                 });
-                // Sort: most recent first, then by mile marker ascending when dates equal
                 conditionsWithMiles.sort((a, b) => {
                   const dateDiff = new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime();
                   return dateDiff !== 0 ? dateDiff : a.mileMarker - b.mileMarker;
                 });
-                const unit = weatherUseMiles ? 'mi' : 'km';
+                // Apply type filter
+                const filtered = conditionFilter === 'all' ? conditionsWithMiles : conditionsWithMiles.filter((c) => c.type === conditionFilter);
+                // Count by type for pill badges
+                const countByType = { construction: 0, hazard: 0, closure: 0 };
+                conditionsWithMiles.forEach((c) => { if (c.type in countByType) countByType[c.type as keyof typeof countByType]++; });
+
                 return (
                   <>
                     <Pressable style={[st.collapsible, { borderColor: theme.border }]} onPress={() => setConditionsExpanded((v) => !v)}>
@@ -921,20 +929,45 @@ export default function TripPlanner() {
                       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={[st.collapsibleTitle, { color: theme.textPrimary }]}>ROAD CONDITIONS</Text>
                         {isConditionsStale ? (
-                          <Pressable onPress={() => { /* re-trigger conditions fetch via route change detection */ setTripConditions([]); setConditionsLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) { (async () => { const samples = sampleRouteCoordinates(coords, 30).slice(0, 5); const all: RoadCondition[] = []; for (const s of samples) { try { const c = await fetchHEREConditions(s.lat, s.lng); c.forEach((r) => { if (!all.some((e) => e.id === r.id)) all.push(r); }); } catch {} await new Promise((r) => setTimeout(r, 300)); } setTripConditions(all); setConditionsLoading(false); })(); } }} style={{ padding: 4 }}>
+                          <Pressable onPress={() => { setTripConditions([]); setConditionsLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) { (async () => { const samples = sampleRouteCoordinates(coords, 30).slice(0, 5); const all: RoadCondition[] = []; for (const s of samples) { try { const c = await fetchHEREConditions(s.lat, s.lng); c.forEach((r) => { if (!all.some((e) => e.id === r.id)) all.push(r); }); } catch {} await new Promise((r) => setTimeout(r, 300)); } setTripConditions(all); setConditionsLoading(false); })(); } }} style={{ padding: 4 }}>
                             <Feather name="refresh-cw" size={14} color={theme.textMuted} />
                           </Pressable>
                         ) : conditionsLoading
                           ? <View style={[st.statusBadge, { backgroundColor: theme.textMuted }]}><Text style={st.statusBadgeText}>CHECKING</Text></View>
-                          : conditions.length === 0
+                          : recentConditions.length === 0
                             ? <View style={[st.statusBadge, { backgroundColor: '#2E7D32' }]}><Text style={st.statusBadgeText}>CLEAR</Text></View>
-                            : conditions.length <= 5
-                              ? <View style={[st.statusBadge, { backgroundColor: '#FF9800' }]}><Text style={st.statusBadgeText}>ACTIVE</Text></View>
-                              : <View style={[st.statusBadge, { backgroundColor: '#C62828' }]}><Text style={st.statusBadgeText}>BUSY</Text></View>
+                            : recentConditions.length <= 5
+                              ? <View style={[st.statusBadge, { backgroundColor: '#FF9800' }]}><Text style={st.statusBadgeText}>{recentConditions.length} ACTIVE</Text></View>
+                              : <View style={[st.statusBadge, { backgroundColor: '#C62828' }]}><Text style={st.statusBadgeText}>{recentConditions.length} REPORTS</Text></View>
                         }
                       </View>
                     </Pressable>
-                    {conditionsExpanded && conditionsWithMiles.length > 0 && conditionsWithMiles.map((c) => {
+                    {/* Category filter pills */}
+                    {conditionsExpanded && conditionsWithMiles.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
+                        {([
+                          { key: 'all' as const, label: 'ALL', icon: 'list', count: conditionsWithMiles.length },
+                          { key: 'construction' as const, label: 'CONSTRUCTION', icon: 'tool', count: countByType.construction },
+                          { key: 'hazard' as const, label: 'HAZARD', icon: 'alert-circle', count: countByType.hazard },
+                          { key: 'closure' as const, label: 'CLOSURE', icon: 'alert-triangle', count: countByType.closure },
+                        ]).filter((f) => f.key === 'all' || f.count > 0).map((f) => {
+                          const active = conditionFilter === f.key;
+                          return (
+                            <Pressable
+                              key={f.key}
+                              style={[st.condFilterPill, { backgroundColor: active ? theme.red + '22' : theme.bgPanel, borderColor: active ? theme.red : theme.border }]}
+                              onPress={() => setConditionFilter(f.key)}
+                            >
+                              <Feather name={f.icon as any} size={11} color={active ? theme.red : theme.textMuted} />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: active ? theme.red : theme.textMuted, letterSpacing: 0.3 }}>
+                                {f.label}{f.count > 0 ? ` (${f.count})` : ''}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    )}
+                    {conditionsExpanded && filtered.length > 0 && filtered.map((c) => {
                       const ageMs = Date.now() - new Date(c.reportedAt).getTime();
                       const ageDays = Math.floor(ageMs / 86_400_000);
                       const ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : `${ageDays} days ago`;
@@ -954,6 +987,9 @@ export default function TripPlanner() {
                         </View>
                       );
                     })}
+                    {conditionsExpanded && filtered.length === 0 && conditionsWithMiles.length > 0 && (
+                      <Text style={{ fontSize: 12, color: theme.textMuted, paddingVertical: 12 }}>No {conditionFilter} reports on this route.</Text>
+                    )}
                   </>
                 );
               })()}
@@ -1128,6 +1164,7 @@ const st = StyleSheet.create({
   checkpointTemp: { fontSize: 13, fontWeight: '600' },
   checkpointLabel: { fontSize: 11, flex: 1 },
   checkpointRain: { fontSize: 10, fontWeight: '700' },
+  condFilterPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   condCard: { borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 6, gap: 4 },
   condTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   condDesc: { fontSize: 11, lineHeight: 16 },

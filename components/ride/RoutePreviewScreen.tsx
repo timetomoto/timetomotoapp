@@ -443,7 +443,7 @@ const st = StyleSheet.create({
   },
 
   body: {
-    paddingBottom: 120,
+    paddingBottom: 20,
   },
 
   destRow: {

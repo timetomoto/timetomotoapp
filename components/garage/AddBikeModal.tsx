@@ -43,12 +43,16 @@ const BIKE_TYPES: { key: BikeType; label: string; icon: keyof typeof Feather.gly
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAKES = [
+// Fallback makes if NHTSA fetch fails
+const FALLBACK_MAKES = [
   'Aprilia', 'Benelli', 'Beta', 'BMW', 'Can-Am', 'CFMoto',
   'Ducati', 'Gas Gas', 'Harley-Davidson', 'Honda', 'Husqvarna',
   'Indian', 'Kawasaki', 'KTM', 'Moto Guzzi', 'Royal Enfield',
   'Sherco', 'Suzuki', 'Triumph', 'Yamaha', 'Zero Motorcycles',
 ];
+
+// Major motorcycle brands to prioritize at top of list
+const MAJOR_BRANDS = new Set(FALLBACK_MAKES.map((m) => m.toUpperCase()));
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from(
@@ -124,9 +128,25 @@ function YearPicker({ value, onChange }: { value: string; onChange: (y: string) 
 export function MakeAutocomplete({ value, onChange }: { value: string; onChange: (m: string) => void }) {
   const { theme } = useTheme();
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [nhtsaMakes, setNhtsaMakes] = useState<string[]>(FALLBACK_MAKES);
+
+  // Fetch motorcycle makes from NHTSA VPIC on mount
+  useEffect(() => {
+    fetch('https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/motorcycle?format=json')
+      .then((r) => r.json())
+      .then((json) => {
+        const all: string[] = (json.Results ?? []).map((r: any) => r.MakeName as string).filter(Boolean);
+        // Sort: major brands first, then alphabetical
+        const major = all.filter((m) => MAJOR_BRANDS.has(m.toUpperCase())).sort();
+        const rest = all.filter((m) => !MAJOR_BRANDS.has(m.toUpperCase())).sort();
+        setNhtsaMakes([...major, ...rest]);
+      })
+      .catch(() => {}); // keep fallback
+  }, []);
+
   const filtered = value.length > 0
-    ? MAKES.filter((m) => m.toLowerCase().startsWith(value.toLowerCase()))
-    : MAKES;
+    ? nhtsaMakes.filter((m) => m.toLowerCase().includes(value.toLowerCase()))
+    : nhtsaMakes.slice(0, 25); // show top 25 when empty
 
   return (
     <View>
@@ -140,15 +160,70 @@ export function MakeAutocomplete({ value, onChange }: { value: string; onChange:
       />
       {showSuggestions && filtered.length > 0 && (
         <View style={[styles.suggestions, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          {filtered.map((make) => (
-            <Pressable
-              key={make}
-              style={[styles.suggestionItem, { borderBottomColor: theme.border }]}
-              onPress={() => { onChange(make); setShowSuggestions(false); }}
-            >
-              <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{make}</Text>
-            </Pressable>
-          ))}
+          <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+            {filtered.slice(0, 30).map((make) => (
+              <Pressable
+                key={make}
+                style={[styles.suggestionItem, { borderBottomColor: theme.border }]}
+                onPress={() => { onChange(make); setShowSuggestions(false); }}
+              >
+                <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{make}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+}
+
+export function ModelAutocomplete({ value, onChange, make, year }: { value: string; onChange: (m: string) => void; make: string; year: string }) {
+  const { theme } = useTheme();
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch models when make + year are set
+  useEffect(() => {
+    if (!make.trim() || !year.trim()) { setModels([]); return; }
+    setLoading(true);
+    fetch(`https://api.nhtsa.gov/products/vehicle/models?modelYear=${encodeURIComponent(year)}&make=${encodeURIComponent(make.toUpperCase())}&issueType=r`)
+      .then((r) => r.json())
+      .then((json) => {
+        const list: string[] = (json.results ?? []).map((r: any) => r.model as string).filter(Boolean);
+        setModels(list.sort());
+      })
+      .catch(() => setModels([]))
+      .finally(() => setLoading(false));
+  }, [make, year]);
+
+  const filtered = value.length > 0
+    ? models.filter((m) => m.toLowerCase().includes(value.toLowerCase()))
+    : models;
+
+  return (
+    <View>
+      <StyledInput
+        value={value}
+        onChangeText={(t) => { onChange(t); setShowSuggestions(true); }}
+        placeholder={loading ? 'Loading models…' : models.length > 0 ? `${models.length} models available — type to search` : 'e.g. Tiger 900 Rally Pro'}
+        onFocus={() => setShowSuggestions(true)}
+        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+        autoCorrect={false}
+      />
+      {showSuggestions && filtered.length > 0 && (
+        <View style={[styles.suggestions, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+            {filtered.slice(0, 30).map((m) => (
+              <Pressable
+                key={m}
+                style={[styles.suggestionItem, { borderBottomColor: theme.border }]}
+                onPress={() => { onChange(m); setShowSuggestions(false); }}
+              >
+                <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>{m}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -229,12 +304,44 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving]           = useState(false);
   const [error, setError]             = useState<string | null>(null);
+  const [fuelAutoFilled, setFuelAutoFilled] = useState(false);
+  const fuelManuallySet = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem('ttm_units_capacity').then((v) => {
       if (v === 'liters' || v === 'gallons') setCapUnit(v);
     });
   }, []);
+
+  // Auto-lookup fuel capacity when make + model + year are set
+  useEffect(() => {
+    if (!make.trim() || !model.trim() || !year.trim() || fuelManuallySet.current || isEdit) return;
+    const key = process.env.EXPO_PUBLIC_API_NINJAS_KEY;
+    if (!key || key === 'your_key_here') return;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+
+    fetch(
+      `https://api.api-ninjas.com/v1/motorcycles?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&year=${encodeURIComponent(year)}`,
+      { headers: { 'X-Api-Key': key }, signal: controller.signal },
+    )
+      .then((r) => r.ok ? r.json() : null)
+      .then((results) => {
+        if (!Array.isArray(results) || results.length === 0) return;
+        const cap = parseFloat(results[0].fuel_capacity);
+        if (!isNaN(cap) && cap > 0 && !fuelManuallySet.current) {
+          // API returns liters — convert if user prefers gallons
+          const val = capacityUnit === 'gallons' ? Math.round(cap * 0.264172 * 10) / 10 : Math.round(cap * 10) / 10;
+          setFuelCap(String(val));
+          setFuelAutoFilled(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
+
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [make, model, year]);
 
   useEffect(() => {
     Animated.parallel([
@@ -495,15 +602,7 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
             <MakeAutocomplete value={make} onChange={setMake} />
 
             <FieldLabel label="MODEL" />
-            <StyledInput
-              value={model}
-              onChangeText={setModel}
-              placeholder="e.g. Tiger 900 Rally Pro"
-              autoCorrect={false}
-            />
-            <Text style={[styles.helperText, { color: theme.textMuted }]}>
-              Exact model name helps auto-fill specs and service data.
-            </Text>
+            <ModelAutocomplete value={model} onChange={setModel} make={make} year={year} />
 
             <FieldLabel label="NICKNAME — OPTIONAL" />
             <StyledInput
@@ -528,10 +627,13 @@ export default function AddBikeModal({ onClose, bike: editBike, defaultPhotoUrl 
             <FieldLabel label={`FUEL CAPACITY (${capacityUnit.toUpperCase()}) — OPTIONAL`} />
             <StyledInput
               value={fuelCapacity}
-              onChangeText={setFuelCap}
+              onChangeText={(t) => { setFuelCap(t); fuelManuallySet.current = true; setFuelAutoFilled(false); }}
               placeholder={capacityUnit === 'gallons' ? 'e.g. 4.5' : 'e.g. 17'}
               keyboardType="decimal-pad"
             />
+            {fuelAutoFilled && (
+              <Text style={{ fontSize: 10, color: theme.green, marginTop: 2 }}>Auto-filled from specs — edit to override</Text>
+            )}
 
             <FieldLabel label="BIKE TYPE" />
             <BikeTypeSelector value={bikeType} onChange={setBikeType} />

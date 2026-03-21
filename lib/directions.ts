@@ -42,7 +42,7 @@ export async function fetchDirections(
     geometries: 'geojson',
     steps: 'true',
     overview: 'full',
-    alternatives: waypoints && waypoints.length > 0 ? 'false' : 'true',
+    alternatives: (waypoints && waypoints.length > 0) || profile === 'cycling' ? 'false' : 'true',
     language: 'en',
   });
 
