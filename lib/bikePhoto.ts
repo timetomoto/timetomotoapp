@@ -168,6 +168,13 @@ async function fetchFromWiki(make: string, model: string): Promise<string | null
     const directThumb = await getThumbnail(`${make} ${model}`);
     if (directThumb) return directThumb;
 
+    // Strategy 1b — try compact model name (e.g. "R 1300 GS" → "R1300GS")
+    const compact = model.replace(/\s+/g, '');
+    if (compact !== model) {
+      const compactThumb = await getThumbnail(`${make} ${compact}`);
+      if (compactThumb) return compactThumb;
+    }
+
     // Strategy 2 — Wikimedia Commons search (has newer/more specific photos)
     const commonsUrl = await fetchFromCommons(make, model);
     if (commonsUrl) return commonsUrl;

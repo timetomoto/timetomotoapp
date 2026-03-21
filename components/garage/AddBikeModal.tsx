@@ -187,11 +187,11 @@ export function ModelAutocomplete({ value, onChange, make, year }: { value: stri
   useEffect(() => {
     if (!make.trim() || !year.trim()) { setModels([]); return; }
     setLoading(true);
-    fetch(`https://api.nhtsa.gov/products/vehicle/models?modelYear=${encodeURIComponent(year)}&make=${encodeURIComponent(make.toUpperCase())}&issueType=r`)
+    fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeYear/make/${encodeURIComponent(make)}/modelyear/${encodeURIComponent(year)}/vehicletype/motorcycle?format=json`)
       .then((r) => r.json())
       .then((json) => {
-        const list: string[] = (json.results ?? []).map((r: any) => r.model as string).filter(Boolean);
-        setModels(list.sort());
+        const list: string[] = (json.Results ?? []).map((r: any) => r.Model_Name as string).filter(Boolean);
+        setModels([...new Set(list)].sort());
       })
       .catch(() => setModels([]))
       .finally(() => setLoading(false));

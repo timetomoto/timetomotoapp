@@ -291,7 +291,7 @@ ${fieldList}`;
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
   });
 
   const endpoints = [
@@ -329,13 +329,22 @@ ${fieldList}`;
         continue;
       }
 
-      // Fix truncated JSON — find last complete object/array boundary
-      const lastBrace = cleaned.lastIndexOf('}');
-      const lastBracket = cleaned.lastIndexOf(']');
-      const lastValid = Math.max(lastBrace, lastBracket);
-      if (lastValid > 0) cleaned = cleaned.substring(0, lastValid + 1);
-
-      const parsed = JSON.parse(cleaned);
+      // Fix truncated JSON — try progressively shorter substrings
+      let parsed: any = null;
+      // First try the full string
+      try { parsed = JSON.parse(cleaned); } catch {}
+      // If that fails, walk backwards looking for a parseable cut point
+      if (!parsed) {
+        for (let i = cleaned.length - 1; i > 10; i--) {
+          const ch = cleaned[i];
+          if (ch !== '}' && ch !== ']') continue;
+          try {
+            parsed = JSON.parse(cleaned.substring(0, i + 1));
+            break;
+          } catch {}
+        }
+      }
+      if (!parsed) continue;
       const result: Partial<BikeSpecs> = {};
       for (const [key, value] of Object.entries(parsed)) {
         if (value !== null && value !== undefined && missingFields.includes(key)) {
