@@ -106,7 +106,10 @@ function encodePolyline(coords: { lat: number; lng: number }[]): string {
 }
 
 /** Build Mapbox Static Image URL for a route thumbnail */
-function routeThumbnailUrl(points: { lat: number; lng: number }[]): string | null {
+function routeThumbnailUrl(points: { lat: number; lng: number }[], mapStyleUrl?: string | null): string | null {
+  const styleId = mapStyleUrl
+    ? mapStyleUrl.replace('mapbox://styles/mapbox/', '')
+    : 'satellite-streets-v12';
   if (!MAPBOX_TOKEN || points.length < 2) return null;
 
   // Check minimum bounding box — skip if route is essentially a single point
@@ -126,10 +129,10 @@ function routeThumbnailUrl(points: { lat: number; lng: number }[]): string | nul
     // URL too long for auto — use midpoint with zoom 10
     const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
     const midLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-    return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encoded})/${midLng},${midLat},10/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
+    return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/path-4+E53935-0.8(${encoded})/${midLng},${midLat},10/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
   }
 
-  return `https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/path-4+E53935-0.8(${encoded})/auto/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
+  return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/path-4+E53935-0.8(${encoded})/auto/400x200@2x?access_token=${MAPBOX_TOKEN}&padding=40`;
 }
 
 const UNCATEGORIZED = '__uncategorized__';
@@ -295,7 +298,7 @@ function RouteCard({
       </View>
 
       {route.points.length >= 2 && (() => {
-        const url = routeThumbnailUrl(route.points);
+        const url = routeThumbnailUrl(route.points, route.map_style);
         return url ? (
           <RouteThumbnail url={url} />
         ) : null;
@@ -409,7 +412,7 @@ function SavedRideCard({
       ) : null}
 
       {route.points.length >= 2 && (() => {
-        const url = routeThumbnailUrl(route.points);
+        const url = routeThumbnailUrl(route.points, route.map_style);
         return url ? (
           <RouteThumbnail url={url} />
         ) : null;
@@ -1089,10 +1092,10 @@ const srStyles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#E53935',
+    backgroundColor: '#C62828',
   },
   recText: {
-    color: '#E53935',
+    color: '#C62828',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.3,

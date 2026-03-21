@@ -6,6 +6,8 @@ import type { TrackPoint } from './gpx';
 import type { Route } from './routes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkTheme, sandTheme, lightTheme, Theme } from './theme';
+import type { RouteWeatherPoint } from './routeWeather';
+import type { RoadCondition } from './discoverStore';
 
 // ---------------------------------------------------------------------------
 // Safety / crash-detection store
@@ -16,6 +18,7 @@ export interface EmergencyContact {
   phone: string;
   relationship?: string;
   email?: string;
+  is_primary?: boolean;
 }
 
 interface SafetyState {
@@ -398,6 +401,123 @@ export const useThemeStore = create<ThemeStore>()((set, get) => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Map style store — unified map style preference across all maps
+// ---------------------------------------------------------------------------
+
+const MAP_STYLE_KEY = '@ttm/map_style_preference';
+const DEFAULT_MAP_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
+
+type MapStyleStore = {
+  mapStyle: string;
+  setMapStyle: (style: string) => void;
+  loadSavedMapStyle: () => Promise<void>;
+};
+
+export const useMapStyleStore = create<MapStyleStore>()((set) => ({
+  mapStyle: DEFAULT_MAP_STYLE,
+  setMapStyle: (mapStyle) => {
+    set({ mapStyle });
+    AsyncStorage.setItem(MAP_STYLE_KEY, mapStyle).catch(() => {});
+  },
+  loadSavedMapStyle: async () => {
+    const saved = await AsyncStorage.getItem(MAP_STYLE_KEY);
+    if (saved) set({ mapStyle: saved });
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// Trip planner store — persists across tab switches
+// ---------------------------------------------------------------------------
+
+interface TripLoc { name: string; lat: number; lng: number; }
+
+interface TripPlannerState {
+  tripOrigin: TripLoc | null;
+  tripDestination: TripLoc | null;
+  tripWaypoints: TripLoc[];
+  tripDeparture: Date;
+  tripCustomDate: Date | null;
+  tripRouteGeojson: any;
+  tripRouteDistance: number;
+  tripRouteDuration: number;
+  tripWeatherPoints: RouteWeatherPoint[];
+  tripWeatherMsg: string | null;
+  tripWeatherHasConcern: boolean;
+  tripWeatherCheckpoints: number;
+  tripWeatherFetchedAt: number | null;
+  tripConditions: RoadCondition[];
+  tripConditionsFetchedAt: number | null;
+  tripSaved: boolean;
+
+  setTripOrigin: (v: TripLoc | null) => void;
+  setTripDestination: (v: TripLoc | null) => void;
+  setTripWaypoints: (v: TripLoc[]) => void;
+  setTripDeparture: (v: Date) => void;
+  setTripCustomDate: (v: Date | null) => void;
+  setTripRoute: (geojson: any, distance: number, duration: number) => void;
+  setTripWeather: (points: RouteWeatherPoint[], msg: string | null, hasConcern: boolean, checkpoints: number) => void;
+  setTripConditions: (conditions: RoadCondition[]) => void;
+  setTripSaved: (v: boolean) => void;
+  clearTrip: () => void;
+}
+
+const defaultDepartureTime = () => {
+  const d = new Date();
+  d.setMinutes(0, 0, 0);
+  d.setHours(d.getHours() + 1);
+  return d;
+};
+
+export const useTripPlannerStore = create<TripPlannerState>((set) => ({
+  tripOrigin: null,
+  tripDestination: null,
+  tripWaypoints: [],
+  tripDeparture: defaultDepartureTime(),
+  tripCustomDate: null,
+  tripRouteGeojson: null,
+  tripRouteDistance: 0,
+  tripRouteDuration: 0,
+  tripWeatherPoints: [],
+  tripWeatherMsg: null,
+  tripWeatherHasConcern: false,
+  tripWeatherCheckpoints: 0,
+  tripWeatherFetchedAt: null,
+  tripConditions: [],
+  tripConditionsFetchedAt: null,
+  tripSaved: false,
+
+  setTripOrigin: (tripOrigin) => set({ tripOrigin }),
+  setTripDestination: (tripDestination) => set({ tripDestination }),
+  setTripWaypoints: (tripWaypoints) => set({ tripWaypoints }),
+  setTripDeparture: (tripDeparture) => set({ tripDeparture }),
+  setTripCustomDate: (tripCustomDate) => set({ tripCustomDate }),
+  setTripRoute: (tripRouteGeojson, tripRouteDistance, tripRouteDuration) =>
+    set({ tripRouteGeojson, tripRouteDistance, tripRouteDuration }),
+  setTripWeather: (tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints) =>
+    set({ tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints, tripWeatherFetchedAt: Date.now() }),
+  setTripConditions: (tripConditions) =>
+    set({ tripConditions, tripConditionsFetchedAt: Date.now() }),
+  setTripSaved: (tripSaved) => set({ tripSaved }),
+  clearTrip: () => set({
+    tripOrigin: null,
+    tripDestination: null,
+    tripWaypoints: [],
+    tripDeparture: defaultDepartureTime(),
+    tripCustomDate: null,
+    tripRouteGeojson: null,
+    tripRouteDistance: 0,
+    tripRouteDuration: 0,
+    tripWeatherPoints: [],
+    tripWeatherMsg: null,
+    tripWeatherHasConcern: false,
+    tripWeatherCheckpoints: 0,
+    tripWeatherFetchedAt: null,
+    tripConditions: [],
+    tripConditionsFetchedAt: null,
+    tripSaved: false,
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Tab reset store — signals tabs to reset to default sub-screen
 // ---------------------------------------------------------------------------

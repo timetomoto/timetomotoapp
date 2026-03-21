@@ -15,14 +15,13 @@ import {
 } from '../../lib/routeWeather';
 import { useTheme } from '../../lib/useTheme';
 import { useAuthStore, useGarageStore, useSafetyStore, bikeLabel } from '../../lib/store';
+import RideSettingsBlock, { type RideSettingsValues } from './RideSettingsBlock';
 import { fetchDirections } from '../../lib/directions';
 import type { NavDestination, NavRoute, RoutePreference } from '../../lib/navigationStore';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-type SavedRoutePill = 'this_route' | 'fastest' | 'no_hwy' | 'no_tolls';
 
 interface Props {
   destination: NavDestination;
@@ -73,12 +72,6 @@ const PREFERENCE_PILLS: { key: RoutePreference; label: string }[] = [
   { key: 'offroad', label: 'BACK ROADS' },
 ];
 
-const SAVED_ROUTE_PILLS: { key: SavedRoutePill; label: string }[] = [
-  { key: 'this_route', label: 'THIS ROUTE' },
-  { key: 'fastest', label: 'FASTEST' },
-  { key: 'no_hwy', label: 'NO HWY' },
-  { key: 'no_tolls', label: 'NO TOLLS' },
-];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -113,72 +106,33 @@ export default function RoutePreviewScreen({
   } = useSafetyStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
   const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
-  const [recordRide, setRecordRide] = useState(false);
-  const [crashOn, setCrashOn] = useState(isMonitoring);
-  const [crashOverride, setCrashOverride] = useState(false);
-  const [locationOn, setLocationOn] = useState(shareActive);
-  const [locationOverride, setLocationOverride] = useState(false);
+  const rideSettingsRef = useRef<RideSettingsValues>({
+    crashOn: false, crashOverride: false,
+    shareEnabled: false, shareOverride: false,
+    checkInOn: false, checkInMins: 60,
+    notifyContactIds: [],
+  });
 
   // Weather summary
   const [weatherMsg, setWeatherMsg] = useState<string | null>(null);
   const [weatherSeverity, setWeatherSeverity] = useState<'clear' | 'minor' | 'moderate' | 'severe'>('clear');
   const [weatherLoading, setWeatherLoading] = useState(false);
 
-  const handleCrashToggle = useCallback(() => {
-    if (!crashOn && !isMonitoring) {
-      Alert.alert(
-        'Crash Detection is Disabled',
-        'Crash Detection is turned off in your Settings. Would you like to enable it?',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Enable in Settings', onPress: () => { setMonitoring(true); setCrashOn(true); } },
-          { text: 'Enable for This Ride', onPress: () => { setCrashOn(true); setCrashOverride(true); } },
-        ],
-      );
-      return;
-    }
-    setCrashOn((v) => !v);
-    setCrashOverride(false);
-  }, [crashOn, isMonitoring, setMonitoring]);
-
-  const handleLocationToggle = useCallback(() => {
-    if (!locationOn && !shareActive) {
-      Alert.alert(
-        'Live Location Sharing is Disabled',
-        'Live Location Sharing is turned off in your Settings. Would you like to enable it?',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Enable in Settings', onPress: () => { useSafetyStore.getState().setShareActive(true); setLocationOn(true); } },
-          { text: 'Enable for This Ride', onPress: () => { setLocationOn(true); setLocationOverride(true); } },
-        ],
-      );
-      return;
-    }
-    setLocationOn((v) => !v);
-    setLocationOverride(false);
-  }, [locationOn, shareActive]);
-
-  // ── Saved route pill state ──
-  const [selectedPill, setSelectedPill] = useState<SavedRoutePill>('this_route');
-  const [pillLoading, setPillLoading] = useState(false);
-  const cacheRef = useRef<Record<string, NavRoute>>({});
-
   const savedRoute = routes[0] ?? null;
-  const selectedRoute = isSavedRoute
-    ? (selectedPill === 'this_route' ? savedRoute : (cacheRef.current[selectedPill] ?? savedRoute))
-    : (routes[selectedRouteIdx] ?? null);
+  const selectedRoute = isSavedRoute ? savedRoute : (routes[selectedRouteIdx] ?? null);
 
   const handleStartNav = useCallback(() => {
     if (!selectedRoute) return;
-    if (crashOn && !isMonitoring) {
+    const rs = rideSettingsRef.current;
+    if (rs.crashOn && !isMonitoring) {
       setCrashDetectionOverride(true);
       setMonitoring(true);
     }
-    if (locationOn && !shareActive) {
+    if (rs.shareEnabled && !shareActive) {
       setLocationSharingOverride(true);
     }
-    onStartNavigation(selectedRoute, navBikeId, recordRide, locationOn);
-  }, [selectedRoute, crashOn, isMonitoring, locationOn, shareActive, navBikeId, recordRide, setCrashDetectionOverride, setMonitoring, setLocationSharingOverride, onStartNavigation]);
+    onStartNavigation(selectedRoute, navBikeId, rs.crashOn, rs.shareEnabled);
+  }, [selectedRoute, isMonitoring, shareActive, navBikeId, setCrashDetectionOverride, setMonitoring, setLocationSharingOverride, onStartNavigation]);
 
   const [routeSaved, setRouteSaved] = useState(false);
 
@@ -249,39 +203,7 @@ export default function RoutePreviewScreen({
   }, [selectedRoute]);
 
 
-  const fetchAlternative = useCallback(async (pill: 'fastest' | 'no_hwy' | 'no_tolls') => {
-    if (cacheRef.current[pill]) {
-      setSelectedPill(pill);
-      onGeometryChange?.(cacheRef.current[pill].geometry);
-      return;
-    }
-    const start = savedRouteStart;
-    const end = destination;
-    if (!start || !end) return;
-    setPillLoading(true);
-    setSelectedPill(pill);
-    try {
-      const prefMap: Record<string, RoutePreference> = { fastest: 'fastest', no_hwy: 'no_highway', no_tolls: 'no_tolls' };
-      const results = await fetchDirections(start.lng, start.lat, end.lng, end.lat, prefMap[pill] ?? 'fastest');
-      if (results.length > 0) { cacheRef.current[pill] = results[0]; onGeometryChange?.(results[0].geometry); }
-    } catch {
-      setSelectedPill('this_route');
-      if (savedRoute) onGeometryChange?.(savedRoute.geometry);
-    } finally { setPillLoading(false); }
-  }, [savedRouteStart, destination, savedRoute, onGeometryChange]);
-
-  const handleSavedPillPress = useCallback((pill: SavedRoutePill) => {
-    if (pill === selectedPill) {
-      if (pill !== 'this_route') { setSelectedPill('this_route'); if (savedRoute) onGeometryChange?.(savedRoute.geometry); }
-      return;
-    }
-    if (pill === 'this_route') { setSelectedPill('this_route'); if (savedRoute) onGeometryChange?.(savedRoute.geometry); }
-    else fetchAlternative(pill);
-  }, [selectedPill, savedRoute, fetchAlternative, onGeometryChange]);
-
-  const handleRecordToggle = useCallback(() => setRecordRide((v) => !v), []);
-
-  const displayMeta = pillLoading ? '— mi · — min' : selectedRoute ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds) : '';
+  const displayMeta = selectedRoute ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds) : '';
 
   return (
     <Modal
@@ -293,7 +215,7 @@ export default function RoutePreviewScreen({
       <View style={[st.root, { backgroundColor: theme.bgPanel }]}>
         <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
         {/* Header */}
-        <View style={[st.header, { paddingTop: insets.top + 8, borderBottomColor: theme.border }]}>
+        <View style={[st.header, { paddingTop: 8, borderBottomColor: theme.border }]}>
           <View style={{ width: 40 }} />
           <Text style={[st.headerTitle, { color: theme.textPrimary }]}>Start Ride</Text>
           <Pressable onPress={onCancel} hitSlop={8} style={{ width: 40, alignItems: 'flex-end' }}>
@@ -322,20 +244,6 @@ export default function RoutePreviewScreen({
               </Pressable>
             )}
           </View>
-
-          {/* Saved route pills */}
-          {isSavedRoute && !loading && !error && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.pillsScroll} contentContainerStyle={st.pillsContent}>
-              {SAVED_ROUTE_PILLS.map((pill) => {
-                const active = selectedPill === pill.key;
-                return (
-                  <Pressable key={pill.key} style={[st.pill, { backgroundColor: active ? theme.red : theme.bgCard, borderColor: active ? theme.red : theme.border }]} onPress={() => handleSavedPillPress(pill.key)}>
-                    <Text style={[st.pillText, { color: active ? theme.white : theme.textMuted }]}>{pill.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          )}
 
           {/* Destination search pills */}
           {!isSavedRoute && (
@@ -468,72 +376,47 @@ export default function RoutePreviewScreen({
             </View>
           )}
 
-          {/* Ride option toggles */}
+          {/* Ride settings + notify contacts */}
           {!loading && !error && selectedRoute && (
-            <View style={st.toggleGroup}>
-              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleRecordToggle}>
-                <View style={st.toggleLeft}>
-                  <Feather name="play-circle" size={16} color={recordRide ? theme.toggleTrackOn : theme.textMuted} />
-                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Record this ride</Text>
-                </View>
-                <View style={[st.toggleTrack, { backgroundColor: recordRide ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                  <View style={[st.toggleThumb, { backgroundColor: recordRide ? theme.toggleThumbOn : theme.toggleThumbOff }, recordRide && st.toggleThumbOn_]} />
-                </View>
-              </Pressable>
+            <View style={{ paddingHorizontal: 20 }}>
+              <RideSettingsBlock
+                onChange={(v) => { rideSettingsRef.current = v; }}
+                onCloseModal={onCancel}
+              />
+            </View>
+          )}
 
-              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleCrashToggle}>
-                <View style={st.toggleLeft}>
-                  <Feather name="shield" size={16} color={crashOn ? theme.toggleTrackOn : theme.textMuted} />
-                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Crash detection</Text>
-                </View>
-                <View style={[st.toggleTrack, { backgroundColor: crashOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                  <View style={[st.toggleThumb, { backgroundColor: crashOn ? theme.toggleThumbOn : theme.toggleThumbOff }, crashOn && st.toggleThumbOn_]} />
-                </View>
-              </Pressable>
-
-              <Pressable style={[st.toggleRow, { borderColor: theme.border }]} onPress={handleLocationToggle}>
-                <View style={st.toggleLeft}>
-                  <Feather name="map-pin" size={16} color={locationOn ? theme.toggleTrackOn : theme.textMuted} />
-                  <Text style={[st.toggleText, { color: theme.textPrimary }]}>Share my location</Text>
-                </View>
-                <View style={[st.toggleTrack, { backgroundColor: locationOn ? theme.toggleTrackOn : theme.toggleTrackOff }]}>
-                  <View style={[st.toggleThumb, { backgroundColor: locationOn ? theme.toggleThumbOn : theme.toggleThumbOff }, locationOn && st.toggleThumbOn_]} />
-                </View>
+          {/* Action buttons — inside scroll */}
+          {!loading && !error && (
+            <View style={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 30, gap: 8 }}>
+              {selectedRoute && (
+                <Pressable style={[st.startBtn, { backgroundColor: theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]} onPress={handleStartNav}>
+                  <Feather name="navigation" size={18} color={theme.white} />
+                  <Text style={st.startBtnText}>START NAVIGATION</Text>
+                </Pressable>
+              )}
+              {isTripPlannerRoute && !isSavedRoute && selectedRoute && onSaveRoute && (
+                <Pressable
+                  style={[st.saveRouteBtn, { borderColor: theme.border }]}
+                  onPress={() => {
+                    const name = tripPlannerName || destination.name;
+                    onSaveRoute(name, selectedRoute);
+                    setRouteSaved(true);
+                  }}
+                  disabled={routeSaved}
+                >
+                  <Feather name={routeSaved ? 'check' : 'bookmark'} size={14} color={routeSaved ? theme.green : theme.textSecondary} />
+                  <Text style={[st.saveRouteBtnText, { color: routeSaved ? theme.green : theme.textSecondary }]}>
+                    {routeSaved ? 'ROUTE SAVED' : 'SAVE ROUTE'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable style={st.cancelBtn} onPress={onCancel}>
+                <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
               </Pressable>
             </View>
           )}
         </ScrollView>
-
-        {/* Sticky footer — always visible */}
-        {!loading && !error && (
-          <View style={[st.footer, { backgroundColor: theme.bgPanel, borderTopColor: theme.border, paddingBottom: insets.bottom + 16 }]}>
-            {selectedRoute && (
-              <Pressable style={[st.startBtn, { backgroundColor: recordRide ? theme.green : theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]} onPress={handleStartNav}>
-                <Feather name={recordRide ? 'play-circle' : 'navigation'} size={18} color={theme.white} />
-                <Text style={st.startBtnText}>{recordRide ? 'START & RECORD' : 'START NAVIGATION'}</Text>
-              </Pressable>
-            )}
-            {isTripPlannerRoute && !isSavedRoute && selectedRoute && onSaveRoute && (
-              <Pressable
-                style={[st.saveRouteBtn, { borderColor: theme.border }]}
-                onPress={() => {
-                  const name = tripPlannerName || destination.name;
-                  onSaveRoute(name, selectedRoute);
-                  setRouteSaved(true);
-                }}
-                disabled={routeSaved}
-              >
-                <Feather name={routeSaved ? 'check' : 'bookmark'} size={14} color={routeSaved ? theme.green : theme.textSecondary} />
-                <Text style={[st.saveRouteBtnText, { color: routeSaved ? theme.green : theme.textSecondary }]}>
-                  {routeSaved ? 'ROUTE SAVED' : 'SAVE ROUTE'}
-                </Text>
-              </Pressable>
-            )}
-            <Pressable style={st.cancelBtn} onPress={onCancel}>
-              <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
-            </Pressable>
-          </View>
-        )}
       </View>
     </Modal>
   );

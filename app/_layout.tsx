@@ -7,6 +7,7 @@ import { LogBox } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 
 LogBox.ignoreLogs(['InteractionManager has been deprecated']);
+LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './onboarding';
 import { StatusBar } from 'expo-status-bar';
@@ -14,7 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
-import { useAuthStore, useSafetyStore, useThemeStore } from '../lib/store';
+import { useAuthStore, useSafetyStore, useThemeStore, useMapStyleStore } from '../lib/store';
 import type { TrackPoint } from '../lib/gpx';
 import { CrashDetector } from '../lib/safety';
 import { endShare } from '../lib/liveShare';
@@ -247,6 +248,7 @@ function RootLayoutInner() {
 
   useEffect(() => {
     loadSavedMode();
+    useMapStyleStore.getState().loadSavedMapStyle();
   }, []);
 
   return (

@@ -19,14 +19,13 @@ import Mapbox, {
   RasterLayer,
   RasterSource,
   ShapeSource,
-  StyleURL,
 } from '@rnmapbox/maps';
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -49,7 +48,6 @@ import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
 import TimetomotoLogo from '../../components/common/TimetomotoLogo';
 import { HEADER_HEIGHT, LOGO_WIDTH, LOGO_HEIGHT } from '../../lib/headerLayout';
-import { darkTheme } from '../../lib/theme';
 import { addFavorite } from '../../lib/favorites';
 import { useTheme } from '../../lib/useTheme';
 import Svg, { Circle, Polygon as SvgPolygon, Rect as SvgRect, Text as SvgText } from 'react-native-svg';
@@ -72,13 +70,13 @@ Mapbox.setTelemetryEnabled(false);
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type MapStyle = 'standard' | 'terrain' | 'satellite' | 'hybrid';
+type MapStyle = 'hybrid' | 'outdoors' | 'streets' | 'dark';
 
 const MAP_STYLES: Record<MapStyle, string> = {
-  standard:  'mapbox://styles/mapbox/dark-v11',
-  terrain:   StyleURL.Outdoors,
-  satellite: StyleURL.Satellite,
-  hybrid:    StyleURL.SatelliteStreet,
+  hybrid:    'mapbox://styles/mapbox/satellite-streets-v12',
+  outdoors:  'mapbox://styles/mapbox/outdoors-v12',
+  streets:   'mapbox://styles/mapbox/streets-v12',
+  dark:      'mapbox://styles/mapbox/dark-v11',
 };
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
@@ -116,17 +114,23 @@ const WeatherLegend = memo(function WeatherLegend() {
   return (
     <View style={[wl.panel, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}>
       <Text style={[wl.title, { color: theme.textPrimary }]}>PRECIPITATION</Text>
-      <View style={wl.row}>
-        <View style={[wl.swatch, { backgroundColor: '#1a1aff' }]} />
-        <Text style={[wl.label, { color: theme.textPrimary }]}>Heavy</Text>
-        <View style={[wl.swatch, { backgroundColor: '#00aaff', marginLeft: 8 }]} />
-        <Text style={[wl.label, { color: theme.textPrimary }]}>Moderate</Text>
-      </View>
-      <View style={wl.row}>
-        <View style={[wl.swatch, { backgroundColor: '#aaffaa' }]} />
-        <Text style={[wl.label, { color: theme.textPrimary }]}>Light</Text>
-        <View style={[wl.swatch, { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border, marginLeft: 8 }]} />
-        <Text style={[wl.label, { color: theme.textPrimary }]}>None</Text>
+      <View style={wl.col}>
+        <View style={wl.row}>
+          <View style={[wl.swatch, { backgroundColor: '#1a1aff' }]} />
+          <Text style={[wl.label, { color: theme.textPrimary }]}>Heavy</Text>
+        </View>
+        <View style={wl.row}>
+          <View style={[wl.swatch, { backgroundColor: '#00aaff' }]} />
+          <Text style={[wl.label, { color: theme.textPrimary }]}>Moderate</Text>
+        </View>
+        <View style={wl.row}>
+          <View style={[wl.swatch, { backgroundColor: '#aaffaa' }]} />
+          <Text style={[wl.label, { color: theme.textPrimary }]}>Light</Text>
+        </View>
+        <View style={wl.row}>
+          <View style={[wl.swatch, { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border }]} />
+          <Text style={[wl.label, { color: theme.textPrimary }]}>None</Text>
+        </View>
       </View>
     </View>
   );
@@ -139,15 +143,18 @@ const wl = StyleSheet.create({
     left: 16,
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    gap: 4,
-    minWidth: 160,
+    padding: 8,
+    gap: 3,
   },
   title: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 2,
+  },
+  col: {
+    flexDirection: 'column',
+    gap: 3,
   },
   row: {
     flexDirection: 'row',
@@ -155,12 +162,12 @@ const wl = StyleSheet.create({
     gap: 4,
   },
   swatch: {
-    width: 14,
+    width: 10,
     height: 10,
     borderRadius: 2,
   },
   label: {
-    fontSize: 10,
+    fontSize: 9,
   },
 });
 
@@ -283,7 +290,10 @@ export default function RideScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
-  const [mapStyle, setMapStyle] = useState<MapStyle>('standard');
+  const { mapStyle: globalMapStyleUrl, setMapStyle: setGlobalMapStyle } = useMapStyleStore();
+
+  // Derive local MapStyle key from store URL
+  const mapStyle: MapStyle = Object.entries(MAP_STYLES).find(([, url]) => url === globalMapStyleUrl)?.[0] as MapStyle ?? 'hybrid';
   const { user }                = useAuthStore();
   const { addRoute, pendingNavigateRoute, setPendingNavigateRoute } = useRoutesStore();
   const { bikes, selectedBikeId, fetchBikes } = useGarageStore();
@@ -336,6 +346,7 @@ export default function RideScreen() {
   const pinScaleAnim = useRef(new RNAnimated.Value(0)).current;
 
   function handleDropPin(coords: { latitude: number; longitude: number }) {
+    setSelectedPlace(null);
     const { latitude: lat, longitude: lng } = coords;
     setDroppedPin({ lat, lng });
     setDroppedPinAddress(null);
@@ -507,10 +518,10 @@ export default function RideScreen() {
   const [toastMsg, setToastMsg] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function showToast(msg: string) {
+  function showToast(msg: string, durationMs = 2500) {
     setToastMsg(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastMsg(''), 2500);
+    toastTimer.current = setTimeout(() => setToastMsg(''), durationMs);
   }
 
   const mapRef       = useRef<Mapbox.MapView>(null);
@@ -939,7 +950,7 @@ export default function RideScreen() {
       const miles   = calcDistance(recordedPoints);
       const gainFt  = 0;
       try {
-        const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, 'Recorded Rides', 'recorded', recordingBikeIdRef.current);
+        const saved = await createRoute(user.id, name, recordedPoints, miles, gainFt, elapsedRef.current, 'Recorded Rides', 'recorded', recordingBikeIdRef.current, null, useMapStyleStore.getState().mapStyle);
         if (saved) {
           addRoute(saved);
           showToast('Ride saved!');
@@ -1027,18 +1038,11 @@ export default function RideScreen() {
     : null;
 
   // Map style — respect theme for standard, always use correct style for others
-  const activeMapStyle = (() => {
-    if (mapStyle === 'satellite') return StyleURL.Satellite;
-    if (mapStyle === 'hybrid') return StyleURL.SatelliteStreet;
-    if (mapStyle === 'terrain') return StyleURL.Outdoors;
-    // standard — respect theme
-    return theme.bg === darkTheme.bg
-      ? 'mapbox://styles/mapbox/dark-v11'
-      : 'mapbox://styles/mapbox/light-v11';
-  })();
+  const activeMapStyle = globalMapStyleUrl;
 
-  // Weather tile URL — RainViewer open radar (no API key needed)
-  const weatherTileUrl = `https://tilecache.rainviewer.com/v2/radar/nowcast/{z}/{x}/{y}/2/1_1.png`;
+  // Weather tile URL — OpenWeatherMap precipitation overlay
+  const owmKey = process.env.EXPO_PUBLIC_OWM_API_KEY ?? '';
+  const weatherTileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`;
 
   const isNavigatingActive = navMode === 'navigating' || navMode === 'off_route' || navMode === 'recalculating';
 
@@ -1111,7 +1115,7 @@ export default function RideScreen() {
             const coords = geom?.coordinates;
             if (coords) handleDropPin({ latitude: coords[1], longitude: coords[0] });
           }}
-          onPress={() => { if (droppedPin) dismissDroppedPin(); }}
+          onPress={() => { setSelectedPlace(null); if (droppedPin) dismissDroppedPin(); }}
         >
           <Camera
             ref={cameraRef}
@@ -1119,7 +1123,11 @@ export default function RideScreen() {
           />
 
           {/* User location puck */}
-          <LocationPuck puckBearingEnabled puckBearing="heading" pulsing={{ isEnabled: true }} />
+          <LocationPuck
+            puckBearingEnabled
+            puckBearing="heading"
+            pulsing={{ isEnabled: true }}
+          />
 
           {/* ── Weather tile overlay ── */}
           {weatherOn && (
@@ -1127,10 +1135,14 @@ export default function RideScreen() {
               id="weather-tiles"
               tileUrlTemplates={[weatherTileUrl]}
               tileSize={256}
+              minZoomLevel={0}
+              maxZoomLevel={12}
             >
               <RasterLayer
                 id="weather-layer"
                 style={{ rasterOpacity: 0.6 }}
+                minZoomLevel={0}
+                maxZoomLevel={12}
               />
             </RasterSource>
           )}
@@ -1146,6 +1158,7 @@ export default function RideScreen() {
                 const dist = lastKnownLocation
                   ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
                   : undefined;
+                dismissDroppedPin();
                 setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'fuel', distanceMiles: dist });
               }}
             >
@@ -1172,6 +1185,7 @@ export default function RideScreen() {
                 const dist = lastKnownLocation
                   ? haversineMiles(lastKnownLocation.lat, lastKnownLocation.lng, props.lat, props.lng)
                   : undefined;
+                dismissDroppedPin();
                 setSelectedPlace({ name: props.name, address: props.address ?? '', lat: props.lat, lng: props.lng, kind: 'food', subtype: props.type, distanceMiles: dist });
               }}
             >
@@ -1217,7 +1231,7 @@ export default function RideScreen() {
             <ShapeSource id="live-track" shape={liveTrackGeoJson}>
               <LineLayer
                 id="live-track-line"
-                style={{ lineColor: '#E53935', lineWidth: 3, lineOpacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
+                style={{ lineColor: '#C62828', lineWidth: 3, lineOpacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
               />
             </ShapeSource>
           )}
@@ -1301,6 +1315,15 @@ export default function RideScreen() {
           onPress={() => setDrawerOpen(true)}
         >
           <Feather name="layers" size={20} color={theme.textPrimary} />
+        </Pressable>
+
+        {/* ── Locate me / crosshair button ── */}
+        <Pressable
+          style={[styles.locateBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
+          onPress={handleLocateMe}
+          hitSlop={8}
+        >
+          <Feather name="crosshair" size={26} color={theme.textPrimary} />
         </Pressable>
 
         {/* ── Compass / heading buttons (Garmin-style) ── */}
@@ -1391,7 +1414,7 @@ export default function RideScreen() {
               >
                 <PlayIcon />
               </Pressable>
-              <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>START & RECORD</Text>
+              <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>START & RECORD</Text>
             </View>
           </View>
         )}
@@ -1408,7 +1431,7 @@ export default function RideScreen() {
                   >
                     {isRidePaused ? <PlayIcon /> : <PauseIcon />}
                   </Pressable>
-                  <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
+                  <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
                 </View>
               )}
               <View style={styles.rideBtnCol}>
@@ -1428,7 +1451,7 @@ export default function RideScreen() {
                 >
                   <StopIcon />
                 </Pressable>
-                <Text style={[styles.rideBtnLabel, { color: theme.textSecondary }]}>STOP</Text>
+                <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>STOP</Text>
               </View>
             </View>
           </View>
@@ -1442,11 +1465,23 @@ export default function RideScreen() {
           </View>
         )}
 
+        {/* ── Tap-to-dismiss backdrop for panels ── */}
+        {(selectedPlace || droppedPin) && (
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => { setSelectedPlace(null); dismissDroppedPin(); }}
+          />
+        )}
+
         {/* Place detail panel (fuel / food) */}
         <PlaceDetailPanel
           place={selectedPlace}
           onClose={() => setSelectedPlace(null)}
           onNavigateInApp={(dest) => fetchAndPreviewRoute(dest)}
+          onSaveFavorite={async (p) => {
+            await addFavorite({ name: p.name, lat: p.lat, lng: p.lng, address: p.address || null }, user?.id ?? 'local');
+            showToast('Saved! Manage favorites under MY ACCOUNT.', 5000);
+          }}
         />
 
         {/* ── Dropped pin callout ── */}
@@ -1480,9 +1515,9 @@ export default function RideScreen() {
                 onPress={async () => {
                   if (!droppedPin) return;
                   const name = droppedPinAddress || `${droppedPin.lat.toFixed(4)}, ${droppedPin.lng.toFixed(4)}`;
-                  await addFavorite({ name, lat: droppedPin.lat, lng: droppedPin.lng }, user?.id ?? 'local');
+                  await addFavorite({ name, lat: droppedPin.lat, lng: droppedPin.lng, address: droppedPinAddress || null }, user?.id ?? 'local');
                   dismissDroppedPin();
-                  showToast('Saved to Favorites');
+                  showToast('Saved! Manage favorites under MY ACCOUNT.', 5000);
                 }}
               >
                 <Feather name="heart" size={14} color={theme.textSecondary} />
@@ -1625,7 +1660,7 @@ export default function RideScreen() {
         visible={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         mapStyle={mapStyle}
-        onChangeMapStyle={setMapStyle}
+        onChangeMapStyle={(s: MapStyle) => { setGlobalMapStyle(MAP_STYLES[s]); }}
         weatherOn={weatherOn}
         fuelOn={fuelStationsOn}
         fuelLoading={fuelStationsLoading}
@@ -1719,10 +1754,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Locate me button
+  locateBtn: {
+    position: 'absolute',
+    bottom: 60,
+    right: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   // Compass orientation toggle
   compassWrap: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 115,
     right: 12,
     alignItems: 'center',
   },
@@ -1751,6 +1799,8 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
+    borderWidth: 2,
+    borderColor: '#66BB6A',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1763,6 +1813,8 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
+    borderWidth: 2,
+    borderColor: '#EF5350',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1776,6 +1828,8 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 29,
     backgroundColor: '#FF9800',
+    borderWidth: 2,
+    borderColor: '#FFB74D',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1785,7 +1839,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   resumeCircleBtn: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2E7D32',
+    borderColor: '#66BB6A',
   },
   rideControlRow: {
     flexDirection: 'row',
@@ -1961,7 +2016,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#E53935',
+    backgroundColor: '#C62828',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -1981,7 +2036,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 8,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#E53935',
+    borderTopColor: '#C62828',
     alignSelf: 'center',
     marginTop: -2,
   },

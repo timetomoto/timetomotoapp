@@ -291,7 +291,7 @@ ${fieldList}`;
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
   });
 
   const endpoints = [
@@ -329,6 +329,12 @@ ${fieldList}`;
         continue;
       }
 
+      // Fix truncated JSON — find last complete object/array boundary
+      const lastBrace = cleaned.lastIndexOf('}');
+      const lastBracket = cleaned.lastIndexOf(']');
+      const lastValid = Math.max(lastBrace, lastBracket);
+      if (lastValid > 0) cleaned = cleaned.substring(0, lastValid + 1);
+
       const parsed = JSON.parse(cleaned);
       const result: Partial<BikeSpecs> = {};
       for (const [key, value] of Object.entries(parsed)) {
@@ -339,7 +345,7 @@ ${fieldList}`;
       return result;
     } catch (e: any) {
       if (e.name === 'AbortError') continue;
-      console.error('[Specs] Gemini parse failed:', e);
+      console.warn('[Specs] Gemini response truncated or malformed, retrying...', e.message);
       continue;
     }
   }

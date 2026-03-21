@@ -14,7 +14,6 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -29,7 +28,7 @@ import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore, useRoutesStore, useSafetyStore } from '../../lib/store';
+import { useAuthStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore } from '../../lib/store';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 import { fetchDirections } from '../../lib/directions';
@@ -61,7 +60,6 @@ async function reverseGeocodeLoc(lat: number, lng: number): Promise<string> {
 }
 
 function addDays(d: Date, n: number): Date { const c = new Date(d); c.setDate(c.getDate() + n); return c; }
-function defaultDeparture(): Date { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d; }
 function daysBetween(a: Date, b: Date): number { return Math.floor((b.getTime() - a.getTime()) / 86_400_000); }
 
 /**
@@ -100,51 +98,60 @@ export default function TripPlanner() {
   const userId = user?.id ?? 'local';
   const cameraRef = useRef<Camera>(null);
   const isDark = theme.bg === darkTheme.bg;
-  const mapStyle = 'mapbox://styles/mapbox/outdoors-v12';
+  const mapStyle = useMapStyleStore((s) => s.mapStyle);
 
-  // Map visibility — three-state panel
-  // State 1 (off): map hidden, full panel
-  // State 2 (compact): map 55%, panel compact (stops only)
-  // State 3 (expanded): map 30%, panel expanded (weather + conditions)
-  const MAP_H_COMPACT = SCREEN_H * 0.30 + 160;
-  const MAP_H_EXPANDED = SCREEN_H * 0.55;
-  const [mapVisible, setMapVisible] = useState(false);
   const [mapStyleReady, setMapStyleReady] = useState(false);
-  const [panelExpanded, setPanelExpanded] = useState(false);
-  const mapHeightAnim = useRef(new Animated.Value(0)).current;
-  const mapOpacity = mapHeightAnim.interpolate({
-    inputRange: [0, MAP_H_COMPACT * 0.5, MAP_H_COMPACT],
-    outputRange: [0, 0, 1],
-    extrapolate: 'clamp',
-  });
-  const panelTopAnim = mapHeightAnim; // panel top = map height
   const routeGeojsonRef = useRef<any>(null);
 
-  // PanResponder for drag handle
-  const panelExpandedRef = useRef(false);
+  // Bottom sheet snap points
+  const SNAP_COLLAPSED = SCREEN_H * 0.50 + 45;
+  const SNAP_EXPANDED = SCREEN_H - 65;
+  const panelY = useRef(new Animated.Value(SCREEN_H - SNAP_COLLAPSED)).current;
+  const lastPanelY = useRef(SCREEN_H - SNAP_COLLAPSED);
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
+      onPanResponderGrant: () => {
+        lastPanelY.current = (panelY as any)._value;
+      },
+      onPanResponderMove: (_, g) => {
+        const newY = Math.max(SCREEN_H - SNAP_EXPANDED, Math.min(SCREEN_H - SNAP_COLLAPSED, lastPanelY.current + g.dy));
+        panelY.setValue(newY);
+      },
       onPanResponderRelease: (_, g) => {
-        if (g.dy > 40 && !panelExpandedRef.current) {
-          // Swipe down → expand map (grow map, shrink panel)
-          panelExpandedRef.current = true;
-          setPanelExpanded(true);
-          Animated.spring(mapHeightAnim, { toValue: MAP_H_EXPANDED, useNativeDriver: false, tension: 80, friction: 14 }).start();
-        } else if (g.dy < -40 && panelExpandedRef.current) {
-          // Swipe up → compact map (shrink map, grow panel)
-          panelExpandedRef.current = false;
-          setPanelExpanded(false);
-          Animated.spring(mapHeightAnim, { toValue: MAP_H_COMPACT, useNativeDriver: false, tension: 80, friction: 14 }).start();
+        const threshold = SCREEN_H * 0.1;
+        if (g.dy < -threshold) {
+          // Swipe up → expand panel
+          Animated.spring(panelY, { toValue: SCREEN_H - SNAP_EXPANDED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+        } else {
+          // Swipe down → collapse panel
+          Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
         }
       },
     })
   ).current;
 
-  // Fields
-  const [origin, setOrigin] = useState<Loc | null>(null);
-  const [destination, setDestination] = useState<Loc | null>(null);
-  const [waypoints, setWaypoints] = useState<Loc[]>([]);
+  // ── Persisted state (survives tab switches) ──
+  const {
+    tripOrigin: origin, setTripOrigin: setOrigin,
+    tripDestination: destination, setTripDestination: setDestination,
+    tripWaypoints: waypoints, setTripWaypoints: setWaypoints,
+    tripDeparture: departure, setTripDeparture: setDeparture,
+    tripCustomDate: customDate, setTripCustomDate: setCustomDate,
+    tripRouteGeojson: routeGeojson, tripRouteDistance: routeDistance, tripRouteDuration: routeDuration,
+    setTripRoute,
+    tripWeatherPoints: weatherPoints, tripWeatherMsg: weatherMsg,
+    tripWeatherHasConcern: weatherHasConcern, tripWeatherCheckpoints: weatherCheckpoints,
+    tripWeatherFetchedAt: weatherFetchedAt,
+    setTripWeather,
+    tripConditions: conditions, tripConditionsFetchedAt: conditionsFetchedAt,
+    setTripConditions,
+    tripSaved: saved, setTripSaved: setSaved,
+    clearTrip,
+  } = useTripPlannerStore();
+
+  // ── Ephemeral UI state (OK to reset on remount) ──
   const [activeField, setActiveField] = useState<'origin' | 'destination' | number | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Loc[]>([]);
@@ -152,34 +159,28 @@ export default function TripPlanner() {
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Route
-  const [routeGeojson, setRouteGeojson] = useState<any>(null);
-  const [routeDistance, setRouteDistance] = useState(0);
-  const [routeDuration, setRouteDuration] = useState(0);
+  // Route loading
   const [routeLoading, setRouteLoading] = useState(false);
   const routeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Weather
+  // Weather UI
   const [weatherExpanded, setWeatherExpanded] = useState(false);
-  const [weatherMsg, setWeatherMsg] = useState<string | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
-  const [weatherCheckpoints, setWeatherCheckpoints] = useState(0);
-  const [weatherPoints, setWeatherPoints] = useState<RouteWeatherPoint[]>([]);
   const [weatherUseCelsius, setWeatherUseCelsius] = useState(false);
   const [weatherUseMiles, setWeatherUseMiles] = useState(true);
 
-  // Road conditions
+  // Road conditions UI
   const [conditionsExpanded, setConditionsExpanded] = useState(false);
-  const [conditions, setConditions] = useState<RoadCondition[]>([]);
   const [conditionsLoading, setConditionsLoading] = useState(false);
 
-  // Departure
-  const [departure, setDeparture] = useState<Date>(defaultDeparture);
-  const [customDate, setCustomDate] = useState<Date | null>(null);
+  // Date picker UI
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Weather concern flag
-  const [weatherHasConcern, setWeatherHasConcern] = useState(false);
+  // Stale TTLs
+  const WEATHER_TTL = 30 * 60 * 1000;
+  const ROAD_TTL = 15 * 60 * 1000;
+  const isWeatherStale = weatherFetchedAt ? Date.now() - weatherFetchedAt > WEATHER_TTL : false;
+  const isConditionsStale = conditionsFetchedAt ? Date.now() - conditionsFetchedAt > ROAD_TTL : false;
 
   // Marker dragging
   const [draggingMarker, setDraggingMarker] = useState<'origin' | 'destination' | number | null>(null);
@@ -201,11 +202,10 @@ export default function TripPlanner() {
     const coords = geojson.coordinates;
     const lats = coords.map((c: number[]) => c[1]);
     const lngs = coords.map((c: number[]) => c[0]);
-    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, 40, 40], 600);
+    // Bottom padding accounts for the collapsed panel covering the lower portion
+    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, SNAP_COLLAPSED * 0.7, 40], 600);
   }
 
-  // State
-  const [saved, setSaved] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -225,22 +225,6 @@ export default function TripPlanner() {
     if (placingTimeoutRef.current) clearTimeout(placingTimeoutRef.current);
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
   }, []);
-
-  const toggleMap = useCallback(() => {
-    const showing = !mapVisible;
-    setMapVisible(showing);
-    if (showing) {
-      // Turn on → compact mode (State 2)
-      setPanelExpanded(false);
-      panelExpandedRef.current = false;
-      Animated.spring(mapHeightAnim, { toValue: MAP_H_COMPACT, useNativeDriver: false, tension: 80, friction: 14 }).start(() => fitRoute());
-    } else {
-      // Turn off → State 1
-      setPanelExpanded(false);
-      panelExpandedRef.current = false;
-      Animated.spring(mapHeightAnim, { toValue: 0, useNativeDriver: false, tension: 80, friction: 14 }).start();
-    }
-  }, [mapVisible]);
 
   useEffect(() => { loadFavorites(userId).then(setFavorites); }, [userId]);
 
@@ -288,7 +272,7 @@ export default function TripPlanner() {
 
   // Debounced route fetch + weather + conditions
   useEffect(() => {
-    if (!origin || !destination) { setRouteGeojson(null); setConditions([]); return; }
+    if (!origin || !destination) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
     if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current);
     setRouteLoading(true);
     routeDebounceRef.current = setTimeout(async () => {
@@ -297,9 +281,7 @@ export default function TripPlanner() {
         const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, 'fastest', wps.length > 0 ? wps : undefined);
         if (routes.length > 0) {
           const r = routes[0];
-          setRouteGeojson(r.geometry);
-          setRouteDistance(r.distanceMiles);
-          setRouteDuration(r.durationSeconds);
+          setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);
           setSaved(false);
           const coords = r.geometry.coordinates;
 
@@ -309,17 +291,17 @@ export default function TripPlanner() {
             setWeatherLoading(true);
             fetchRouteWeather(coords)
               .then(({ points, useCelsius, useMiles }) => {
-                setWeatherCheckpoints(points.length);
-                setWeatherPoints(points);
                 setWeatherUseCelsius(useCelsius);
                 setWeatherUseMiles(useMiles);
-                if (points.length === 0 || points.every((p) => p.temp === 0)) { setWeatherMsg('Unable to check route weather.'); setWeatherHasConcern(false); }
-                else if (!hasRouteWeatherConcern(points, useCelsius)) { setWeatherMsg('Clear conditions along this route.'); setWeatherHasConcern(false); }
-                else { setWeatherMsg(getRouteWarningMessage(points, useCelsius) ?? 'Check conditions before riding.'); setWeatherHasConcern(true); }
+                let msg: string | null; let concern: boolean;
+                if (points.length === 0 || points.every((p) => p.temp === 0)) { msg = 'Unable to check route weather.'; concern = false; }
+                else if (!hasRouteWeatherConcern(points, useCelsius)) { msg = 'Clear conditions along this route.'; concern = false; }
+                else { msg = getRouteWarningMessage(points, useCelsius) ?? 'Check conditions before riding.'; concern = true; }
+                setTripWeather(points, msg, concern, points.length);
               })
-              .catch(() => { setWeatherMsg('Unable to check route weather.'); setWeatherHasConcern(false); setWeatherPoints([]); })
+              .catch(() => { setTripWeather([], 'Unable to check route weather.', false, 0); })
               .finally(() => setWeatherLoading(false));
-          } else { setWeatherMsg(null); setWeatherCheckpoints(0); setWeatherHasConcern(false); setWeatherPoints([]); }
+          } else { setTripWeather([], null, false, 0); }
 
           // Fetch road conditions along route
           setConditionsLoading(true);
@@ -336,7 +318,7 @@ export default function TripPlanner() {
             if (samples.indexOf(sample) < samples.length - 1) await new Promise((r) => setTimeout(r, 300));
           }
           allConditions.sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
-          setConditions(allConditions);
+          setTripConditions(allConditions);
           setConditionsLoading(false);
         }
       } catch {}
@@ -357,7 +339,7 @@ export default function TripPlanner() {
       const loc: Loc = { name, lat, lng };
       if (!origin) { setOrigin(loc); return; }
       if (!destination) { setDestination(loc); return; }
-      setWaypoints((prev) => [...prev, loc]);
+      setWaypoints([...waypoints, loc]);
     })();
   }
 
@@ -374,12 +356,12 @@ export default function TripPlanner() {
               if (!text?.trim()) return;
               if (type === 'origin' && origin) setOrigin({ ...origin, name: text.trim() });
               else if (type === 'destination' && destination) setDestination({ ...destination, name: text.trim() });
-              else if (typeof type === 'number') setWaypoints((p) => p.map((w, i) => i === type ? { ...w, name: text.trim() } : w));
+              else if (typeof type === 'number') setWaypoints(waypoints.map((w, i) => i === type ? { ...w, name: text.trim() } : w));
             }, 'plain-text', current?.name);
           } else if (idx === 1) {
             if (type === 'origin') setOrigin(null);
             else if (type === 'destination') setDestination(null);
-            else setWaypoints((p) => p.filter((_, i) => i !== type));
+            else setWaypoints(waypoints.filter((_, i) => i !== type));
           }
         },
       );
@@ -390,13 +372,13 @@ export default function TripPlanner() {
             if (!text?.trim()) return;
             if (type === 'origin' && origin) setOrigin({ ...origin, name: text.trim() });
             else if (type === 'destination' && destination) setDestination({ ...destination, name: text.trim() });
-            else if (typeof type === 'number') setWaypoints((p) => p.map((w, i) => i === type ? { ...w, name: text.trim() } : w));
+            else if (typeof type === 'number') setWaypoints(waypoints.map((w, i) => i === type ? { ...w, name: text.trim() } : w));
           }, 'plain-text', current?.name);
         }},
         { text: 'Remove', style: 'destructive', onPress: () => {
           if (type === 'origin') setOrigin(null);
           else if (type === 'destination') setDestination(null);
-          else setWaypoints((p) => p.filter((_, i) => i !== type));
+          else setWaypoints(waypoints.filter((_, i) => i !== type));
         }},
         { text: 'Cancel', style: 'cancel' },
       ]);
@@ -414,9 +396,9 @@ export default function TripPlanner() {
     if (!geom?.coordinates) return;
     const [lng, lat] = geom.coordinates;
     // Update coordinate immediately for visual feedback
-    if (type === 'origin') setOrigin((prev) => prev ? { ...prev, lat, lng } : prev);
-    else if (type === 'destination') setDestination((prev) => prev ? { ...prev, lat, lng } : prev);
-    else if (typeof type === 'number') setWaypoints((prev) => prev.map((w, i) => i === type ? { ...w, lat, lng } : w));
+    if (type === 'origin') { if (origin) setOrigin({ ...origin, lat, lng }); }
+    else if (type === 'destination') { if (destination) setDestination({ ...destination, lat, lng }); }
+    else if (typeof type === 'number') setWaypoints(waypoints.map((w, i) => i === type ? { ...w, lat, lng } : w));
     // Debounced route fetch while dragging
     if (dragRouteDebounceRef.current) clearTimeout(dragRouteDebounceRef.current);
     dragRouteDebounceRef.current = setTimeout(async () => {
@@ -430,9 +412,7 @@ export default function TripPlanner() {
       try {
         const routes = await fetchDirections(o.lng, o.lat, d.lng, d.lat, 'fastest', wps.length > 0 ? wps : undefined);
         if (routes.length > 0) {
-          setRouteGeojson(routes[0].geometry);
-          setRouteDistance(routes[0].distanceMiles);
-          setRouteDuration(routes[0].durationSeconds);
+          setTripRoute(routes[0].geometry, routes[0].distanceMiles, routes[0].durationSeconds);
         }
       } catch {}
     }, 300);
@@ -446,7 +426,7 @@ export default function TripPlanner() {
     const name = await reverseGeocodeLoc(lat, lng);
     if (type === 'origin') setOrigin({ name, lat, lng });
     else if (type === 'destination') setDestination({ name, lat, lng });
-    else if (typeof type === 'number') setWaypoints((prev) => prev.map((w, i) => i === type ? { name, lat, lng } : w));
+    else if (typeof type === 'number') setWaypoints(waypoints.map((w, i) => i === type ? { name, lat, lng } : w));
     setSaved(false);
   }
 
@@ -459,7 +439,7 @@ export default function TripPlanner() {
     markUserPlacing();
     (async () => {
       const name = await reverseGeocodeLoc(lat, lng);
-      setWaypoints((prev) => [...prev, { name, lat, lng }]);
+      setWaypoints([...waypoints, { name, lat, lng }]);
     })();
   }
 
@@ -467,7 +447,7 @@ export default function TripPlanner() {
     const tmp = origin;
     setOrigin(destination);
     setDestination(tmp);
-    setWaypoints((prev) => [...prev].reverse());
+    setWaypoints([...waypoints].reverse());
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
@@ -506,10 +486,8 @@ export default function TripPlanner() {
     if (activeField === 'origin') setOrigin(loc);
     else if (activeField === 'destination') setDestination(loc);
     else if (typeof activeField === 'number') {
-      setWaypoints((p) => {
-        if (activeField >= p.length) return [...p, loc]; // new stop
-        return p.map((w, i) => i === activeField ? loc : w); // edit existing
-      });
+      if (activeField >= waypoints.length) setWaypoints([...waypoints, loc]);
+      else setWaypoints(waypoints.map((w, i) => i === activeField ? loc : w));
     }
     setActiveField(null);
     setQuery('');
@@ -533,6 +511,7 @@ export default function TripPlanner() {
       return;
     }
     navStore.setPendingSearchDest(destination);
+    clearTrip();
     router.navigate('/(tabs)/ride' as any);
   }
 
@@ -614,12 +593,12 @@ export default function TripPlanner() {
     if (weatherLoading) return { label: 'CHECKING', color: theme.textMuted };
     if (weatherPoints.length === 0) return null;
     const hasSevere = weatherPoints.some((p) => p.weatherCode >= 95 || (p.weatherCode >= 56 && p.weatherCode <= 57) || (p.weatherCode >= 66 && p.weatherCode <= 67) || (p.weatherCode >= 71 && p.weatherCode <= 86));
-    if (hasSevere) return { label: 'ALERT', color: '#E53935' };
+    if (hasSevere) return { label: 'ALERT', color: '#C62828' };
     const hasModerate = weatherPoints.some((p) => p.rainChance > 50);
     if (hasModerate) return { label: 'WATCH', color: '#FF9800' };
     const hasMinor = weatherPoints.some((p) => p.weatherCode >= 51 || p.rainChance > 0 || p.wind > (weatherUseCelsius ? 56 : 35));
     if (hasMinor) return { label: 'MINOR', color: '#FF9800' };
-    return { label: 'CLEAR', color: '#4CAF50' };
+    return { label: 'CLEAR', color: '#2E7D32' };
   }
   const weatherBadge = getWeatherBadge();
 
@@ -627,13 +606,10 @@ export default function TripPlanner() {
   if (daysOut > 16) weatherDisclaimer = "That ride's still on the horizon. Weather this far out is more vibe than forecast — update your departure date closer to the ride for conditions you can count on.";
   else if (daysOut > 7) weatherDisclaimer = "Heads up — forecasts this far out are early estimates. Check back closer to your departure date for conditions you can count on.";
 
-  const footerH = canNavigate && activeField === null ? 110 : 0;
-
   return (
     <View style={{ flex: 1 }}>
-      {/* Map — absolute, always mounted, fades in/out */}
-      <Animated.View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: mapHeightAnim, opacity: mapOpacity, overflow: 'hidden' }} pointerEvents={mapVisible ? 'auto' : 'none'}>
-        <View style={{ height: MAP_H_EXPANDED }}>
+      {/* Map — always full screen behind panel */}
+      <View style={StyleSheet.absoluteFillObject}>
         <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onPress={handleMapPress} onDidFinishLoadingStyle={() => setMapStyleReady(true)} onWillStartLoadingMap={() => setMapStyleReady(false)}>
           <Camera ref={cameraRef} defaultSettings={{ centerCoordinate: AUSTIN, zoomLevel: 9 }} />
           {origin && (
@@ -659,44 +635,48 @@ export default function TripPlanner() {
           ))}
           {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
         </MapView>
-        {routeLoading && <View style={st.mapOverlay}><ActivityIndicator size="small" color={theme.red} /></View>}
+        {routeLoading && <View style={st.mapOverlay}><ActivityIndicator size="small" color="#FFFFFF" /></View>}
         {/* Fit route button */}
         {routeGeojson && (
           <Pressable style={[st.fitRouteBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]} onPress={fitRoute}>
             <Text style={[st.fitRouteBtnText, { color: theme.textMuted }]}>FIT ROUTE</Text>
           </Pressable>
         )}
-        </View>
-      </Animated.View>
+        {/* ── Layers button ── */}
+        <Pressable
+          style={[st.layersBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          onPress={() => {
+            const options = [
+              { label: 'Hybrid', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
+              { label: 'Outdoors', url: 'mapbox://styles/mapbox/outdoors-v12' },
+              { label: 'Streets', url: 'mapbox://styles/mapbox/streets-v12' },
+              { label: 'Dark', url: 'mapbox://styles/mapbox/dark-v11' },
+            ];
+            if (Platform.OS === 'ios') {
+              ActionSheetIOS.showActionSheetWithOptions(
+                { options: [...options.map((o) => o.label), 'Cancel'], cancelButtonIndex: options.length },
+                (idx) => { if (idx < options.length) useMapStyleStore.getState().setMapStyle(options[idx].url); },
+              );
+            } else {
+              Alert.alert('Map Style', undefined, [
+                ...options.map((o) => ({ text: o.label, onPress: () => useMapStyleStore.getState().setMapStyle(o.url) })),
+                { text: 'Cancel', style: 'cancel' as const },
+              ]);
+            }
+          }}
+        >
+          <Feather name="layers" size={18} color={theme.textPrimary} />
+        </Pressable>
+      </View>
 
-      {/* Panel — absolute, slides down when map shown */}
-      <Animated.View style={{ position: 'absolute', top: panelTopAnim, left: 0, right: 0, bottom: footerH }}>
+      {/* Bottom sheet panel */}
+      <Animated.View style={[st.bottomSheet, { top: panelY, backgroundColor: theme.bgPanel }]}>
         {/* Drag handle */}
-        {mapVisible && (
-          <View {...panResponder.panHandlers} style={st.dragHandleWrap}>
-            <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
-          </View>
-        )}
-
-        {/* Map toggle + Import row — pinned, never scrolls */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, marginHorizontal: 16, marginTop: mapVisible ? 4 : 12, marginBottom: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Switch
-              value={mapVisible}
-              onValueChange={toggleMap}
-              trackColor={{ false: '#C7C7CC', true: theme.red }}
-              thumbColor="#FFFFFF"
-              ios_backgroundColor="#C7C7CC"
-            />
-            <Text style={{ fontSize: 12, color: theme.textSecondary }}>{mapVisible ? 'Hide map' : 'Show map'}</Text>
-          </View>
-          <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 4 }} onPress={() => setImportModalOpen(true)}>
-            <Feather name="bookmark" size={13} color={theme.textSecondary} />
-            <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Import from Routes</Text>
-          </Pressable>
+        <View {...panResponder.panHandlers} style={st.dragHandleWrap}>
+          <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
-        <ScrollView style={[st.panel, { backgroundColor: theme.bgPanel }]} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>
@@ -750,7 +730,7 @@ export default function TripPlanner() {
                             <View style={[st.dot, { backgroundColor: theme.orange }]} />
                             <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
                           </Pressable>
-                          <Pressable onPress={() => setWaypoints((p) => p.filter((_, i) => i !== idx))} hitSlop={6}><Feather name="x-circle" size={16} color={theme.textMuted} /></Pressable>
+                          <Pressable onPress={() => setWaypoints(waypoints.filter((_, i) => i !== idx))} hitSlop={6}><Feather name="x-circle" size={16} color={theme.textMuted} /></Pressable>
                           <Pressable onLongPress={drag} delayLongPress={150} hitSlop={6} style={{ paddingVertical: 8, paddingHorizontal: 4 }}>
                             <Feather name="menu" size={16} color={theme.textMuted} />
                           </Pressable>
@@ -768,31 +748,30 @@ export default function TripPlanner() {
                 {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
               </Pressable>
 
-              {/* Add Stop | Reverse */}
-              <View style={st.actionsRow}>
-                <Pressable style={st.addStop} onPress={() => { setActiveField(waypoints.length); }}>
+              {/* Add Stop | Import */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32, paddingHorizontal: 16, marginVertical: 12 }}>
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
                   <Feather name="plus" size={13} color={theme.textSecondary} />
-                  <Text style={[st.addStopText, { color: theme.textSecondary }]}>Add Stop</Text>
+                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
                 </Pressable>
-                {origin && destination && (
-                  <Pressable style={st.addStop} onPress={handleReverse}>
-                    <Feather name="repeat" size={13} color={theme.textSecondary} />
-                    <Text style={[st.addStopText, { color: theme.textSecondary }]}>Reverse</Text>
-                  </Pressable>
-                )}
+                <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
+                  <Feather name="bookmark" size={13} color={theme.textSecondary} />
+                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import from My Routes</Text>
+                </Pressable>
               </View>
 
               {/* Route summary */}
               {routeGeojson && (
-                <View style={[st.summaryCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                  <Text style={[st.summaryText, { color: theme.textPrimary }]}>
+                <View style={{ marginTop: -2, borderRadius: 10, backgroundColor: 'rgba(76,175,80,0.12)', borderWidth: 1, borderColor: 'rgba(76,175,80,0.3)', paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: theme.textPrimary, letterSpacing: 0.8, marginBottom: 6, opacity: 0.7 }}>ROUTE DETAILS</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, textAlign: 'center' }}>
                     {routeDistance.toFixed(1)} mi · {Math.floor(routeDuration / 3600)}h {Math.floor((routeDuration % 3600) / 60)}m
                   </Text>
                 </View>
               )}
 
               {/* Departure — hidden in compact map mode */}
-              {(!mapVisible || panelExpanded) && routeGeojson && (
+              {routeGeojson && (
                 <View style={[st.departureCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                   <Text style={[st.sectionLabel, { color: theme.textSecondary }]}>DEPARTURE</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
@@ -867,13 +846,17 @@ export default function TripPlanner() {
               )}
 
               {/* Weather along route — hidden in compact map mode */}
-              {(!mapVisible || panelExpanded) && routeGeojson && daysOut <= 16 && (
+              {routeGeojson && daysOut <= 16 && (
                 <>
                   <Pressable style={[st.collapsible, { borderColor: theme.border, alignItems: 'flex-start' }]} onPress={() => setWeatherExpanded((v) => !v)}>
                     <Feather name={weatherExpanded ? 'chevron-down' : 'chevron-right'} size={14} color={theme.textPrimary} style={{ marginTop: 2 }} />
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                       <Text style={[st.collapsibleTitle, { color: theme.textPrimary }]}>WEATHER ALONG ROUTE</Text>
-                      {weatherBadge && <View style={[st.statusBadge, { backgroundColor: weatherBadge.color }]}><Text style={st.statusBadgeText}>{weatherBadge.label}</Text></View>}
+                      {isWeatherStale ? (
+                        <Pressable onPress={() => { setWeatherLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) fetchRouteWeather(coords).then(({ points, useCelsius, useMiles }) => { setWeatherUseCelsius(useCelsius); setWeatherUseMiles(useMiles); let msg: string | null; let concern: boolean; if (points.length === 0 || points.every((p) => p.temp === 0)) { msg = 'Unable to check route weather.'; concern = false; } else if (!hasRouteWeatherConcern(points, useCelsius)) { msg = 'Clear conditions along this route.'; concern = false; } else { msg = getRouteWarningMessage(points, useCelsius) ?? 'Check conditions before riding.'; concern = true; } setTripWeather(points, msg, concern, points.length); }).catch(() => setTripWeather([], 'Unable to check route weather.', false, 0)).finally(() => setWeatherLoading(false)); }} style={{ padding: 4 }}>
+                          <Feather name="refresh-cw" size={14} color={theme.textMuted} />
+                        </Pressable>
+                      ) : weatherBadge && <View style={[st.statusBadge, { backgroundColor: weatherBadge.color }]}><Text style={st.statusBadgeText}>{weatherBadge.label}</Text></View>}
                     </View>
                   </Pressable>
                   {weatherExpanded && (
@@ -904,7 +887,7 @@ export default function TripPlanner() {
                   )}
                 </>
               )}
-              {(!mapVisible || panelExpanded) && routeGeojson && daysOut > 16 && (
+              {routeGeojson && daysOut > 16 && (
                 <>
                   <View style={[st.collapsible, { borderColor: theme.border, alignItems: 'flex-start' }]}>
                     <Feather name="cloud" size={14} color={theme.textMuted} style={{ marginTop: 2 }} />
@@ -917,7 +900,7 @@ export default function TripPlanner() {
               )}
 
               {/* Road conditions — hidden in compact map mode */}
-              {(!mapVisible || panelExpanded) && routeGeojson && (() => {
+              {routeGeojson && (() => {
                 // Pre-compute mile markers for conditions
                 const conditionsWithMiles = conditions.map((c) => {
                   const { distanceKm, offsetKm } = getRouteMileMarker(routeGeojson.coordinates, c.lat, c.lng);
@@ -937,13 +920,17 @@ export default function TripPlanner() {
                       <Feather name={conditionsExpanded ? 'chevron-down' : 'chevron-right'} size={14} color={theme.textPrimary} />
                       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <Text style={[st.collapsibleTitle, { color: theme.textPrimary }]}>ROAD CONDITIONS</Text>
-                        {conditionsLoading
+                        {isConditionsStale ? (
+                          <Pressable onPress={() => { /* re-trigger conditions fetch via route change detection */ setTripConditions([]); setConditionsLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) { (async () => { const samples = sampleRouteCoordinates(coords, 30).slice(0, 5); const all: RoadCondition[] = []; for (const s of samples) { try { const c = await fetchHEREConditions(s.lat, s.lng); c.forEach((r) => { if (!all.some((e) => e.id === r.id)) all.push(r); }); } catch {} await new Promise((r) => setTimeout(r, 300)); } setTripConditions(all); setConditionsLoading(false); })(); } }} style={{ padding: 4 }}>
+                            <Feather name="refresh-cw" size={14} color={theme.textMuted} />
+                          </Pressable>
+                        ) : conditionsLoading
                           ? <View style={[st.statusBadge, { backgroundColor: theme.textMuted }]}><Text style={st.statusBadgeText}>CHECKING</Text></View>
                           : conditions.length === 0
-                            ? <View style={[st.statusBadge, { backgroundColor: '#4CAF50' }]}><Text style={st.statusBadgeText}>CLEAR</Text></View>
+                            ? <View style={[st.statusBadge, { backgroundColor: '#2E7D32' }]}><Text style={st.statusBadgeText}>CLEAR</Text></View>
                             : conditions.length <= 5
                               ? <View style={[st.statusBadge, { backgroundColor: '#FF9800' }]}><Text style={st.statusBadgeText}>ACTIVE</Text></View>
-                              : <View style={[st.statusBadge, { backgroundColor: '#E53935' }]}><Text style={st.statusBadgeText}>BUSY</Text></View>
+                              : <View style={[st.statusBadge, { backgroundColor: '#C62828' }]}><Text style={st.statusBadgeText}>BUSY</Text></View>
                         }
                       </View>
                     </Pressable>
@@ -972,32 +959,38 @@ export default function TripPlanner() {
               })()}
             </View>
           )}
+
+              {/* Bottom action buttons */}
+              {canNavigate && activeField === null && (
+                <View style={{ marginTop: 8, marginBottom: 220, gap: 8, marginHorizontal: 16 }}>
+                  <Pressable
+                    onPress={handleNavigate}
+                    style={{ backgroundColor: theme.red, borderRadius: 8, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  >
+                    <Feather name="navigation" size={16} color="#fff" />
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.5 }}>NAVIGATE</Text>
+                  </Pressable>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <Pressable
+                      onPress={openSaveModal}
+                      disabled={saved}
+                      style={{ flex: 1, height: 40, borderRadius: 8, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      <Feather name={saved ? 'check' : 'bookmark'} size={14} color={saved ? theme.green : theme.textPrimary} />
+                      <Text style={{ fontWeight: '600', fontSize: 13, color: saved ? theme.green : theme.textPrimary }}>{saved ? 'SAVED' : 'SAVE'}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleShare}
+                      style={{ flex: 1, height: 40, borderRadius: 8, borderWidth: 1, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      <Feather name="share-2" size={14} color={theme.textPrimary} />
+                      <Text style={{ fontWeight: '600', fontSize: 13, color: theme.textPrimary }}>SHARE</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
         </ScrollView>
       </Animated.View>
-
-      {/* Sticky footer — absolute at bottom */}
-      {canNavigate && activeField === null && (
-        <View style={[st.footer, { backgroundColor: theme.bgPanel, borderTopColor: theme.border, paddingBottom: 20 }]}>
-          <Pressable style={[st.navBtn, { backgroundColor: theme.red }]} onPress={handleNavigate}>
-            <Feather name="navigation" size={16} color="#fff" />
-            <Text style={st.navBtnText}>NAVIGATE</Text>
-          </Pressable>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 0, paddingBottom: 0 }}>
-            <Pressable style={[st.secBtn, { borderColor: theme.border, flex: 1 }]} onPress={openSaveModal} disabled={saved}>
-              <Feather name={saved ? 'check' : 'bookmark'} size={14} color={saved ? theme.green : theme.textSecondary} />
-              <Text style={[st.secBtnText, { color: saved ? theme.green : theme.textSecondary }]}>{saved ? 'SAVED' : 'SAVE'}</Text>
-            </Pressable>
-            <Pressable style={[st.secBtn, { borderColor: theme.border, flex: 1 }]} onPress={handleShare}>
-              <Feather name="share-2" size={14} color={theme.textSecondary} />
-              <Text style={[st.secBtnText, { color: theme.textSecondary }]}>SHARE</Text>
-            </Pressable>
-            <Pressable style={[st.secBtn, { borderColor: theme.border, flex: 1 }]} onPress={handleReverse}>
-              <Feather name="repeat" size={14} color={theme.textSecondary} />
-              <Text style={[st.secBtnText, { color: theme.textSecondary }]}>REVERSE</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       {/* Import modal */}
       <Modal visible={importModalOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setImportModalOpen(false)}>
@@ -1088,13 +1081,27 @@ export default function TripPlanner() {
 const st = StyleSheet.create({
   marker: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
   markerDragging: { width: 20, height: 20, borderRadius: 10, borderWidth: 3, opacity: 0.85 },
-  mapOverlay: { position: 'absolute', top: 16, right: 16, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
+  mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-  dragHandleWrap: { alignItems: 'center', paddingVertical: 8 },
+  bottomSheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SCREEN_H,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  dragHandleWrap: { alignItems: 'center', paddingVertical: 12 },
   dragHandle: { width: 36, height: 4, borderRadius: 2 },
   inlinePicker: { borderWidth: 1, borderRadius: 8, marginTop: 8, overflow: 'hidden' },
-  panel: { flex: 1, borderTopLeftRadius: 12, borderTopRightRadius: 12 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, gap: 8, marginBottom: 8 },
   searchInput: { flex: 1, fontSize: 14, padding: 0 },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
@@ -1124,7 +1131,7 @@ const st = StyleSheet.create({
   condCard: { borderWidth: 1, borderRadius: 8, padding: 10, marginTop: 6, gap: 4 },
   condTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   condDesc: { fontSize: 11, lineHeight: 16 },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingTop: 10, paddingHorizontal: 12, borderTopWidth: 1, gap: 6 },
+  footer: { paddingTop: 10, paddingHorizontal: 12, borderTopWidth: 1, gap: 6 },
   navBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, height: 42 },
   navBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
   secBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 6, borderWidth: 1, height: 32, paddingVertical: 0 },
@@ -1139,7 +1146,7 @@ const st = StyleSheet.create({
   toast: { position: 'absolute', bottom: 140, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 14 },
   toastText: { fontSize: 13, fontWeight: '600' },
   flexOne: { flex: 1 },
-  fieldsWrap: { padding: 16, gap: 10 },
+  fieldsWrap: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10, gap: 10 },
   searchPad: { padding: 16 },
   actionsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 },
   secBtnRow: { flexDirection: 'row', gap: 8 },

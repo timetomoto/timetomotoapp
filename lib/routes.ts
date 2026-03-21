@@ -20,6 +20,7 @@ export interface Route {
   recorded_at?: string | null;
   bike_id?: string | null;
   departure_time?: string | null;
+  map_style?: string | null;
   created_at: string;
 }
 
@@ -58,7 +59,7 @@ export async function fetchUserRoutes(userId: string): Promise<Route[]> {
   try {
     const { data, error } = await supabase
       .from('saved_routes')
-      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, source, recorded_at, bike_id, departure_time, created_at')
+      .select('id, user_id, name, points, distance_miles, elevation_gain_ft, duration_seconds, category, source, recorded_at, bike_id, departure_time, map_style, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -89,6 +90,7 @@ export async function createRoute(
   source: string = 'recorded',
   bikeId?: string | null,
   departureTime?: string | null,
+  mapStyle?: string | null,
 ): Promise<Route | null> {
   const recordedAt = source === 'recorded' ? new Date().toISOString() : null;
   try {
@@ -106,6 +108,7 @@ export async function createRoute(
         recorded_at: recordedAt,
         bike_id: bikeId ?? null,
         departure_time: departureTime ?? null,
+        map_style: mapStyle ?? null,
       })
       .select()
       .single();
@@ -127,6 +130,7 @@ export async function createRoute(
     source,
     recorded_at: recordedAt,
     bike_id: bikeId ?? null,
+    map_style: mapStyle ?? 'mapbox://styles/mapbox/satellite-streets-v12',
     created_at: new Date().toISOString(),
   };
   const local = await loadLocalRoutes(userId);
@@ -1755,9 +1759,16 @@ let seedingInProgress = false;
 
 export async function seedRoutes(userId: string): Promise<void> {
   if (seedingInProgress) return;
+  // Only seed once per user — skip if already done
+  const seedKey = `@ttm/routes_seeded_${userId}`;
+  try {
+    const already = await AsyncStorage.getItem(seedKey);
+    if (already === 'true') return;
+  } catch {}
   seedingInProgress = true;
   try {
     await _seedRoutesInner(userId);
+    await AsyncStorage.setItem(seedKey, 'true').catch(() => {});
   } finally {
     seedingInProgress = false;
   }
@@ -1765,7 +1776,23 @@ export async function seedRoutes(userId: string): Promise<void> {
 
 async function _seedRoutesInner(userId: string): Promise<void> {
   const existing = await fetchUserRoutes(userId);
-  const existingByName = new Map(existing.map((r) => [r.name, r]));
+
+  // Deduplicate — keep only the first occurrence of each name in BDR category
+  const seen = new Set<string>();
+  for (const route of existing) {
+    if (route.category === 'Backcountry Discovery Routes' || route.category === 'BDR Routes' || route.category === 'Backcountry Discovery Routes (BDR)') {
+      if (seen.has(route.name)) {
+        // Duplicate — delete it
+        try { await deleteRoute(route.id, userId); } catch {}
+      } else {
+        seen.add(route.name);
+      }
+    }
+  }
+
+  // Re-fetch after cleanup
+  const cleaned = await fetchUserRoutes(userId);
+  const existingByName = new Map(cleaned.map((r) => [r.name, r]));
 
   // Backfill category on already-seeded routes that are missing it or have the old name
   for (const seed of SEED_ROUTES) {
@@ -1776,7 +1803,7 @@ async function _seedRoutesInner(userId: string): Promise<void> {
     }
   }
 
-  const existingNames = new Set(existing.map((r) => r.name));
+  const existingNames = new Set(cleaned.map((r) => r.name));
 
   for (const seed of SEED_ROUTES) {
     if (existingNames.has(seed.name)) continue;

@@ -218,21 +218,23 @@ interface ContactCardProps {
   index: number;
   onEdit: () => void;
   onDelete: () => void;
+  onSetPrimary: () => void;
 }
 
-function ContactCard({ contact, index, onEdit, onDelete }: ContactCardProps) {
+function ContactCard({ contact, index, onEdit, onDelete, onSetPrimary }: ContactCardProps) {
   const { theme } = useTheme();
-  const isPrimary = index === 0;
 
   return (
     <View style={[styles.contactCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
       <View style={styles.contactCardTop}>
         <View style={styles.contactCardLeft}>
-          {isPrimary && (
-            <View style={[styles.primaryBadge, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
-              <Text style={[styles.primaryBadgeText, { color: theme.red }]}>PRIMARY</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {contact.is_primary && (
+              <View style={[styles.primaryBadge, { backgroundColor: theme.red + '22', borderColor: theme.red + '55' }]}>
+                <Text style={[styles.primaryBadgeText, { color: theme.red }]}>PRIMARY</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.contactName, { color: theme.textPrimary }]}>{contact.name}</Text>
           {!!contact.relationship && (
             <Text style={[styles.contactRelationship, { color: theme.textSecondary }]}>{contact.relationship}</Text>
@@ -243,6 +245,14 @@ function ContactCard({ contact, index, onEdit, onDelete }: ContactCardProps) {
           )}
         </View>
         <View style={styles.contactCardActions}>
+          <Pressable
+            style={[styles.iconBtn, { borderColor: contact.is_primary ? theme.red : theme.border }]}
+            onPress={onSetPrimary}
+            hitSlop={6}
+            accessibilityLabel="Set as primary contact"
+          >
+            <Feather name="star" size={14} color={contact.is_primary ? theme.red : theme.textMuted} />
+          </Pressable>
           <Pressable
             style={[styles.iconBtn, { borderColor: theme.border }]}
             onPress={onEdit}
@@ -352,6 +362,14 @@ export default function EmergencyContactsScreen() {
     );
   }
 
+  async function handleSetPrimary(index: number) {
+    setSaving(true);
+    const updated = contacts.map((c, i) => ({ ...c, is_primary: i === index }));
+    const err = await saveContacts(user?.id ?? 'local', updated);
+    setSaving(false);
+    if (err) setError(err);
+  }
+
   async function handleAddContact(data: ContactFormData) {
     if (!data.name.trim() || !data.phone.trim()) {
       setError('Name and phone number are required.');
@@ -365,7 +383,8 @@ export default function EmergencyContactsScreen() {
     setError(null);
     setSaving(true);
     try {
-      const newContact: EmergencyContact = { name: data.name, relationship: data.relationship, phone: data.phone, email: data.email };
+      const hasPrimary = contacts.some((c) => c.is_primary);
+      const newContact: EmergencyContact = { name: data.name, relationship: data.relationship, phone: data.phone, email: data.email, is_primary: !hasPrimary };
       const updated = [...contacts, newContact];
       const err = await saveContacts(user?.id ?? 'local', updated);
       if (err) {
@@ -457,6 +476,7 @@ export default function EmergencyContactsScreen() {
                 index={index}
                 onEdit={() => setEditingIndex(index)}
                 onDelete={() => handleDeleteContact(index)}
+                onSetPrimary={() => handleSetPrimary(index)}
               />
             )}
           </View>

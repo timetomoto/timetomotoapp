@@ -47,7 +47,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#2E7D32' }}
         thumbColor="#FFFFFF"
         ios_backgroundColor="#C7C7CC"
       />
@@ -310,7 +310,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={false}
                   onValueChange={() => {}}
-                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#2E7D32' }}
                   thumbColor="#FFFFFF"
                   ios_backgroundColor="#C7C7CC"
                 />
@@ -341,7 +341,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={false}
                   onValueChange={() => {}}
-                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#2E7D32' }}
                   thumbColor="#FFFFFF"
                   ios_backgroundColor="#C7C7CC"
                 />
@@ -401,20 +401,6 @@ export default function SettingsScreen() {
         )}
 
         {/* WEATHER */}
-        <SectionHeader label="WEATHER" />
-        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
-          <Pressable
-            style={[styles.row, { borderBottomColor: theme.border }]}
-            onPress={() => router.push('/favorite-locations')}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Favorite Locations</Text>
-              <Text style={[styles.rowSubtitle, { color: theme.textMuted }]}>Save cities for quick access</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={theme.textMuted} />
-          </Pressable>
-        </View>
-
         {/* OFFLINE MAPS */}
         <SectionHeader label="OFFLINE MAPS" />
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>

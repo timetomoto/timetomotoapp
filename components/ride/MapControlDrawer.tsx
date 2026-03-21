@@ -19,7 +19,7 @@ import { useTheme } from '../../lib/useTheme';
 // Types
 // ---------------------------------------------------------------------------
 
-type MapStyleOption = 'standard' | 'terrain' | 'satellite' | 'hybrid';
+type MapStyleOption = 'hybrid' | 'outdoors' | 'streets' | 'dark';
 
 interface Props {
   visible: boolean;
@@ -70,10 +70,10 @@ export default function MapControlDrawer({
   ).current;
 
   const MAP_STYLE_OPTIONS: { key: MapStyleOption; label: string; icon: string }[] = [
-    { key: 'standard', label: 'Standard', icon: 'map' },
-    { key: 'terrain', label: 'Terrain', icon: 'layers' },
-    { key: 'satellite', label: 'Satellite', icon: 'globe' },
     { key: 'hybrid', label: 'Hybrid', icon: 'image' },
+    { key: 'outdoors', label: 'Outdoors', icon: 'compass' },
+    { key: 'streets', label: 'Streets', icon: 'map' },
+    { key: 'dark', label: 'Dark', icon: 'moon' },
   ];
 
   return (

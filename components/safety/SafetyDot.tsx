@@ -57,7 +57,7 @@ export default function SafetyDot() {
   );
 }
 
-const ACTIVE_COLOR  = '#4CAF50';
+const ACTIVE_COLOR  = '#2E7D32';
 const INACTIVE_COLOR = '#383838';
 
 const s = StyleSheet.create({

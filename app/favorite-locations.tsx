@@ -357,7 +357,7 @@ export default function FavoriteLocationsScreen() {
                 <Switch
                   value={makeHome}
                   onValueChange={setMakeHome}
-                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+                  trackColor={{ false: '#C7C7CC', true: theme.green ?? '#2E7D32' }}
                   thumbColor="#FFFFFF"
                   ios_backgroundColor="#C7C7CC"
                 />
@@ -427,6 +427,11 @@ export default function FavoriteLocationsScreen() {
                       {fav.nickname ? (
                         <Text style={[s.favAddress, { color: theme.textMuted }]} numberOfLines={1}>
                           {fav.name}
+                        </Text>
+                      ) : null}
+                      {fav.address ? (
+                        <Text style={[s.favAddress, { color: theme.textMuted }]} numberOfLines={1}>
+                          {fav.address}
                         </Text>
                       ) : null}
                     </View>

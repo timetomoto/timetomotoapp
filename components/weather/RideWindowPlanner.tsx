@@ -24,10 +24,10 @@ import { useTheme } from '../../lib/useTheme';
 // ---------------------------------------------------------------------------
 
 const RISK_COLOR: Record<RiskLevel, string> = {
-  CLEAR:   '#4CAF50',
+  CLEAR:   '#2E7D32',
   WATCH:   '#FF9800',
   WARNING: '#F44336',
-  DANGER:  '#E53935',
+  DANGER:  '#C62828',
 };
 
 function formatETA(d: Date): string {

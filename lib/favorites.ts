@@ -12,6 +12,7 @@ export interface FavoriteLocation {
   lng: number;
   nickname?: string | null;
   is_home?: boolean;
+  address?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ export async function loadFavorites(userId?: string | null): Promise<FavoriteLoc
   try {
     const { data, error } = await supabase
       .from('favorite_locations')
-      .select('id, user_id, name, latitude, longitude, nickname, is_home, created_at')
+      .select('id, user_id, name, latitude, longitude, nickname, is_home, address, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
@@ -76,6 +77,7 @@ export async function loadFavorites(userId?: string | null): Promise<FavoriteLoc
       lng: Number(row.longitude),
       nickname: row.nickname ?? null,
       is_home: row.is_home ?? false,
+      address: row.address ?? null,
     }));
 
     // Update local cache
@@ -116,6 +118,7 @@ export async function addFavorite(
           longitude: fav.lng,
           nickname: fav.nickname ?? null,
           is_home: fav.is_home ?? false,
+          address: fav.address ?? null,
         })
         .select()
         .single();

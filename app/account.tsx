@@ -74,7 +74,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#4CAF50' }}
+        trackColor={{ false: '#C7C7CC', true: theme.green ?? '#2E7D32' }}
         thumbColor="#FFFFFF"
         ios_backgroundColor="#C7C7CC"
       />
@@ -264,17 +264,13 @@ export default function AccountScreen() {
           </Pressable>
         </View>
 
-        {/* SECURITY */}
-        <SectionHeader label="SECURITY" />
+        {/* FAVORITE LOCATIONS */}
+        <SectionHeader label="FAVORITE LOCATIONS" />
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <SettingRow
-            label="Change Password"
-            onPress={() => setShowChangePassword((v) => !v)}
+            label="Favorite Locations"
+            onPress={() => router.push('/favorite-locations')}
           />
-          {showChangePassword && (
-            <ChangePasswordForm onDone={() => setShowChangePassword(false)} />
-          )}
-          <SettingRow label="Reset Password via Email" onPress={handleResetPassword} />
         </View>
 
         {/* PRIVACY */}
@@ -292,13 +288,17 @@ export default function AccountScreen() {
           />
         </View>
 
-        {/* FAVORITE LOCATIONS */}
-        <SectionHeader label="FAVORITE LOCATIONS" />
+        {/* SECURITY */}
+        <SectionHeader label="SECURITY" />
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <SettingRow
-            label="Favorite Locations"
-            onPress={() => router.push('/favorite-locations')}
+            label="Change Password"
+            onPress={() => setShowChangePassword((v) => !v)}
           />
+          {showChangePassword && (
+            <ChangePasswordForm onDone={() => setShowChangePassword(false)} />
+          )}
+          <SettingRow label="Reset Password via Email" onPress={handleResetPassword} />
         </View>
       </ScrollView>
     </SafeAreaView>
