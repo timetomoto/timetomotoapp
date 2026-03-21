@@ -257,6 +257,13 @@ export default function ServiceIntervalsSection({ bike, onCountChange }: { bike:
         </View>
       )}
 
+      {/* Data source caption */}
+      {result && !loading && (
+        <Text style={[s.dataSource, { color: theme.textMuted }]}>
+          Data sourced from Google Gemini. Intervals are general guidelines and may vary by model year, region, or riding conditions. Always consult your owner's manual for manufacturer-recommended service schedules.
+        </Text>
+      )}
+
       {/* Results */}
       {result && !loading && (
         <>
@@ -278,6 +285,7 @@ export default function ServiceIntervalsSection({ bike, onCountChange }: { bike:
           )}
         </>
       )}
+
       </View>
     </View>
   );
@@ -377,4 +385,5 @@ const s = StyleSheet.create({
   cardNotes: { fontSize: 11, lineHeight: 17, marginTop: 4 },
 
   errorText: { fontSize: 12, textAlign: 'center', marginTop: 4 },
+  dataSource: { fontSize: 10, lineHeight: 14, marginTop: 16, marginBottom: 8, fontStyle: 'italic' },
 });

@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
+import { darkTheme } from '../../lib/theme';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 
 const TABS = [
@@ -20,7 +21,7 @@ export default function FloatingTabBar() {
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
-      <View style={[s.pill, { backgroundColor: theme.bgCard }]}>
+      <View style={[s.pill, { backgroundColor: theme.bgCard }, theme.bg === darkTheme.bg && { borderWidth: 1, borderColor: '#000000' }]}>
         {TABS.map((tab) => {
           const isActive = pathname.includes(tab.name);
           const color = isActive ? theme.red : theme.textMuted;

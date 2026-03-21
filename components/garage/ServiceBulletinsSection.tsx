@@ -235,6 +235,13 @@ export default function ServiceBulletinsSection({ bike, onCountChange }: { bike:
         )}
       </View>
 
+      {/* Data source caption */}
+      {result && (
+        <Text style={[s.attribution, { color: theme.textMuted }]}>
+          Data sourced from NHTSA (nhtsa.gov). Recalls and complaints are from the official U.S. government vehicle safety database. Not all issues may be listed — always check with your dealer for the latest safety information.
+        </Text>
+      )}
+
       {/* ── Idle state ── */}
       {!result && !isLoading && (
         <View style={[s.idleBox, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
@@ -307,12 +314,6 @@ export default function ServiceBulletinsSection({ bike, onCountChange }: { bike:
         </>
       )}
 
-      {/* ── Attribution ── */}
-      {result && (
-        <Text style={[s.attribution, { color: theme.textMuted }]}>
-          Data from NHTSA (nhtsa.gov) — official U.S. government vehicle safety database
-        </Text>
-      )}
       </View>
     </View>
   );
@@ -452,9 +453,9 @@ const s = StyleSheet.create({
 
   attribution: {
     fontSize: 10,
-    letterSpacing: 0.1,
-    textAlign: 'center',
-    marginTop: 12,
+    lineHeight: 14,
+    marginTop: 16,
     marginBottom: 8,
+    fontStyle: 'italic',
   },
 });

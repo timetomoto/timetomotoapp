@@ -628,6 +628,11 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             </View>
           ) : null}
 
+          {/* Data source caption */}
+          <Text style={[st.dataSource, { color: theme.textMuted }]}>
+            Data sourced from API Ninjas, Google Gemini, and NHTSA. Values are estimates and may vary by region or trim. Tap any field to edit.
+          </Text>
+
           {/* Spec rows — operational */}
           {OPERATIONAL_ROWS.map((def) => (
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
@@ -638,7 +643,6 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
-          {/* Empty hint — removed, moved to top */}
         </View>
     </View>
   );
@@ -746,4 +750,5 @@ const st = StyleSheet.create({
     paddingVertical: 6,
   },
   refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  dataSource: { fontSize: 10, lineHeight: 14, marginTop: 16, marginBottom: 8, fontStyle: 'italic' },
 });

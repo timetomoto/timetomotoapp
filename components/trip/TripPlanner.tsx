@@ -749,12 +749,18 @@ export default function TripPlanner() {
                 {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
               </Pressable>
 
-              {/* Add Stop | Import */}
-              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 32, paddingHorizontal: 16, marginVertical: 12 }}>
+              {/* Add Stop | Reverse | Import */}
+              <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
                 <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
                   <Feather name="plus" size={13} color={theme.textSecondary} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
                 </Pressable>
+                {origin && destination && (
+                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleReverse}>
+                    <Feather name="refresh-cw" size={13} color={theme.textSecondary} />
+                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Reverse</Text>
+                  </Pressable>
+                )}
                 <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
                   <Feather name="bookmark" size={13} color={theme.textSecondary} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import from My Routes</Text>
