@@ -28,7 +28,7 @@ import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
-import { useAuthStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore } from '../../lib/store';
+import { useAuthStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore } from '../../lib/store';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 import { fetchDirections } from '../../lib/directions';
@@ -229,6 +229,15 @@ export default function TripPlanner() {
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
+  const pendingTripFullScreen = useTabResetStore((s) => s.pendingTripFullScreen);
+
+  // Enter full-screen when requested from My Routes VIEW button
+  useEffect(() => {
+    if (pendingTripFullScreen) {
+      useTabResetStore.getState().setPendingTripFullScreen(false);
+      setTimeout(() => enterFullScreen(), 300);
+    }
+  }, [pendingTripFullScreen]);
 
   // Construction layer
   const [constructionOn, setConstructionOn] = useState(false);
@@ -273,7 +282,11 @@ export default function TripPlanner() {
     const coords = geojson.coordinates;
     const lats = coords.map((c: number[]) => c[1]);
     const lngs = coords.map((c: number[]) => c[0]);
-    const bottomPad = (isFullScreenMode ?? fullScreen) ? 80 : SNAP_COLLAPSED * 0.7;
+    // Bottom padding: account for how much the panel covers
+    // panelY is the top of the panel from screen top — SCREEN_H - panelY = panel height
+    const currentPanelY = (lastPanelY.current as number) ?? (SCREEN_H - SNAP_COLLAPSED);
+    const panelHeight = SCREEN_H - currentPanelY;
+    const bottomPad = (isFullScreenMode ?? fullScreen) ? 80 : Math.max(panelHeight + 40, 80);
     cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, bottomPad, 40], 600);
   }
 
@@ -404,9 +417,12 @@ export default function TripPlanner() {
   }, []);
 
   // Debounced route fetch + weather + conditions
+  const tripRouteIsManual = useTripPlannerStore((s) => s.tripRouteIsManual);
   useEffect(() => {
-    console.log('[TripPlanner] Route useEffect fired', { origin: origin?.name, destination: destination?.name, waypointCount: waypoints.length });
+    console.log('[TripPlanner] Route useEffect fired', { origin: origin?.name, destination: destination?.name, waypointCount: waypoints.length, isManual: tripRouteIsManual });
     if (!origin || !destination) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
+    // Skip Mapbox recalculation if geometry was set directly (saved route)
+    if (tripRouteIsManual) return;
     if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current);
     setRouteLoading(true);
     routeDebounceRef.current = setTimeout(async () => {

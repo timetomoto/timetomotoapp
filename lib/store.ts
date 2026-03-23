@@ -449,13 +449,14 @@ interface TripPlannerState {
   tripConditionsFetchedAt: number | null;
   tripSaved: boolean;
   tripRoutePreference: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null;
+  tripRouteIsManual: boolean;
 
   setTripOrigin: (v: TripLoc | null) => void;
   setTripDestination: (v: TripLoc | null) => void;
   setTripWaypoints: (v: TripLoc[]) => void;
   setTripDeparture: (v: Date) => void;
   setTripCustomDate: (v: Date | null) => void;
-  setTripRoute: (geojson: any, distance: number, duration: number) => void;
+  setTripRoute: (geojson: any, distance: number, duration: number, isManual?: boolean) => void;
   setTripWeather: (points: RouteWeatherPoint[], msg: string | null, hasConcern: boolean, checkpoints: number) => void;
   setTripConditions: (conditions: RoadCondition[]) => void;
   setTripSaved: (v: boolean) => void;
@@ -488,14 +489,15 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   tripConditionsFetchedAt: null,
   tripSaved: false,
   tripRoutePreference: null,
+  tripRouteIsManual: false,
 
-  setTripOrigin: (tripOrigin) => set({ tripOrigin }),
-  setTripDestination: (tripDestination) => set({ tripDestination }),
+  setTripOrigin: (tripOrigin) => set({ tripOrigin, tripRouteIsManual: false }),
+  setTripDestination: (tripDestination) => set({ tripDestination, tripRouteIsManual: false }),
   setTripWaypoints: (tripWaypoints) => set({ tripWaypoints }),
   setTripDeparture: (tripDeparture) => set({ tripDeparture }),
   setTripCustomDate: (tripCustomDate) => set({ tripCustomDate }),
-  setTripRoute: (tripRouteGeojson, tripRouteDistance, tripRouteDuration) =>
-    set({ tripRouteGeojson, tripRouteDistance, tripRouteDuration }),
+  setTripRoute: (tripRouteGeojson, tripRouteDistance, tripRouteDuration, isManual) =>
+    set({ tripRouteGeojson, tripRouteDistance, tripRouteDuration, tripRouteIsManual: isManual ?? false }),
   setTripWeather: (tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints) =>
     set({ tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints, tripWeatherFetchedAt: Date.now() }),
   setTripConditions: (tripConditions) =>
@@ -520,6 +522,7 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
     tripConditionsFetchedAt: null,
     tripSaved: false,
     tripRoutePreference: null,
+    tripRouteIsManual: false,
   }),
 }));
 
@@ -534,9 +537,11 @@ interface TabResetState {
   tripReset: number;
   pendingWeatherSubTab: 'current' | 'ride-window' | null;
   pendingTripSubTab: 'trip-planner' | null;
+  pendingTripFullScreen: boolean;
   resetTab: (tab: 'ride' | 'weather' | 'garage' | 'trip') => void;
   setPendingWeatherSubTab: (tab: 'current' | 'ride-window' | null) => void;
   setPendingTripSubTab: (tab: 'trip-planner' | null) => void;
+  setPendingTripFullScreen: (v: boolean) => void;
 }
 
 export const useTabResetStore = create<TabResetState>((set) => ({
@@ -546,7 +551,9 @@ export const useTabResetStore = create<TabResetState>((set) => ({
   tripReset: 0,
   pendingWeatherSubTab: null,
   pendingTripSubTab: null,
+  pendingTripFullScreen: false,
   resetTab: (tab) => set((s) => ({ [`${tab}Reset`]: s[`${tab}Reset` as keyof TabResetState] as number + 1 })),
   setPendingWeatherSubTab: (tab) => set({ pendingWeatherSubTab: tab }),
   setPendingTripSubTab: (tab) => set({ pendingTripSubTab: tab }),
+  setPendingTripFullScreen: (pendingTripFullScreen) => set({ pendingTripFullScreen }),
 }));

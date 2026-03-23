@@ -390,7 +390,31 @@ export async function executeScoutTool(
       }
 
       case 'add_waypoint': {
-        const results = await geocodeLocation(parameters.query, context.currentLocation);
+        // Read LIVE store state for proximity (context may be stale after load_saved_route)
+        const routeProximity = (() => {
+          const ts = useTripPlannerStore.getState();
+          const geojson = ts.tripRouteGeojson;
+          const pos = parameters.position as number | undefined;
+          const wps = ts.tripWaypoints as TripStop[];
+          const o = ts.tripOrigin;
+          const d = ts.tripDestination;
+
+          // Best: use route geometry at insertion fraction
+          if (geojson?.coordinates?.length > 2) {
+            const total = geojson.coordinates.length;
+            // Estimate insertion fraction
+            const fraction = pos != null && wps.length > 0 ? (pos + 0.5) / (wps.length + 2) : 0.5;
+            const idx = Math.min(Math.floor(fraction * total), total - 1);
+            const pt = geojson.coordinates[idx];
+            return { lat: pt[1], lng: pt[0] };
+          }
+
+          // Fallback: midpoint of origin-destination
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return context.currentLocation;
+        })();
+        const results = await geocodeLocation(parameters.query, routeProximity);
         if (results.length === 0) return `Could not find "${parameters.query}". Try a more specific place name.`;
         const place = results[0];
         const wp: TripStop = { name: parameters.label || place.name, lat: place.lat, lng: place.lng };
@@ -708,10 +732,12 @@ export async function executeScoutTool(
 
       // ── Saving ──────────────────────────────────────────────────────
       case 'describe_saved_route': {
-        const query = (parameters.query as string).toLowerCase();
-        const allRoutes = useRoutesStore.getState().routes;
-        const match = allRoutes.find((r) => r.name.toLowerCase().includes(query));
-        if (!match) return `No saved route matching "${parameters.query}" found. You have ${allRoutes.length} saved route(s).`;
+        const match = findSavedRoute(parameters.query as string);
+        if (!match) {
+          const allRoutes = useRoutesStore.getState().routes;
+          const cats = [...new Set(allRoutes.map((r) => r.category).filter(Boolean))];
+          return `No saved route matching "${parameters.query}". You have ${allRoutes.length} route(s) in: ${cats.join(', ')}.`;
+        }
         const parts: string[] = [];
         parts.push(`Route: ${match.name}`);
         if (match.category) parts.push(`Category: ${match.category}`);
@@ -729,17 +755,20 @@ export async function executeScoutTool(
       }
 
       case 'load_saved_route': {
-        const query = (parameters.query as string).toLowerCase();
-        const allRoutes = useRoutesStore.getState().routes;
-        const match = allRoutes.find((r) => r.name.toLowerCase().includes(query));
+        const match = findSavedRoute(parameters.query as string);
         if (!match) return `No saved route matching "${parameters.query}" found.`;
         if (match.points.length < 2) return `Route "${match.name}" doesn't have enough points to load.`;
         const first = match.points[0];
         const last = match.points[match.points.length - 1];
         tripStore.setTripOrigin({ name: match.name.split('→')[0]?.trim() || 'Start', lat: first.lat, lng: first.lng });
         tripStore.setTripDestination({ name: match.name.split('→')[1]?.trim() || 'End', lat: last.lat, lng: last.lng });
-        // Clear existing waypoints — the route geometry will be recalculated from origin/destination
         tripStore.setTripWaypoints([]);
+        // Set route geometry directly from saved points so weather/conditions tools work immediately
+        const geometry = {
+          type: 'LineString' as const,
+          coordinates: match.points.map((p) => [p.lng, p.lat] as [number, number]),
+        };
+        tripStore.setTripRoute(geometry, match.distance_miles, match.duration_seconds ?? 0, true);
         return `Loaded "${match.name}" into Trip Planner — ${match.distance_miles.toFixed(1)} mi${match.duration_seconds ? `, ${Math.floor(match.duration_seconds / 3600)}h ${Math.round((match.duration_seconds % 3600) / 60)}m` : ''}.`;
       }
 
@@ -812,6 +841,31 @@ export async function executeScoutTool(
 // ---------------------------------------------------------------------------
 
 /** Format minutes-since-midnight to 12h time string. */
+/** Fuzzy match a saved route by name or category — tries exact substring, then word overlap */
+function findSavedRoute(query: string) {
+  const allRoutes = useRoutesStore.getState().routes;
+  const q = query.toLowerCase();
+
+  // 1. Exact substring match on name
+  const exact = allRoutes.find((r) => r.name.toLowerCase().includes(q));
+  if (exact) return exact;
+
+  // 2. Exact substring match on category
+  const catMatch = allRoutes.find((r) => r.category?.toLowerCase().includes(q));
+  if (catMatch) return catMatch;
+
+  // 3. Word-level match — split query into words, find route where most words match name+category
+  const queryWords = q.split(/[\s\-_]+/).filter((w) => w.length > 1);
+  let bestRoute: typeof allRoutes[0] | null = null;
+  let bestScore = 0;
+  for (const r of allRoutes) {
+    const text = `${r.name} ${r.category ?? ''}`.toLowerCase();
+    const score = queryWords.filter((w) => text.includes(w)).length;
+    if (score > bestScore) { bestScore = score; bestRoute = r; }
+  }
+  return bestScore > 0 ? bestRoute : null;
+}
+
 function fmtTime(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60) % 24;
   const m = totalMinutes % 60;

@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = 'ttm_scout_quota';
-const DAILY_LIMIT = 50;
+const DAILY_LIMIT = 500;
 
 // Bypass list — unlimited usage during testing
 const BYPASS_USER_IDS = new Set<string>([

@@ -25,7 +25,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -1671,6 +1671,46 @@ export default function RideScreen() {
                 if (saved) { addRoute(saved); showToast('Route saved to Planned Rides'); }
               } catch { showToast('Could not save route'); }
             }}
+            onViewInPlanner={isSavedRoutePreview && activeRoute ? () => {
+              const pts = activeRoute.geometry.coordinates;
+              if (pts.length < 2) return;
+              const tripStore = useTripPlannerStore.getState();
+              const first = pts[0];
+              const last = pts[pts.length - 1];
+              tripStore.setTripOrigin({ name: destination?.name?.split('→')[0]?.trim() || 'Start', lat: first[1], lng: first[0] });
+              tripStore.setTripDestination({ name: destination?.name?.split('→')[1]?.trim() || 'End', lat: last[1], lng: last[0] });
+              // Sample up to 23 intermediate waypoints
+              const maxWp = 100;
+              const count = Math.min(pts.length - 2, maxWp);
+              const wps: Array<{ name: string; lat: number; lng: number }> = [];
+              if (pts.length > 2 && count > 0) {
+                const step = (pts.length - 1) / (count + 1);
+                for (let i = 1; i <= count; i++) {
+                  const idx = Math.round(step * i);
+                  if (idx > 0 && idx < pts.length - 1) {
+                    wps.push({ name: `WP ${i}`, lat: pts[idx][1], lng: pts[idx][0] });
+                  }
+                }
+              }
+              tripStore.setTripWaypoints(wps);
+              tripStore.setTripRoute(activeRoute.geometry, activeRoute.distanceMiles, activeRoute.durationSeconds, true);
+              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+              const wasSampled = pts.length - 2 > maxWp;
+              setNavMode('idle');
+              setDestination(null);
+              setActiveRoute(null);
+              setIsSavedRoutePreview(false);
+              router.navigate('/(tabs)/trip' as any);
+              if (wasSampled) {
+                const totalPoints = pts.length - 2;
+                setTimeout(() => {
+                  Alert.alert(
+                    'Route Simplified',
+                    `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWp} waypoints. We placed ${maxWp} evenly-spaced markers along the route so you can drag and adjust them.\n\nThe full route line is shown on the map.`,
+                  );
+                }, 1500);
+              }
+            } : undefined}
             savedRouteStart={savedRouteStartRef.current}
             onGeometryChange={(geo) => setNavRouteGeojson(geo)}
           />

@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { useRoutesStore, useAuthStore, useSafetyStore } from '../../lib/store';
+import { useRoutesStore, useAuthStore, useSafetyStore, useTripPlannerStore, useTabResetStore } from '../../lib/store';
 import { fetchUserRoutes, seedRoutes, createRoute, type Route } from '../../lib/routes';
 import { parseGpx, calcDistance, calcElevationGain } from '../../lib/gpx';
 import { useNavigationStore } from '../../lib/navigationStore';
@@ -78,6 +78,56 @@ export default function DiscoverRoutes() {
     }
   }
 
+  function handleViewInPlanner(route: Route) {
+    if (route.points.length < 2) return;
+    const tripStore = useTripPlannerStore.getState();
+    const pts = route.points;
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+
+    // Set origin + destination
+    tripStore.setTripOrigin({ name: route.name.split('→')[0]?.trim() || 'Start', lat: first.lat, lng: first.lng });
+    tripStore.setTripDestination({ name: route.name.split('→')[1]?.trim() || 'End', lat: last.lat, lng: last.lng });
+
+    // Sample up to 23 intermediate waypoints (25 total with origin+destination = Mapbox limit)
+    const maxWaypoints = 100;
+    const intermediateCount = Math.min(pts.length - 2, maxWaypoints);
+    const waypoints: Array<{ name: string; lat: number; lng: number }> = [];
+    if (pts.length > 2 && intermediateCount > 0) {
+      const step = (pts.length - 1) / (intermediateCount + 1);
+      for (let i = 1; i <= intermediateCount; i++) {
+        const idx = Math.round(step * i);
+        if (idx > 0 && idx < pts.length - 1) {
+          const p = pts[idx];
+          waypoints.push({ name: `WP ${i}`, lat: p.lat, lng: p.lng });
+        }
+      }
+    }
+    tripStore.setTripWaypoints(waypoints);
+
+    // Set route geometry directly from saved points
+    const geometry = {
+      type: 'LineString' as const,
+      coordinates: pts.map((p) => [p.lng, p.lat] as [number, number]),
+    };
+    tripStore.setTripRoute(geometry, route.distance_miles, route.duration_seconds ?? 0, true);
+
+    // Switch to Trip Planner tab in full-screen map view
+    useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+    useTabResetStore.getState().setPendingTripFullScreen(true);
+
+    // Notify user if route was sampled (delay to let navigation + full-screen settle)
+    if (pts.length - 2 > maxWaypoints) {
+      const totalPoints = pts.length - 2;
+      setTimeout(() => {
+        Alert.alert(
+          'Route Simplified',
+          `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWaypoints} waypoints. We placed ${maxWaypoints} evenly-spaced markers along the route so you can drag and adjust them.\n\nThe full route line is shown on the map.`,
+        );
+      }, 1500);
+    }
+  }
+
   function handleNewCategory() {
     Alert.prompt('New Category', 'Enter a name for the new category', (name) => {
       if (!name?.trim()) return;
@@ -89,6 +139,7 @@ export default function DiscoverRoutes() {
     <RouteList
       showSavedRides={false}
       onNavigate={handleNavigate}
+      onViewInPlanner={handleViewInPlanner}
       onImport={handleImport}
       onNewCategory={handleNewCategory}
       importing={importing}

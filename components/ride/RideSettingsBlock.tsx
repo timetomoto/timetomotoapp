@@ -42,6 +42,38 @@ const CHECK_IN_PRESETS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
+type RowStatus = 'ok' | 'warn' | 'off' | 'loading';
+
+function CheckRow({ icon, title, detail, status, children }: {
+  icon: string; title: string; detail: string; status: RowStatus; children?: React.ReactNode;
+}) {
+  const { theme } = useTheme();
+  const statusColor = status === 'ok' ? theme.green : status === 'warn' ? '#FF9800' : theme.textSecondary;
+  const statusIcon  = status === 'ok' ? 'check-circle' : status === 'warn' ? 'alert-circle' : status === 'loading' ? null : 'circle';
+  return (
+    <View style={s.row}>
+      <View style={s.rowLeft}>
+        <View style={[s.rowIconWrap, { backgroundColor: statusColor + '18' }]}>
+          <Feather name={icon as any} size={14} color={statusColor} />
+        </View>
+        <View style={s.rowText}>
+          <Text style={[s.rowTitle, { color: theme.textPrimary }]}>{title}</Text>
+          <Text style={[s.rowDetail, { color: theme.textSecondary }]}>{detail}</Text>
+        </View>
+      </View>
+      <View style={s.rowRight}>
+        {children ?? (
+          status === 'loading'
+            ? <ActivityIndicator size="small" color={theme.textSecondary} />
+            : statusIcon
+              ? <Feather name={statusIcon as any} size={16} color={statusColor} />
+              : null
+        )}
+      </View>
+    </View>
+  );
+}
+
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   const { theme } = useTheme();
   return (
@@ -143,51 +175,52 @@ export default function RideSettingsBlock({ onChange, onCloseModal }: Props) {
 
   return (
     <>
-      {/* ── RIDE SETTINGS — 2x2 grid ── */}
+      {/* ── RIDE SETTINGS ── */}
       <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>RIDE SETTINGS</Text>
-      <View style={s.grid}>
-        {/* GPS LOCK */}
-        <View style={[s.tile, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          {gpsStatus === 'loading'
-            ? <ActivityIndicator size="small" color={theme.textSecondary} />
-            : <Feather name={gpsStatus === 'ok' ? 'check-circle' : 'alert-circle'} size={20} color={gpsStatus === 'ok' ? theme.green : '#FF9800'} />
-          }
-          <Text style={[s.tileTitle, { color: theme.textPrimary }]}>GPS LOCK</Text>
-        </View>
-
-        {/* CRASH DETECTION */}
-        <Pressable style={[s.tile, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => handleCrashToggle(!crashOn)}>
+      <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <CheckRow
+          icon="map-pin" title="GPS LOCK"
+          detail={gpsStatus === 'loading' ? 'Checking…' : gpsStatus === 'ok' ? 'Location permission granted' : 'Location permission denied — enable in Settings'}
+          status={gpsStatus === 'loading' ? 'loading' : gpsStatus}
+        />
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
+        <CheckRow
+          icon="shield" title="CRASH DETECTION"
+          detail={crashOn ? (crashOverride ? 'Armed — this ride only' : 'Armed — accelerometer monitoring at 10 Hz') : 'Off — tap to enable'}
+          status={crashOn ? 'ok' : 'off'}
+        >
           <Toggle value={crashOn} onChange={handleCrashToggle} />
-          <Text style={[s.tileTitle, { color: theme.textPrimary }]}>CRASH</Text>
-        </Pressable>
-
-        {/* LIVE SHARE */}
-        <Pressable style={[s.tile, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => handleShareToggle(!shareEnabled)}>
+        </CheckRow>
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
+        <CheckRow
+          icon="share-2" title="LIVE SHARE"
+          detail={shareEnabled ? (shareOverride ? 'Sharing enabled — this ride only' : 'Share link copied to clipboard when you start') : 'Off — contacts can follow your ride in real-time'}
+          status={shareEnabled ? 'ok' : 'off'}
+        >
           <Toggle value={shareEnabled} onChange={handleShareToggle} />
-          <Text style={[s.tileTitle, { color: theme.textPrimary }]}>SHARE</Text>
-        </Pressable>
-
-        {/* CHECK-IN TIMER */}
-        <Pressable style={[s.tile, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setCheckInOn(!checkInOn)}>
+        </CheckRow>
+        <View style={[s.divider, { backgroundColor: theme.border }]} />
+        <CheckRow
+          icon="clock" title="CHECK-IN TIMER"
+          detail={checkInOn ? `Alert contacts if you don't check in within ${checkInMins >= 60 ? `${checkInMins / 60} hr` : `${checkInMins} min`}` : 'Off — set a deadline for checking in'}
+          status={checkInOn ? 'ok' : 'off'}
+        >
           <Toggle value={checkInOn} onChange={setCheckInOn} />
-          <Text style={[s.tileTitle, { color: theme.textPrimary }]}>CHECK-IN</Text>
-        </Pressable>
+        </CheckRow>
+        {checkInOn && (
+          <View style={s.durationRow}>
+            {CHECK_IN_PRESETS.map((p) => (
+              <Pressable
+                key={p.value}
+                style={[s.durationChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }, checkInMins === p.value && { backgroundColor: theme.red + '22', borderColor: theme.red }]}
+                onPress={() => setCheckInMins(p.value)}
+              >
+                <Text style={[s.durationChipText, { color: theme.textSecondary }, checkInMins === p.value && { color: theme.red }]}>{p.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
-
-      {/* Check-in duration presets — shown below grid when active */}
-      {checkInOn && (
-        <View style={[s.durationRow, { marginTop: 8 }]}>
-          {CHECK_IN_PRESETS.map((p) => (
-            <Pressable
-              key={p.value}
-              style={[s.durationChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }, checkInMins === p.value && { backgroundColor: theme.red + '22', borderColor: theme.red }]}
-              onPress={() => setCheckInMins(p.value)}
-            >
-              <Text style={[s.durationChipText, { color: theme.textSecondary }, checkInMins === p.value && { color: theme.red }]}>{p.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
 
       {/* ── NOTIFY ON THIS RIDE ── */}
       <View style={{ opacity: alertsActive ? 1 : 0.25 }} pointerEvents={alertsActive ? 'auto' : 'none'}>
@@ -244,33 +277,20 @@ export default function RideSettingsBlock({ onChange, onCloseModal }: Props) {
 
 const s = StyleSheet.create({
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 20 },
-
-  // 2x2 grid
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  tile: {
-    width: '47%' as any,
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-  },
-  tileTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
-
-  // Toggle
-  toggle: { width: 44, height: 24, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 2, marginTop: 2 },
+  card: { borderWidth: 1, borderRadius: 8, marginBottom: 10, overflow: 'hidden' },
+  divider: { height: 1, marginHorizontal: 12 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14, minHeight: 53 },
+  rowLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 9 },
+  rowIconWrap: { width: 33, height: 33, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, gap: 2 },
+  rowTitle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  rowDetail: { fontSize: 10, lineHeight: 14 },
+  rowRight: { marginLeft: 10 },
+  toggle: { width: 44, height: 24, borderRadius: 12, justifyContent: 'center', paddingHorizontal: 2 },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, alignSelf: 'flex-start' },
-
-  // Check-in presets
-  durationRow: { flexDirection: 'row', gap: 6 },
+  durationRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingBottom: 10 },
   durationChip: { flex: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderRadius: 6 },
   durationChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-
-  // Notify contacts
-  card: { borderWidth: 1, borderRadius: 8, marginBottom: 10, overflow: 'hidden' },
   contactPills: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12 },
   contactPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
   contactPillText: { fontSize: 11, fontWeight: '600' },

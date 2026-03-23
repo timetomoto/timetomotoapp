@@ -5,6 +5,7 @@ import {
   Easing,
   FlatList,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -23,6 +24,7 @@ import {
   useRoutesStore,
   useSafetyStore,
   useAuthStore,
+  useTabResetStore,
 } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage } from '../../lib/scoutAgent';
@@ -136,7 +138,27 @@ function relativeTime(date: Date): string {
 // Main component — always mounted, visibility via store
 // ---------------------------------------------------------------------------
 
+/** Outer shell — only reads isScoutOpen to avoid re-renders when hidden */
 export default function ScoutPanel() {
+  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const closeScout = useScoutStore((s) => s.closeScout);
+
+  return (
+    <View
+      style={[StyleSheet.absoluteFillObject, { display: isScoutOpen ? 'flex' : 'none', zIndex: 100 }]}
+      pointerEvents={isScoutOpen ? 'auto' : 'none'}
+    >
+      {/* Tap backdrop to close */}
+      <Pressable style={{ height: insets.top + 60 }} onPress={closeScout} />
+      {isScoutOpen && <ScoutPanelContent />}
+    </View>
+  );
+}
+
+/** Inner content — only mounted when Scout is open, all heavy hooks live here */
+function ScoutPanelContent() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -149,9 +171,9 @@ export default function ScoutPanel() {
     pathname.includes('garage') ? 'garage' : 'other';
 
   // Scout store (visibility + conversation)
-  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
   const storeInitialMessage = useScoutStore((s) => s.initialMessage);
   const closeScout = useScoutStore((s) => s.closeScout);
+  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
   const { messages, isLoading, addMessage, setLoading, setError, clearSession } = useScoutStore();
 
   // App stores
@@ -167,7 +189,6 @@ export default function ScoutPanel() {
   const [input, setInput] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const initialSent = useRef(false);
-  const routeModifiedThisSession = useRef(false);
   const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
@@ -207,15 +228,10 @@ export default function ScoutPanel() {
     }
   }, [isScoutOpen, storeInitialMessage, favoritesLoaded]);
 
-  // On close: reset guards, navigate to Trip Planner if route was modified
+  // Reset guards when panel closes (keep conversation)
   useEffect(() => {
     if (!isScoutOpen) {
       initialSent.current = false;
-      if (routeModifiedThisSession.current && currentScreen !== 'trip') {
-        routeModifiedThisSession.current = false;
-        router.navigate('/(tabs)/trip' as any);
-      }
-      routeModifiedThisSession.current = false;
     }
   }, [isScoutOpen]);
 
@@ -301,6 +317,13 @@ export default function ScoutPanel() {
       let content = result.text;
       const routeModified = result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t));
       if (routeModified) {
+        // Strip any Gemini-generated nav hints before appending ours
+        content = content
+          .replace(/\n*Head to (the )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*Close Scout[^\n]*/gi, '')
+          .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*Your route is ready[^\n]*/gi, '')
+          .trimEnd();
         content += '\n\nHead to Trip Planner to see your route.';
       }
 
@@ -322,7 +345,6 @@ export default function ScoutPanel() {
 
       // Notify TripPlanner if route was modified
       if (routeModified) {
-        routeModifiedThisSession.current = true;
         useScoutStore.getState().onRouteUpdated?.();
       }
     } catch {
@@ -425,7 +447,13 @@ export default function ScoutPanel() {
             <Text
               key={i}
               style={{ textDecorationLine: 'underline', color: theme.red }}
-              onPress={() => { closeScout(); router.navigate(p.link as any); }}
+              onPress={() => {
+                closeScout();
+                if (p.link === '/(tabs)/trip') {
+                  useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+                }
+                router.navigate(p.link as any);
+              }}
             >
               {p.text}
             </Text>
@@ -464,22 +492,24 @@ export default function ScoutPanel() {
   // No bikes empty state
   const noBikes = bikes.length === 0;
 
+  // Swipe-down to close
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 50) closeScout();
+      },
+    }),
+  ).current;
+
   return (
-    <View
-      style={[StyleSheet.absoluteFillObject, { display: isScoutOpen ? 'flex' : 'none', zIndex: 100 }]}
-      pointerEvents={isScoutOpen ? 'auto' : 'none'}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={[st.container, { backgroundColor: theme.bgPanel }]}
     >
-      {/* Tap backdrop to close */}
-      <Pressable
-        style={{ height: insets.top + 60 }}
-        onPress={closeScout}
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[st.container, { backgroundColor: theme.bgPanel }]}
-      >
-        {/* Drag handle */}
-        <View style={st.dragHandleWrap}>
+        {/* Drag handle — swipe down to close */}
+        <View {...panResponder.panHandlers} style={st.dragHandleWrap}>
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
@@ -600,7 +630,6 @@ export default function ScoutPanel() {
           </>
         )}
       </KeyboardAvoidingView>
-    </View>
   );
 }
 
@@ -614,7 +643,7 @@ const st = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
-  dragHandleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
+  dragHandleWrap: { alignItems: 'center', paddingTop: 12, paddingBottom: 8 },
   dragHandle: { width: 36, height: 4, borderRadius: 2 },
 
   // Header

@@ -214,6 +214,7 @@ function RouteCard({
   route,
   categories,
   onNavigate,
+  onViewInPlanner,
   onExport,
   onDelete,
   onRename,
@@ -222,6 +223,7 @@ function RouteCard({
   route: Route;
   categories: string[];
   onNavigate: () => void;
+  onViewInPlanner?: () => void;
   onExport: () => void;
   onDelete: () => void;
   onRename: () => void;
@@ -313,6 +315,15 @@ function RouteCard({
           <Feather name="navigation" size={13} color={theme.red} />
           <Text style={[styles.actionText, { color: theme.red }]}>NAVIGATE</Text>
         </Pressable>
+        {onViewInPlanner && (
+          <>
+            <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
+            <Pressable style={styles.actionBtn} onPress={onViewInPlanner}>
+              <Feather name="map" size={13} color={theme.textSecondary} />
+              <Text style={[styles.actionText, { color: theme.textSecondary }]}>VIEW</Text>
+            </Pressable>
+          </>
+        )}
         <View style={[styles.actionDivider, { backgroundColor: theme.cardDivider }]} />
         <Pressable style={styles.actionBtn} onPress={() => shareRoute(route)}>
           <Feather name="share-2" size={13} color={theme.textSecondary} />
@@ -560,13 +571,14 @@ function SavedRidesSection({
 interface RouteListProps {
   showSavedRides: boolean;
   onNavigate: (route: Route) => void;
+  onViewInPlanner?: (route: Route) => void;
   headerExtra?: React.ReactNode;
   onImport?: () => void;
   onNewCategory?: () => void;
   importing?: boolean;
 }
 
-export default function RouteList({ showSavedRides, onNavigate, headerExtra, onImport, onNewCategory, importing }: RouteListProps) {
+export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner, headerExtra, onImport, onNewCategory, importing }: RouteListProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const {
@@ -783,6 +795,7 @@ export default function RouteList({ showSavedRides, onNavigate, headerExtra, onI
                   route={route}
                   categories={allCategories}
                   onNavigate={() => onNavigate(route)}
+                  onViewInPlanner={onViewInPlanner ? () => onViewInPlanner(route) : undefined}
                   onExport={() => handleExport(route)}
                   onDelete={() => handleDelete(route)}
                   onRename={() => handleRename(route)}
