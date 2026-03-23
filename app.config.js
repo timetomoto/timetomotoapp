@@ -23,8 +23,6 @@ export default {
           'timetomoto shares your live location with your emergency contacts during rides.',
         NSContactsUsageDescription:
           'Time to Moto uses your contacts to make it easy to add emergency contacts for your rides.',
-        NSMicrophoneUsageDescription:
-          'Used for voice input to Scout.',
       },
     },
     android: {

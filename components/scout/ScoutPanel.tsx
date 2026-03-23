@@ -16,9 +16,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-// Lazy-loaded — expo-av requires a dev build (crashes Expo Go)
-let Audio: typeof import('expo-av').Audio | null = null;
-try { Audio = require('expo-av').Audio; } catch {}
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import {
@@ -35,8 +32,6 @@ import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes'
 // ---------------------------------------------------------------------------
 
 const MAX_MESSAGES_PER_SESSION = 25;
-
-const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 
 const ROUTE_MODIFYING_TOOLS = new Set([
   'set_origin', 'set_destination', 'add_waypoint', 'steer_segment',
@@ -167,13 +162,6 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
   const flatListRef = useRef<FlatList>(null);
   const initialSent = useRef(false);
 
-  // Voice input state
-  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'transcribing'>('idle');
-  const [micPermDenied, setMicPermDenied] = useState(false);
-  const recordingRef = useRef<any>(null);
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-  const [voiceToast, setVoiceToast] = useState<string | null>(null);
-  const voiceToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-send initialMessage
   useEffect(() => {
@@ -198,150 +186,6 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length, isLoading]);
-
-  // ── Voice input ─────────────────────────────────────────────────────────
-
-  // Pulse animation while listening
-  useEffect(() => {
-    if (voiceState === 'listening') {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ]),
-      ).start();
-    } else {
-      pulseAnim.setValue(0);
-    }
-  }, [voiceState]);
-
-  // Cleanup recording on unmount or close
-  useEffect(() => {
-    if (!visible && recordingRef.current) {
-      recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      recordingRef.current = null;
-      setVoiceState('idle');
-    }
-  }, [visible]);
-
-  function showVoiceToast(msg: string) {
-    setVoiceToast(msg);
-    if (voiceToastTimer.current) clearTimeout(voiceToastTimer.current);
-    voiceToastTimer.current = setTimeout(() => setVoiceToast(null), 2500);
-  }
-
-  async function transcribeAudio(uri: string): Promise<string | null> {
-    if (!GEMINI_KEY) return null;
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1] ?? '');
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: 'Transcribe this audio exactly as spoken. Return only the transcribed text, nothing else.' },
-                { inlineData: { mimeType: 'audio/m4a', data: base64 } },
-              ],
-            }],
-            generationConfig: { temperature: 0, maxOutputTokens: 200 },
-          }),
-          signal: controller.signal,
-        },
-      );
-      clearTimeout(timer);
-      if (!res.ok) return null;
-      const json = await res.json();
-      const text: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      return text.trim() || null;
-    } catch {
-      return null;
-    }
-  }
-
-  const handleMicPress = useCallback(async () => {
-    // Cancel if already recording
-    if (voiceState === 'listening' && recordingRef.current) {
-      await recordingRef.current.stopAndUnloadAsync().catch(() => {});
-      recordingRef.current = null;
-      setVoiceState('idle');
-      return;
-    }
-
-    if (voiceState === 'transcribing') return;
-
-    // Request permission
-    if (!Audio) { showVoiceToast('Voice input not available'); return; }
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== 'granted') {
-      setMicPermDenied(true);
-      showVoiceToast('Microphone access needed for voice input');
-      return;
-    }
-
-    // Start recording
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await Audio!.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      const recording = new Audio!.Recording();
-      await recording.prepareToRecordAsync(Audio!.RecordingOptionsPresets.HIGH_QUALITY);
-      await recording.startAsync();
-      recordingRef.current = recording;
-      setVoiceState('listening');
-    } catch {
-      showVoiceToast("Couldn't start recording — try again");
-      setVoiceState('idle');
-    }
-  }, [voiceState]);
-
-  const handleMicRelease = useCallback(async () => {
-    if (voiceState !== 'listening' || !recordingRef.current) return;
-
-    setVoiceState('transcribing');
-    try {
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
-
-      await Audio?.setAudioModeAsync({ allowsRecordingIOS: false });
-
-      if (!uri) {
-        showVoiceToast("Couldn't hear that — try again");
-        setVoiceState('idle');
-        return;
-      }
-
-      const text = await transcribeAudio(uri);
-      if (text) {
-        setInput(text);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        showVoiceToast("Couldn't hear that — try again");
-      }
-    } catch {
-      showVoiceToast("Couldn't hear that — try again");
-    } finally {
-      setVoiceState('idle');
-    }
-  }, [voiceState]);
 
   // ── Context assembly ───────────────────────────────────────────────────
 
@@ -598,50 +442,19 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
         </View>
       )}
 
-      {/* Voice toast */}
-      {voiceToast && (
-        <View style={[st.voiceToast, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <Feather name="alert-circle" size={14} color={theme.textMuted} />
-          <Text style={{ fontSize: 12, color: theme.textMuted, flex: 1 }}>{voiceToast}</Text>
-        </View>
-      )}
-
       {/* Input row */}
       {!atLimit && (
         <View style={[st.inputRow, { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {/* Mic button */}
-          {Audio && !micPermDenied && !isLoading && (
-            <Pressable
-              style={st.micBtn}
-              onPress={voiceState === 'listening' ? handleMicRelease : handleMicPress}
-              disabled={voiceState === 'transcribing'}
-            >
-              {voiceState === 'transcribing' ? (
-                <ActivityIndicator size="small" color={theme.textMuted} />
-              ) : voiceState === 'listening' ? (
-                <View style={st.micListening}>
-                  <Animated.View style={[st.micPulseRing, {
-                    borderColor: theme.red,
-                    opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
-                    transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.4] }) }],
-                  }]} />
-                  <Feather name="mic" size={18} color={theme.red} />
-                </View>
-              ) : (
-                <Feather name="mic" size={18} color={theme.textMuted} />
-              )}
-            </Pressable>
-          )}
           <TextInput
             style={[st.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder={voiceState === 'listening' ? 'Listening...' : voiceState === 'transcribing' ? 'Transcribing...' : 'Ask Scout...'}
-            placeholderTextColor={voiceState !== 'idle' ? theme.red : theme.inputPlaceholder}
+            placeholder="Ask Scout..."
+            placeholderTextColor={theme.inputPlaceholder}
             value={input}
             onChangeText={setInput}
             multiline={false}
             returnKeyType="send"
             onSubmitEditing={() => handleSend()}
-            editable={!isLoading && voiceState === 'idle'}
+            editable={!isLoading}
           />
           <Pressable
             style={[st.sendBtn, { backgroundColor: input.trim() && !isLoading ? theme.red : theme.bgCard }]}
@@ -729,33 +542,9 @@ const st = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
-  micBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  micListening: {
-    width: 36, height: 36,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  micPulseRing: {
-    position: 'absolute',
-    width: 34, height: 34, borderRadius: 17,
-    borderWidth: 2,
-  },
   sendBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
-  },
-  voiceToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginHorizontal: 12,
-    marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
   },
 
   // Empty state
