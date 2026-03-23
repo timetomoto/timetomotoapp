@@ -5,6 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { darkTheme } from '../../lib/theme';
+import { useScoutStore } from '../../lib/scoutStore';
+import { useTripPlannerStore } from '../../lib/store';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 
 const TABS = [
@@ -18,33 +20,62 @@ export default function FloatingTabBar() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useTheme();
+  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
+  const openScout = useScoutStore((s) => s.openScout);
+  const weatherHasConcern = useTripPlannerStore((s) => s.tripWeatherHasConcern);
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
-      <View style={[s.pill, { backgroundColor: theme.bgCard }, theme.bg === darkTheme.bg && { borderWidth: 1, borderColor: '#000000' }]}>
-        {TABS.map((tab) => {
-          const isActive = pathname.includes(tab.name);
-          const color = isActive ? theme.red : theme.textMuted;
-          return (
-            <Pressable
-              key={tab.name}
-              style={s.tab}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.navigate(`/(tabs)/${tab.name}` as any);
-              }}
-            >
-              {tab.name === 'ride' ? (
-                <View style={{ width: 35, height: 20, alignItems: 'center', justifyContent: 'center' }}>
-                  <MotorcycleIcon size={35} color={color} />
-                </View>
-              ) : (
-                <Feather name={tab.icon as any} size={20} color={color} />
-              )}
-              <Text style={[s.label, { color }]}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
+      <View style={s.row}>
+        {/* Scout FAB */}
+        {!isScoutOpen && (
+          <Pressable
+            style={s.scoutFab}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              openScout();
+            }}
+          >
+            <View style={[s.scoutCircle, { backgroundColor: theme.red }]}>
+              <View style={{ width: 22, height: 22 }}>
+                <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
+                <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
+                <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+                <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+                <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+              </View>
+              {weatherHasConcern && <View style={s.alertDot} />}
+            </View>
+            <Text style={s.scoutLabel}>SCOUT</Text>
+          </Pressable>
+        )}
+
+        {/* Tab pill */}
+        <View style={[s.pill, { backgroundColor: theme.bgCard }, theme.bg === darkTheme.bg && { borderWidth: 1, borderColor: '#000000' }]}>
+          {TABS.map((tab) => {
+            const isActive = pathname.includes(tab.name);
+            const color = isActive ? theme.red : theme.textMuted;
+            return (
+              <Pressable
+                key={tab.name}
+                style={s.tab}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.navigate(`/(tabs)/${tab.name}` as any);
+                }}
+              >
+                {tab.name === 'ride' ? (
+                  <View style={{ width: 35, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+                    <MotorcycleIcon size={35} color={color} />
+                  </View>
+                ) : (
+                  <Feather name={tab.icon as any} size={20} color={color} />
+                )}
+                <Text style={[s.label, { color }]}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -56,6 +87,11 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   pill: {
     flexDirection: 'row',
@@ -80,5 +116,42 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+
+  // Scout FAB
+  scoutFab: {
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 5,
+    marginLeft: -20,
+  },
+  scoutCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  scoutLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: '#fff',
+  },
+  alertDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF9800',
+    borderWidth: 1.5,
+    borderColor: '#000',
   },
 });

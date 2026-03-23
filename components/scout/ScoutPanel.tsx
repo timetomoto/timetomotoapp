@@ -14,24 +14,28 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import {
   useGarageStore,
   useTripPlannerStore,
+  useRoutesStore,
   useSafetyStore,
+  useAuthStore,
 } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage } from '../../lib/scoutAgent';
+import { loadFavorites } from '../../lib/favorites';
+import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_MESSAGES_PER_SESSION = 25;
+const MAX_MESSAGES_PER_SESSION = 50;
 
 const ROUTE_MODIFYING_TOOLS = new Set([
   'set_origin', 'set_destination', 'add_waypoint', 'steer_segment',
@@ -50,27 +54,22 @@ function CompassIcon({ size = 18, color = '#fff' }: { size?: number; color?: str
   const thick = 2;
   return (
     <View style={{ width: size, height: size }}>
-      {/* Circle */}
       <View style={{
         position: 'absolute', width: size, height: size, borderRadius: half,
         borderWidth: 1.5, borderColor: color,
       }} />
-      {/* N */}
       <View style={{
         position: 'absolute', left: half - thick / 2, top: half - arm,
         width: thick, height: arm, backgroundColor: color, borderRadius: 1,
       }} />
-      {/* S */}
       <View style={{
         position: 'absolute', left: half - thick / 2, top: half,
         width: thick, height: arm, backgroundColor: color, opacity: 0.4, borderRadius: 1,
       }} />
-      {/* E */}
       <View style={{
         position: 'absolute', top: half - thick / 2, left: half,
         width: arm, height: thick, backgroundColor: color, opacity: 0.4, borderRadius: 1,
       }} />
-      {/* W */}
       <View style={{
         position: 'absolute', top: half - thick / 2, left: half - arm,
         width: arm, height: thick, backgroundColor: color, opacity: 0.4, borderRadius: 1,
@@ -134,51 +133,85 @@ function relativeTime(date: Date): string {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Main component — always mounted, visibility via store
 // ---------------------------------------------------------------------------
 
-interface Props {
-  visible: boolean;
-  onClose: () => void;
-  initialMessage?: string;
-  onRouteUpdated?: () => void;
-}
-
-export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUpdated }: Props) {
+export default function ScoutPanel() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Stores
+  // Derive current screen for context
+  const currentScreen: 'ride' | 'trip' | 'garage' | 'other' =
+    pathname.includes('ride') ? 'ride' :
+    pathname.includes('trip') ? 'trip' :
+    pathname.includes('garage') ? 'garage' : 'other';
+
+  // Scout store (visibility + conversation)
+  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
+  const storeInitialMessage = useScoutStore((s) => s.initialMessage);
+  const closeScout = useScoutStore((s) => s.closeScout);
   const { messages, isLoading, addMessage, setLoading, setError, clearSession } = useScoutStore();
+
+  // App stores
   const bikes = useGarageStore((s) => s.bikes);
   const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
   const activeBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
   const tripStore = useTripPlannerStore();
+  const routes = useRoutesStore((s) => s.routes);
   const currentLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const userId = useAuthStore((s) => s.user?.id) ?? 'local';
 
   // Local state
   const [input, setInput] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const initialSent = useRef(false);
+  const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
+  const [quotaExhausted, setQuotaExhausted] = useState(false);
+  const bypassed = isQuotaBypassed(userId);
 
-
-  // Auto-send initialMessage
+  // Load favorites + quota when panel opens
   useEffect(() => {
-    if (visible && initialMessage && !initialSent.current && messages.length === 0) {
+    if (isScoutOpen) {
+      if (!bypassed) {
+        getRemaining(userId).then((r) => {
+          setQuotaRemaining(r);
+          setQuotaExhausted(r <= 0);
+        });
+      }
+      setFavoritesLoaded(false);
+      loadFavorites(userId).then((favs) => {
+        setFavorites(
+          favs.map((f) => ({
+            id: f.id ?? f.name,
+            nickname: f.nickname ?? f.name,
+            address: f.address ?? f.name,
+            isHome: f.is_home ?? false,
+          })),
+        );
+        setFavoritesLoaded(true);
+      });
+    }
+  }, [isScoutOpen, userId]);
+
+  // Auto-send initialMessage (wait for favorites to load first)
+  useEffect(() => {
+    if (isScoutOpen && favoritesLoaded && storeInitialMessage && !initialSent.current && messages.length === 0) {
       initialSent.current = true;
-      const timer = setTimeout(() => handleSend(initialMessage), 300);
+      const timer = setTimeout(() => handleSend(storeInitialMessage), 300);
       return () => clearTimeout(timer);
     }
-  }, [visible, initialMessage]);
+  }, [isScoutOpen, storeInitialMessage, favoritesLoaded]);
 
-  // Reset when panel closes
+  // Reset initialMessage guard when panel closes (keep conversation)
   useEffect(() => {
-    if (!visible) {
+    if (!isScoutOpen) {
       initialSent.current = false;
-      clearSession();
     }
-  }, [visible]);
+  }, [isScoutOpen]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -199,6 +232,7 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     const tripWps = tripStore.tripWaypoints as TripStop[];
 
     return {
+      currentScreen,
       bikes,
       activeBike,
       currentLocation: loc,
@@ -206,20 +240,25 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
         origin: tripOrigin ? { name: tripOrigin.name, lat: tripOrigin.lat, lng: tripOrigin.lng } : null,
         destination: tripDest ? { name: tripDest.name, lat: tripDest.lat, lng: tripDest.lng } : null,
         waypoints: tripWps.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
-        departureDate: tripStore.tripCustomDate?.toISOString().split('T')[0] ?? null,
-        departureTime: tripStore.tripCustomDate
-          ? tripStore.tripCustomDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        departureDate: tripStore.tripDeparture?.toISOString().split('T')[0] ?? null,
+        departureTime: tripStore.tripDeparture && (tripStore.tripDeparture.getHours() !== 0 || tripStore.tripDeparture.getMinutes() !== 0)
+          ? tripStore.tripDeparture.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
           : null,
         preference: null,
         routeDistance: tripStore.tripRouteDistance || undefined,
         routeDuration: tripStore.tripRouteDuration || undefined,
       },
-      savedRoutes: [],
-      favoriteLocations: [],
+      savedRoutes: routes.map((r) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category ?? '',
+        distance: r.distance_miles ?? 0,
+      })),
+      favoriteLocations: favorites,
       recentMaintenanceLogs: [],
       serviceIntervals: null,
     };
-  }, [bikes, activeBike, currentLocation, tripStore]);
+  }, [bikes, activeBike, currentLocation, tripStore, favorites, routes, currentScreen]);
 
   // ── Send message ───────────────────────────────────────────────────────
 
@@ -227,6 +266,12 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     const msg = (text ?? input).trim();
     if (!msg || isLoading) return;
     if (messages.length >= MAX_MESSAGES_PER_SESSION) return;
+
+    // Check daily quota
+    if (!bypassed) {
+      const allowed = await canSend(userId);
+      if (!allowed) { setQuotaExhausted(true); return; }
+    }
 
     if (!text) setInput('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -255,9 +300,20 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
       };
       addMessage(assistantMsg);
 
-      // Notify parent if route was modified
+      // Track quota usage
+      if (!bypassed) {
+        const remaining = await recordUsage(userId);
+        setQuotaRemaining(remaining);
+        if (remaining <= 0) setQuotaExhausted(true);
+      }
+
+      // Notify if route was modified (TripPlanner registers callback via store)
       if (result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t))) {
-        onRouteUpdated?.();
+        useScoutStore.getState().onRouteUpdated?.();
+        // Append nav hint if user isn't on the trip screen
+        if (currentScreen !== 'trip') {
+          assistantMsg.content += '\n\nYour route is ready — head to Trip Planner to navigate.';
+        }
       }
     } catch {
       const errMsg: ScoutMessage = {
@@ -281,7 +337,6 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     const bikeLabel = activeBike?.nickname ?? activeBike?.model ?? 'my bike';
 
     if (!hasOrigin && !hasDest) {
-      // No trip planned
       return [
         'Plan a loop from here',
         `Ask about my ${bikeLabel}`,
@@ -290,7 +345,6 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
       ];
     }
     if (hasRoute && tripStore.tripCustomDate) {
-      // Fully planned
       return [
         'Try a different road',
         'Check road conditions',
@@ -298,7 +352,6 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
         'Save this route',
       ];
     }
-    // Trip planned, no departure
     return [
       'Check weather for this Saturday',
       'Check weather tomorrow morning',
@@ -308,44 +361,9 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     ];
   }, [tripStore, activeBike]);
 
-  // ── No bikes empty state ───────────────────────────────────────────────
-
-  if (!visible) return null;
-
-  if (bikes.length === 0) {
-    return (
-      <View style={[st.container, { backgroundColor: theme.bgPanel }]}>
-        <View style={[st.header, { borderBottomColor: theme.border }]}>
-          <View style={st.headerLeft}>
-            <CompassIcon size={18} color={theme.red} />
-            <Text style={[st.headerTitle, { color: theme.textPrimary }]}>SCOUT</Text>
-          </View>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Feather name="x" size={20} color={theme.textMuted} />
-          </Pressable>
-        </View>
-        <View style={st.emptyState}>
-          <CompassIcon size={48} color={theme.textMuted} />
-          <Text style={[st.emptyTitle, { color: theme.textPrimary }]}>Add a bike first</Text>
-          <Text style={[st.emptySubtitle, { color: theme.textMuted }]}>
-            Scout needs to know your ride before planning trips.
-          </Text>
-          <Pressable
-            style={[st.emptyBtn, { backgroundColor: theme.red }]}
-            onPress={() => { onClose(); router.push('/(tabs)/garage'); }}
-          >
-            <Text style={st.emptyBtnText}>Go to Garage</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  // ── Session limit check ────────────────────────────────────────────────
+  // ── Render (always mounted, display toggled) ───────────────────────────
 
   const atLimit = messages.length >= MAX_MESSAGES_PER_SESSION;
-
-  // ── Render ─────────────────────────────────────────────────────────────
 
   const renderMessage = ({ item }: { item: ScoutMessage }) => {
     const isUser = item.role === 'user';
@@ -373,102 +391,156 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     );
   };
 
+  // No bikes empty state
+  const noBikes = bikes.length === 0;
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[st.container, { backgroundColor: theme.bgPanel }]}
+    <View
+      style={[StyleSheet.absoluteFillObject, { display: isScoutOpen ? 'flex' : 'none', zIndex: 100 }]}
+      pointerEvents={isScoutOpen ? 'auto' : 'none'}
     >
-      {/* Drag handle */}
-      <View style={st.dragHandleWrap}>
-        <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
-      </View>
-
-      {/* Header */}
-      <View style={[st.header, { borderBottomColor: theme.border }]}>
-        <View style={st.headerLeft}>
-          <CompassIcon size={18} color={theme.red} />
-          <Text style={[st.headerTitle, { color: theme.textPrimary }]}>SCOUT</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={[st.container, { backgroundColor: theme.bgPanel }]}
+      >
+        {/* Drag handle */}
+        <View style={st.dragHandleWrap}>
+          <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
-        <Pressable onPress={onClose} hitSlop={12}>
-          <Feather name="x" size={20} color={theme.textMuted} />
-        </Pressable>
-      </View>
 
-      {/* Message list */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        renderItem={renderMessage}
-        contentContainerStyle={[st.messageList, { paddingBottom: 8 }]}
-        ListHeaderComponent={
-          messages.length === 0 ? (
-            <View style={st.promptsWrap}>
-              <Text style={[st.promptsLabel, { color: theme.textMuted }]}>SUGGESTIONS</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.promptsScroll}>
-                {getSuggestedPrompts().map((p, i) => (
-                  <Pressable
-                    key={i}
-                    style={[st.promptChip, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-                    onPress={() => handleSend(p)}
-                  >
-                    <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{p}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
-          isLoading ? (
-            <View style={[st.bubbleRow, st.bubbleRowLeft]}>
-              <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                <CompassIcon size={12} color={theme.red} />
+        {/* Header */}
+        <View style={[st.header, { borderBottomColor: theme.border }]}>
+          <View style={st.headerLeft}>
+            <CompassIcon size={18} color={theme.red} />
+            <Text style={[st.headerTitle, { color: theme.textPrimary }]}>SCOUT</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            {messages.length > 0 && (
+              <Pressable onPress={clearSession} hitSlop={12}>
+                <Feather name="refresh-cw" size={16} color={theme.textMuted} />
+              </Pressable>
+            )}
+            <Pressable onPress={closeScout} hitSlop={12}>
+              <Feather name="x" size={20} color={theme.textMuted} />
+            </Pressable>
+          </View>
+        </View>
+
+        {noBikes ? (
+          <View style={st.emptyState}>
+            <CompassIcon size={48} color={theme.textMuted} />
+            <Text style={[st.emptyTitle, { color: theme.textPrimary }]}>Add a bike first</Text>
+            <Text style={[st.emptySubtitle, { color: theme.textMuted }]}>
+              Scout needs to know your ride before planning trips.
+            </Text>
+            <Pressable
+              style={[st.emptyBtn, { backgroundColor: theme.red }]}
+              onPress={() => { closeScout(); router.push('/(tabs)/garage'); }}
+            >
+              <Text style={st.emptyBtnText}>Go to Garage</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            {/* Message list */}
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(m) => m.id}
+              renderItem={renderMessage}
+              contentContainerStyle={[st.messageList, { paddingBottom: 8 }]}
+              ListHeaderComponent={
+                messages.length === 0 ? (
+                  <View style={st.promptsWrap}>
+                    <Text style={[st.promptsLabel, { color: theme.textMuted }]}>SUGGESTIONS</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.promptsScroll}>
+                      {getSuggestedPrompts().map((p, i) => (
+                        <Pressable
+                          key={i}
+                          style={[st.promptChip, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
+                          onPress={() => handleSend(p)}
+                        >
+                          <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{p}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ) : null
+              }
+              ListFooterComponent={
+                isLoading ? (
+                  <View style={[st.bubbleRow, st.bubbleRowLeft]}>
+                    <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                      <CompassIcon size={12} color={theme.red} />
+                    </View>
+                    <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
+                      <TypingDots color={theme.textMuted} />
+                    </View>
+                  </View>
+                ) : null
+              }
+            />
+
+            {/* Quota exhausted banner */}
+            {quotaExhausted && (
+              <View style={[st.limitBanner, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                <Text style={[st.limitText, { color: theme.textMuted }]}>
+                  You've used all {getDailyLimit()} Scout messages for today. Resets at midnight.
+                </Text>
               </View>
-              <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
-                <TypingDots color={theme.textMuted} />
+            )}
+
+            {/* Session limit banner */}
+            {!quotaExhausted && atLimit && (
+              <View style={[st.limitBanner, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                <Text style={[st.limitText, { color: theme.textMuted }]}>
+                  Session limit reached.
+                </Text>
+                <Pressable onPress={clearSession} style={{ marginTop: 8 }}>
+                  <Text style={{ color: theme.red, fontSize: 13, fontWeight: '600' }}>Start new conversation</Text>
+                </Pressable>
               </View>
-            </View>
-          ) : null
-        }
-      />
+            )}
 
-      {/* Session limit banner */}
-      {atLimit && (
-        <View style={[st.limitBanner, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <Text style={[st.limitText, { color: theme.textMuted }]}>
-            Session limit reached. Close and reopen Scout to continue.
-          </Text>
-        </View>
-      )}
+            {/* Remaining messages hint */}
+            {!bypassed && !quotaExhausted && quotaRemaining <= 10 && quotaRemaining > 0 && (
+              <View style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
+                <Text style={{ color: theme.textMuted, fontSize: 11, textAlign: 'center' }}>
+                  {quotaRemaining} message{quotaRemaining === 1 ? '' : 's'} remaining today
+                </Text>
+              </View>
+            )}
 
-      {/* Input row */}
-      {!atLimit && (
-        <View style={[st.inputRow, { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <TextInput
-            style={[st.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
-            placeholder="Ask Scout..."
-            placeholderTextColor={theme.inputPlaceholder}
-            value={input}
-            onChangeText={setInput}
-            multiline={false}
-            returnKeyType="send"
-            onSubmitEditing={() => handleSend()}
-            editable={!isLoading}
-          />
-          <Pressable
-            style={[st.sendBtn, { backgroundColor: input.trim() && !isLoading ? theme.red : theme.bgCard }]}
-            onPress={() => handleSend()}
-            disabled={!input.trim() || isLoading}
-          >
-            {isLoading
-              ? <ActivityIndicator size="small" color={theme.textMuted} />
-              : <Feather name="arrow-up" size={18} color={input.trim() ? theme.white : theme.textMuted} />
-            }
-          </Pressable>
-        </View>
-      )}
-    </KeyboardAvoidingView>
+            {/* Input row */}
+            {!atLimit && !quotaExhausted && (
+              <View style={[st.inputRow, { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom + 70, 82) }]}>
+                <TextInput
+                  style={[st.input, { backgroundColor: theme.bgCard, borderColor: theme.border, color: theme.textPrimary }]}
+                  placeholder="Ask Scout..."
+                  placeholderTextColor={theme.inputPlaceholder}
+                  value={input}
+                  onChangeText={setInput}
+                  multiline={false}
+                  returnKeyType="send"
+                  onSubmitEditing={() => handleSend()}
+                  editable={!isLoading}
+                />
+                <Pressable
+                  style={[st.sendBtn, { backgroundColor: input.trim() && !isLoading ? theme.red : theme.bgCard }]}
+                  onPress={() => handleSend()}
+                  disabled={!input.trim() || isLoading}
+                >
+                  {isLoading
+                    ? <ActivityIndicator size="small" color={theme.textMuted} />
+                    : <Feather name="arrow-up" size={18} color={input.trim() ? theme.white : theme.textMuted} />
+                  }
+                </Pressable>
+              </View>
+            )}
+          </>
+        )}
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 

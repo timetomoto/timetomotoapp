@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,7 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import type { Bike, BikeSpecs } from '../../lib/store';
-import ScoutPanel from '../scout/ScoutPanel';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -297,7 +296,7 @@ ${fieldList}`;
   });
 
   const endpoints = [
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
   ];
 
@@ -489,7 +488,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
   const [specs, setSpecs] = useState<BikeSpecs>(bike.specs ?? {});
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupDone, setLookupDone] = useState(specs.specsLookedUp === true);
-  const [scoutOpen, setScoutOpen] = useState(false);
+  const openScout = useScoutStore((s) => s.openScout);
   const [lookedUpAt, setLookedUpAt] = useState<string | null>(specs.specsLookedUpAt ?? null);
   const hasTriggered = useRef(false);
 
@@ -650,7 +649,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
           {lookupDone && (
             <Pressable
               style={[st.scoutBtn, { borderColor: theme.red }]}
-              onPress={() => setScoutOpen(true)}
+              onPress={() => openScout({ initialMessage: `Tell me about my ${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}` })}
             >
               <View style={{ width: 16, height: 16 }}>
                 <View style={{ position: 'absolute', width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: theme.red }} />
@@ -663,14 +662,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
 
         </View>
 
-        {/* Scout Panel */}
-        <Modal visible={scoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setScoutOpen(false)}>
-          <ScoutPanel
-            visible={scoutOpen}
-            onClose={() => setScoutOpen(false)}
-            initialMessage={`Tell me about my ${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}`}
-          />
-        </Modal>
+        {/* Scout panel now global in _layout.tsx */}
     </View>
   );
 }

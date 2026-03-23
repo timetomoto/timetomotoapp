@@ -26,6 +26,7 @@ export type ScoutMessage = {
 };
 
 export type ScoutContext = {
+  currentScreen: 'ride' | 'trip' | 'garage' | 'other';
   bikes: Bike[];
   activeBike: Bike | null;
   currentLocation: { lat: number; lng: number; city?: string } | null;

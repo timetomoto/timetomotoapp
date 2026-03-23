@@ -62,7 +62,7 @@ If the model name is ambiguous use the closest known variant and note it in assu
 
   // Try endpoints in order until one succeeds (fast non-thinking models first)
   const endpoints = [
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
   ];
   let lastError = 'No models available';

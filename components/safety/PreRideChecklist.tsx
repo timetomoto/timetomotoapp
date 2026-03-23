@@ -15,7 +15,7 @@ import { useTheme } from '../../lib/useTheme';
 import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage } from '../../lib/routeWeather';
 import { codeMeta } from '../../lib/weather';
 import RideSettingsBlock, { type RideSettingsValues } from '../ride/RideSettingsBlock';
-import ScoutPanel from '../scout/ScoutPanel';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -92,7 +92,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
   const [scoutWeatherMsg, setScoutWeatherMsg] = useState<string | null>(null);
   const [scoutWeatherSeverity, setScoutWeatherSeverity] = useState<'green' | 'yellow' | 'red'>('green');
   const [scoutWeatherLoading, setScoutWeatherLoading] = useState(false);
-  const [scoutOpen, setScoutOpen] = useState(false);
+  const openScout = useScoutStore((s) => s.openScout);
   const scoutWeatherFetched = useRef(false);
 
   // Shimmer animation for loading
@@ -314,7 +314,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
                 ? { backgroundColor: 'rgba(255,152,0,0.10)', borderColor: 'rgba(255,152,0,0.3)' }
                 : { backgroundColor: 'rgba(198,40,40,0.10)', borderColor: 'rgba(198,40,40,0.3)' },
           ]}
-          onPress={() => setScoutOpen(true)}
+          onPress={() => openScout({ initialMessage: 'Give me a detailed weather briefing for my route.' })}
         >
           <View style={{ width: 14, height: 14 }}>
             <View style={{
@@ -339,9 +339,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
       )}
 
       {/* Scout Panel */}
-      <Modal visible={scoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setScoutOpen(false)}>
-        <ScoutPanel visible={scoutOpen} onClose={() => setScoutOpen(false)} initialMessage="Give me a detailed weather briefing for my route." />
-      </Modal>
+      {/* Scout panel now global in _layout.tsx */}
 
       {/* ── Shared ride settings + contacts ── */}
       <RideSettingsBlock

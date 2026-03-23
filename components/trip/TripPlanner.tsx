@@ -39,7 +39,7 @@ import { codeMeta } from '../../lib/weather';
 import { fetchHEREConditions, type RoadCondition } from '../../lib/discoverStore';
 import { darkTheme } from '../../lib/theme';
 import type { Route } from '../../lib/routes';
-import ScoutPanel from '../scout/ScoutPanel';
+import { useScoutStore } from '../../lib/scoutStore';
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -182,11 +182,50 @@ export default function TripPlanner() {
   const [conditionsLoading, setConditionsLoading] = useState(false);
   const [conditionFilter, setConditionFilter] = useState<'all' | 'construction' | 'hazard' | 'closure'>('all');
 
-  // Date picker UI
+  // Date & time picker UI
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [hasCustomTime, setHasCustomTime] = useState(() => {
+    // If departure already has a non-midnight time, show it
+    return departure.getHours() !== 0 || departure.getMinutes() !== 0;
+  });
 
-  // Scout
-  const [scoutOpen, setScoutOpen] = useState(false);
+  /** Set a smart default time when date changes: today = next 15min, future = 9 AM */
+  function applyDefaultTime(date: Date): Date {
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const n = new Date(date);
+    if (isToday) {
+      // Round up to next 15-minute mark
+      const mins = now.getMinutes();
+      const next15 = Math.ceil((mins + 1) / 15) * 15;
+      n.setHours(now.getHours(), 0, 0, 0);
+      n.setMinutes(next15); // handles overflow (e.g. 60 → next hour)
+    } else {
+      n.setHours(9, 0, 0, 0);
+    }
+    return n;
+  }
+
+  // Scout — global store
+  const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
+  const wasScoutOpenRef = useRef(false);
+
+  // Register route-updated callback for Scout
+  useEffect(() => {
+    useScoutStore.getState().setOnRouteUpdated(() => {
+      showToast('Route updated — close Scout to view map & details', 5000);
+    });
+    return () => useScoutStore.getState().setOnRouteUpdated(null);
+  }, []);
+
+  // Fit route when Scout closes
+  useEffect(() => {
+    if (wasScoutOpenRef.current && !isScoutOpen) {
+      fitRouteWhenReady();
+    }
+    wasScoutOpenRef.current = isScoutOpen;
+  }, [isScoutOpen]);
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
@@ -238,8 +277,22 @@ export default function TripPlanner() {
     cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, SNAP_COLLAPSED * 0.7, 40], 600);
   }
 
+  /** Poll for route geometry then fit — used after Scout closes */
+  function fitRouteWhenReady() {
+    let attempts = 0;
+    const check = () => {
+      attempts++;
+      if (routeGeojsonRef.current?.coordinates?.length >= 2) {
+        fitRoute();
+      } else if (attempts < 10) {
+        setTimeout(check, 400);
+      }
+    };
+    setTimeout(check, 500);
+  }
+
   function enterFullScreen() {
-    if (scoutOpen) setScoutOpen(false);
+    if (isScoutOpen) useScoutStore.getState().closeScout();
     setFullScreen(true);
     Animated.spring(panelY, { toValue: SCREEN_H + 100, useNativeDriver: false, tension: 80, friction: 14 }).start();
   }
@@ -316,10 +369,13 @@ export default function TripPlanner() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  // Auto-set origin + center camera on user location
+  // Auto-set origin + center camera on user location, or fit existing route
   useEffect(() => {
-    // If stops already exist (returning with existing route), fit to them instead
-    if (origin || destination) return;
+    // If a route exists or is being planned, fit to it
+    if (origin || destination) {
+      fitRouteWhenReady();
+      return;
+    }
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -347,13 +403,16 @@ export default function TripPlanner() {
 
   // Debounced route fetch + weather + conditions
   useEffect(() => {
+    console.log('[TripPlanner] Route useEffect fired', { origin: origin?.name, destination: destination?.name, waypointCount: waypoints.length });
     if (!origin || !destination) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
     if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current);
     setRouteLoading(true);
     routeDebounceRef.current = setTimeout(async () => {
       try {
         const wps = waypoints.map((w) => ({ lng: w.lng, lat: w.lat }));
+        console.log('[TripPlanner] Calling fetchDirections', { origin: `${origin.lat},${origin.lng}`, dest: `${destination.lat},${destination.lng}`, wps: wps.length });
         const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
+        console.log('[TripPlanner] fetchDirections returned', routes.length, 'routes', routes.length > 0 ? `coords: ${routes[0].geometry?.coordinates?.length}` : '');
         if (routes.length > 0) {
           const r = routes[0];
           setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);
@@ -364,7 +423,7 @@ export default function TripPlanner() {
           const dOut = daysBetween(new Date(), departure);
           if (dOut <= 16) {
             setWeatherLoading(true);
-            fetchRouteWeather(coords)
+            fetchRouteWeather(coords, departure, r.durationSeconds)
               .then(({ points, useCelsius, useMiles }) => {
                 setWeatherUseCelsius(useCelsius);
                 setWeatherUseMiles(useMiles);
@@ -400,7 +459,7 @@ export default function TripPlanner() {
       setRouteLoading(false);
     }, 800);
     return () => { if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current); };
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length, waypoints.map((w) => `${w.lat},${w.lng}`).join('|'), routePreference]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length, waypoints.map((w) => `${w.lat},${w.lng}`).join('|'), routePreference, departure.getTime()]);
 
   // Map tap
   function handleMapPress(e: any) {
@@ -656,10 +715,14 @@ export default function TripPlanner() {
     try { await Share.share({ title: name, message: serializeGpx(name, points) }); } catch {}
   }
 
-  function showToast(msg: string) {
-    setToastMsg(msg);
+  function showToast(msg: string, duration = 2500) {
+    // Clear first to re-trigger even if same message
+    setToastMsg('');
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = setTimeout(() => setToastMsg(''), 2500);
+    requestAnimationFrame(() => {
+      setToastMsg(msg);
+      toastTimerRef.current = setTimeout(() => setToastMsg(''), duration);
+    });
   }
 
   const canNavigate = !!origin && !!destination && !!routeGeojson;
@@ -778,36 +841,7 @@ export default function TripPlanner() {
             : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textMuted} />
           }
         </Pressable>
-        {/* Scout FAB */}
-        <Animated.View
-          style={[st.scoutFab, {
-            opacity: panelY.interpolate({
-              inputRange: [SCREEN_H - SNAP_EXPANDED, SCREEN_H - SNAP_EXPANDED + 80],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
-            }),
-          }]}
-          pointerEvents={fullScreen ? 'auto' : 'box-none'}
-        >
-        <Pressable
-          style={st.scoutFabInner}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScoutOpen(true); }}
-
-        >
-          <View style={st.scoutFabCircle}>
-            <View style={{ width: 22, height: 22 }}>
-              <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
-              <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
-              <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-            </View>
-            {/* Weather alert dot */}
-            {weatherHasConcern && <View style={st.scoutAlertDot} />}
-          </View>
-          <Text style={st.scoutFabLabel}>SCOUT</Text>
-        </Pressable>
-        </Animated.View>
+        {/* Scout FAB removed — now in FloatingTabBar */}
       </View>
 
       {/* Bottom sheet panel */}
@@ -921,32 +955,36 @@ export default function TripPlanner() {
               {routeGeojson && (
                 <View style={[st.departureCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                   <Text style={[st.sectionLabel, { color: theme.textSecondary }]}>DEPARTURE</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 8 }}>
-                    {[0, 1, 2].map((offset) => {
-                      const d = addDays(new Date(), offset); d.setHours(0, 0, 0, 0);
-                      const isQuickChip = !customDate && departure.toDateString() === d.toDateString();
-                      const label = offset === 0 ? 'TODAY' : offset === 1 ? 'TOMORROW' : d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-                      return (
-                        <Pressable key={offset} style={[st.dateChip, { backgroundColor: isQuickChip ? theme.red + '22' : theme.bgPanel, borderColor: isQuickChip ? theme.red : theme.border }]} onPress={() => { setCustomDate(null); const n = new Date(departure); n.setFullYear(d.getFullYear(), d.getMonth(), d.getDate()); setDeparture(n); }}>
-                          <Text style={[st.dateChipText, { color: isQuickChip ? theme.red : theme.textSecondary }]}>{label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                    {/* Custom date chip */}
-                    {customDate ? (
-                      <View style={[st.dateChip, { backgroundColor: theme.red + '22', borderColor: theme.red, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                        <Text style={[st.dateChipText, { color: theme.red }]}>{customDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()}</Text>
-                        <Pressable hitSlop={8} onPress={() => { setCustomDate(null); const today = new Date(); today.setMinutes(0, 0, 0); today.setHours(today.getHours() + 1); setDeparture(today); }}>
-                          <Feather name="x" size={12} color={theme.red} />
-                        </Pressable>
-                      </View>
-                    ) : (
-                      <Pressable style={[st.dateChip, { backgroundColor: theme.bgPanel, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 4 }]} onPress={() => setShowDatePicker(true)}>
-                        <Feather name="calendar" size={11} color={theme.textSecondary} />
-                        <Text style={[st.dateChipText, { color: theme.textSecondary }]}>PICK DATE</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                    {/* Date field */}
+                    <Pressable
+                      style={[st.dateChip, { flex: 1, backgroundColor: theme.bgPanel, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }]}
+                      onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}
+                    >
+                      <Feather name="calendar" size={12} color={theme.textSecondary} />
+                      <Text style={[st.dateChipText, { color: theme.textPrimary }]}>
+                        {departure.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </Text>
+                    </Pressable>
+                    {/* Time field */}
+                    <Pressable
+                      style={[st.dateChip, { flex: 1, backgroundColor: theme.bgPanel, borderColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' }]}
+                      onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}
+                    >
+                      <Feather name="clock" size={12} color={theme.textSecondary} />
+                      <Text style={[st.dateChipText, { color: hasCustomTime ? theme.textPrimary : theme.textMuted }]}>
+                        {hasCustomTime
+                          ? departure.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+                          : 'Set time'}
+                      </Text>
+                    </Pressable>
+                    {/* Clear time */}
+                    {hasCustomTime && (
+                      <Pressable hitSlop={8} onPress={() => { setHasCustomTime(false); const n = new Date(departure); n.setHours(0, 0, 0, 0); setDeparture(n); }}>
+                        <Feather name="x" size={14} color={theme.textMuted} />
                       </Pressable>
                     )}
-                  </ScrollView>
+                  </View>
                   {/* Inline date picker */}
                   {showDatePicker && Platform.OS === 'ios' && (
                     <View style={[st.inlinePicker, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
@@ -956,7 +994,7 @@ export default function TripPlanner() {
                         </Pressable>
                       </View>
                       <DateTimePicker
-                        value={customDate ?? addDays(new Date(), 3)}
+                        value={departure}
                         mode="date"
                         display="spinner"
                         minimumDate={new Date()}
@@ -964,9 +1002,9 @@ export default function TripPlanner() {
                         onChange={(_e: DateTimePickerEvent, selected?: Date) => {
                           if (selected) {
                             setCustomDate(selected);
-                            const n = new Date(departure);
-                            n.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-                            setDeparture(n);
+                            const withTime = applyDefaultTime(selected);
+                            setDeparture(withTime);
+                            setHasCustomTime(true);
                           }
                         }}
                       />
@@ -974,7 +1012,7 @@ export default function TripPlanner() {
                   )}
                   {showDatePicker && Platform.OS === 'android' && (
                     <DateTimePicker
-                      value={customDate ?? addDays(new Date(), 3)}
+                      value={departure}
                       mode="date"
                       display="default"
                       minimumDate={new Date()}
@@ -982,9 +1020,51 @@ export default function TripPlanner() {
                         setShowDatePicker(false);
                         if (selected) {
                           setCustomDate(selected);
+                          const withTime = applyDefaultTime(selected);
+                          setDeparture(withTime);
+                          setHasCustomTime(true);
+                        }
+                      }}
+                    />
+                  )}
+                  {/* Inline time picker */}
+                  {showTimePicker && Platform.OS === 'ios' && (
+                    <View style={[st.inlinePicker, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8, paddingTop: 4 }}>
+                        <Pressable onPress={() => setShowTimePicker(false)}>
+                          <Text style={{ color: theme.red, fontSize: 14, fontWeight: '600' }}>Done</Text>
+                        </Pressable>
+                      </View>
+                      <DateTimePicker
+                        value={departure}
+                        mode="time"
+                        display="spinner"
+                        minuteInterval={15}
+                        themeVariant={isDark ? 'dark' : 'light'}
+                        onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                          if (selected) {
+                            const n = new Date(departure);
+                            n.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+                            setDeparture(n);
+                            setHasCustomTime(true);
+                          }
+                        }}
+                      />
+                    </View>
+                  )}
+                  {showTimePicker && Platform.OS === 'android' && (
+                    <DateTimePicker
+                      value={departure}
+                      mode="time"
+                      display="default"
+                      minuteInterval={15}
+                      onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                        setShowTimePicker(false);
+                        if (selected) {
                           const n = new Date(departure);
-                          n.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+                          n.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
                           setDeparture(n);
+                          setHasCustomTime(true);
                         }
                       }}
                     />
@@ -1000,7 +1080,7 @@ export default function TripPlanner() {
                     <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
                       <Text style={[st.collapsibleTitle, { color: theme.textPrimary }]}>WEATHER ALONG ROUTE</Text>
                       {isWeatherStale ? (
-                        <Pressable onPress={() => { setWeatherLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) fetchRouteWeather(coords).then(({ points, useCelsius, useMiles }) => { setWeatherUseCelsius(useCelsius); setWeatherUseMiles(useMiles); let msg: string | null; let concern: boolean; if (points.length === 0 || points.every((p) => p.temp === 0)) { msg = 'Unable to check route weather.'; concern = false; } else if (!hasRouteWeatherConcern(points, useCelsius)) { msg = 'Clear conditions along this route.'; concern = false; } else { msg = getRouteWarningMessage(points, useCelsius) ?? 'Check conditions before riding.'; concern = true; } setTripWeather(points, msg, concern, points.length); }).catch(() => setTripWeather([], 'Unable to check route weather.', false, 0)).finally(() => setWeatherLoading(false)); }} style={{ padding: 4 }}>
+                        <Pressable onPress={() => { setWeatherLoading(true); const coords = routeGeojsonRef.current?.coordinates; if (coords) fetchRouteWeather(coords, departure, routeDuration).then(({ points, useCelsius, useMiles }) => { setWeatherUseCelsius(useCelsius); setWeatherUseMiles(useMiles); let msg: string | null; let concern: boolean; if (points.length === 0 || points.every((p) => p.temp === 0)) { msg = 'Unable to check route weather.'; concern = false; } else if (!hasRouteWeatherConcern(points, useCelsius)) { msg = 'Clear conditions along this route.'; concern = false; } else { msg = getRouteWarningMessage(points, useCelsius) ?? 'Check conditions before riding.'; concern = true; } setTripWeather(points, msg, concern, points.length); }).catch(() => setTripWeather([], 'Unable to check route weather.', false, 0)).finally(() => setWeatherLoading(false)); }} style={{ padding: 4 }}>
                           <Feather name="refresh-cw" size={14} color={theme.textMuted} />
                         </Pressable>
                       ) : weatherBadge && <View style={[st.statusBadge, { backgroundColor: weatherBadge.color }]}><Text style={st.statusBadgeText}>{weatherBadge.label}</Text></View>}
@@ -1249,10 +1329,7 @@ export default function TripPlanner() {
         </View>
       </Modal>
 
-      {/* Scout Panel */}
-      <Modal visible={scoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setScoutOpen(false)}>
-        <ScoutPanel visible={scoutOpen} onClose={() => setScoutOpen(false)} onRouteUpdated={() => showToast('Scout updated your route')} />
-      </Modal>
+      {/* Scout panel now global in _layout.tsx */}
 
       {/* Toast */}
       {!!toastMsg && (
@@ -1333,15 +1410,6 @@ const st = StyleSheet.create({
   importName: { fontSize: 14, fontWeight: '600' },
   importMeta: { fontSize: 11, marginTop: 1 },
   emptyText: { fontSize: 13, textAlign: 'center', paddingVertical: 40 },
-  scoutFab: { position: 'absolute', bottom: 90, right: 16, alignItems: 'center', zIndex: 10 },
-  scoutFabInner: { alignItems: 'center' },
-  scoutFabCircle: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#C62828',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8,
-  },
-  scoutFabLabel: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 3 },
-  scoutAlertDot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF9800', borderWidth: 1.5, borderColor: '#C62828' },
   toast: { position: 'absolute', bottom: 140, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 14 },
   toastText: { fontSize: 13, fontWeight: '600' },
   flexOne: { flex: 1 },

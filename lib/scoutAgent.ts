@@ -8,9 +8,9 @@ import type { ScoutMessage, ScoutContext } from './scoutTypes';
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 const ENDPOINT =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-const MAX_TOOL_ROUNDS = 3;
-const TIMEOUT_MS = 8000;
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const MAX_TOOL_ROUNDS = 6;
+const TIMEOUT_MS = 30000;
 const HISTORY_WINDOW = 10;
 
 // ── Gemini request / response shapes ────────────────────────────────────
@@ -30,7 +30,7 @@ interface GeminiRequest {
   systemInstruction: { parts: [{ text: string }] };
   contents: GeminiContent[];
   tools: { functionDeclarations: typeof SCOUT_TOOL_DEFINITIONS };
-  generationConfig: { maxOutputTokens: number; temperature: number };
+  generationConfig: { maxOutputTokens: number; temperature: number; thinkingConfig?: { thinkingBudget: number } };
 }
 
 interface GeminiCandidate {
@@ -76,11 +76,13 @@ export async function sendScoutMessage(
 
     // 3. First Gemini call
     let response = await callGemini(systemPrompt, contents);
+    console.log('[Scout] Initial response parts:', JSON.stringify(response.candidates?.[0]?.content?.parts?.map((p) => p.functionCall ? `fn:${p.functionCall.name}` : p.text ? `text:${p.text.slice(0, 50)}` : 'other')));
 
     // 4. Function-calling loop
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const functionCalls = extractFunctionCalls(response);
       if (functionCalls.length === 0) break;
+      console.log('[Scout] Tool round', round + 1, functionCalls.map((fc) => fc.name));
 
       // Execute tool calls in parallel
       functionCalls.forEach((fc) => toolsExecuted.push(fc.name));
@@ -117,6 +119,7 @@ export async function sendScoutMessage(
 
     return { text, toolsExecuted };
   } catch (err: any) {
+    console.error('[Scout] sendScoutMessage error:', err);
     if (err?.name === 'AbortError' || err?.message?.includes('timeout')) {
       return { text: 'That took too long. Try a simpler request or check your connection.', toolsExecuted };
     }
@@ -137,7 +140,7 @@ async function callGemini(
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools: { functionDeclarations: SCOUT_TOOL_DEFINITIONS },
-    generationConfig: { maxOutputTokens: 500, temperature: 0.7 },
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
   };
 
   const controller = new AbortController();

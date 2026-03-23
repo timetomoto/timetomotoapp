@@ -161,9 +161,9 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object',
       properties: {
         date: { type: 'string', description: 'Departure date in YYYY-MM-DD format.' },
-        time: { type: 'string', description: 'Departure time in HH:MM (24h) format.' },
+        time: { type: 'string', description: 'Departure time in HH:MM (24h) format. Omit if rider did not specify a time.' },
       },
-      required: ['date', 'time'],
+      required: ['date'],
     },
   },
   {
@@ -235,6 +235,18 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
         question: { type: 'string', description: 'The garage-related question the rider asked.' },
       },
       required: ['question'],
+    },
+  },
+
+  {
+    name: 'set_active_bike',
+    description: 'Switch the active bike by nickname or model name.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Nickname or model name of the bike to activate.' },
+      },
+      required: ['query'],
     },
   },
 
@@ -448,19 +460,25 @@ export async function executeScoutTool(
 
       case 'set_departure': {
         const dateStr = parameters.date as string;
-        const timeStr = parameters.time as string;
+        const timeStr = parameters.time as string | undefined;
         const [year, month, day] = dateStr.split('-').map(Number);
-        const [hours, minutes] = timeStr.split(':').map(Number);
+        let hours = 0, minutes = 0;
+        if (timeStr) {
+          [hours, minutes] = timeStr.split(':').map(Number);
+        }
         const departure = new Date(year, month - 1, day, hours, minutes);
         tripStore.setTripDeparture(departure);
         tripStore.setTripCustomDate(departure);
         const formatted = departure.toLocaleDateString('en-US', {
           weekday: 'short', month: 'short', day: 'numeric',
         });
-        const timeFormatted = departure.toLocaleTimeString('en-US', {
-          hour: 'numeric', minute: '2-digit',
-        });
-        return `Departure set to ${formatted} at ${timeFormatted}.`;
+        if (timeStr) {
+          const timeFormatted = departure.toLocaleTimeString('en-US', {
+            hour: 'numeric', minute: '2-digit',
+          });
+          return `Departure set to ${formatted} at ${timeFormatted}.`;
+        }
+        return `Departure set to ${formatted}.`;
       }
 
       case 'make_loop': {
@@ -621,6 +639,21 @@ export async function executeScoutTool(
         if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
         parts.push(`Question: ${parameters.question}`);
         return parts.join('\n');
+      }
+
+      case 'set_active_bike': {
+        const query = (parameters.query as string).toLowerCase();
+        const bikes = garageStore.bikes;
+        const match = bikes.find(
+          (b) =>
+            b.nickname?.toLowerCase().includes(query) ||
+            b.model?.toLowerCase().includes(query) ||
+            b.make?.toLowerCase().includes(query),
+        );
+        if (!match) return `No bike matching "${parameters.query}" found in your garage.`;
+        garageStore.selectBike(match.id);
+        const label = [match.year, match.make, match.model].filter(Boolean).join(' ');
+        return `Switched active bike to ${match.nickname ? `${label} ("${match.nickname}")` : label}.`;
       }
 
       // ── Saving ──────────────────────────────────────────────────────
