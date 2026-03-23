@@ -176,6 +176,19 @@ const wl = StyleSheet.create({
 // Sub-screens
 // ---------------------------------------------------------------------------
 
+/** Text with 1px black stroke — renders 8 offset copies behind the white text */
+function StrokedLabel({ children, style }: { children: string; style?: any }) {
+  const offsets = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+  return (
+    <View style={{ position: 'relative' }}>
+      {offsets.map(([x,y],i) => (
+        <Text key={i} style={[style, { color: '#000', position: 'absolute', left: x, top: y }]}>{children}</Text>
+      ))}
+      <Text style={style}>{children}</Text>
+    </View>
+  );
+}
+
 function RecordScreen({
   onStopRequested,
   elapsedSeconds,
@@ -1475,7 +1488,7 @@ export default function RideScreen() {
               >
                 <PlayIcon />
               </Pressable>
-              <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>START & RECORD</Text>
+              <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>START & RECORD</StrokedLabel>
             </View>
           </View>
         )}
@@ -1492,7 +1505,7 @@ export default function RideScreen() {
                   >
                     {isRidePaused ? <PlayIcon /> : <PauseIcon />}
                   </Pressable>
-                  <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
+                  <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</StrokedLabel>
                 </View>
               )}
               <View style={styles.rideBtnCol}>
@@ -1512,7 +1525,7 @@ export default function RideScreen() {
                 >
                   <StopIcon />
                 </Pressable>
-                <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>STOP</Text>
+                <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>STOP</StrokedLabel>
               </View>
             </View>
           </View>
@@ -1919,6 +1932,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.3,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   pausedBadge: {
     position: 'absolute',

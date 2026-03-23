@@ -1,4 +1,4 @@
-import { useTripPlannerStore } from './store';
+import { useTripPlannerStore, useRoutesStore } from './store';
 import { useGarageStore } from './store';
 import { geocodeLocation, reverseGeocode } from './geocode';
 import { fetchDirections } from './directions';
@@ -246,6 +246,30 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Nickname or model name of the bike to activate.' },
+      },
+      required: ['query'],
+    },
+  },
+
+  // ── Saved Routes ─────────────────────────────────────────────────────
+  {
+    name: 'describe_saved_route',
+    description: 'Look up a saved route by name and return its details (distance, duration, category, departure time, points). Use this when the rider asks about a specific saved route.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Name or partial name of the saved route to look up.' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'load_saved_route',
+    description: 'Load a saved route into the Trip Planner so the rider can view, edit, or navigate it. Sets origin, destination, and waypoints from the saved route points.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Name or partial name of the saved route to load.' },
       },
       required: ['query'],
     },
@@ -683,6 +707,42 @@ export async function executeScoutTool(
       }
 
       // ── Saving ──────────────────────────────────────────────────────
+      case 'describe_saved_route': {
+        const query = (parameters.query as string).toLowerCase();
+        const allRoutes = useRoutesStore.getState().routes;
+        const match = allRoutes.find((r) => r.name.toLowerCase().includes(query));
+        if (!match) return `No saved route matching "${parameters.query}" found. You have ${allRoutes.length} saved route(s).`;
+        const parts: string[] = [];
+        parts.push(`Route: ${match.name}`);
+        if (match.category) parts.push(`Category: ${match.category}`);
+        parts.push(`Distance: ${match.distance_miles.toFixed(1)} mi`);
+        if (match.duration_seconds) {
+          const hrs = Math.floor(match.duration_seconds / 3600);
+          const mins = Math.round((match.duration_seconds % 3600) / 60);
+          parts.push(`Duration: ${hrs}h ${mins}m`);
+        }
+        if (match.departure_time) parts.push(`Departure: ${match.departure_time}`);
+        if (match.source) parts.push(`Source: ${match.source}`);
+        parts.push(`Points: ${match.points.length}`);
+        parts.push(`Created: ${new Date(match.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
+        return parts.join('\n');
+      }
+
+      case 'load_saved_route': {
+        const query = (parameters.query as string).toLowerCase();
+        const allRoutes = useRoutesStore.getState().routes;
+        const match = allRoutes.find((r) => r.name.toLowerCase().includes(query));
+        if (!match) return `No saved route matching "${parameters.query}" found.`;
+        if (match.points.length < 2) return `Route "${match.name}" doesn't have enough points to load.`;
+        const first = match.points[0];
+        const last = match.points[match.points.length - 1];
+        tripStore.setTripOrigin({ name: match.name.split('→')[0]?.trim() || 'Start', lat: first.lat, lng: first.lng });
+        tripStore.setTripDestination({ name: match.name.split('→')[1]?.trim() || 'End', lat: last.lat, lng: last.lng });
+        // Clear existing waypoints — the route geometry will be recalculated from origin/destination
+        tripStore.setTripWaypoints([]);
+        return `Loaded "${match.name}" into Trip Planner — ${match.distance_miles.toFixed(1)} mi${match.duration_seconds ? `, ${Math.floor(match.duration_seconds / 3600)}h ${Math.round((match.duration_seconds % 3600) / 60)}m` : ''}.`;
+      }
+
       case 'save_current_route': {
         const geojson = tripStore.tripRouteGeojson;
         if (!geojson?.coordinates || geojson.coordinates.length < 2)

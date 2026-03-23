@@ -45,7 +45,13 @@ export default function FloatingTabBar() {
             </View>
             {weatherHasConcern && <View style={s.alertDot} />}
           </View>
-          <Text style={s.scoutLabel}>SCOUT</Text>
+          <View style={{ position: 'relative' }}>
+            {/* Black stroke copies */}
+            {[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]].map(([x,y],i) => (
+              <Text key={i} style={[s.scoutLabel, { color: '#000', position: 'absolute', left: x, top: y }]}>SCOUT</Text>
+            ))}
+            <Text style={s.scoutLabel}>SCOUT</Text>
+          </View>
         </Pressable>
       )}
 
@@ -136,6 +142,9 @@ const s = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     color: '#fff',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   alertDot: {
     position: 'absolute',

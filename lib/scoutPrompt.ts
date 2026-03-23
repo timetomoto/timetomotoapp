@@ -160,15 +160,20 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `Garage:\n` +
     `- ask_garage: Answer questions about any bike's specs, maintenance, or service intervals. Pass bike_name to query a specific bike, or omit for the active bike.\n` +
     `- set_active_bike: Switch the active bike by nickname or model name.\n` +
-    `Saving:\n` +
+    `Saved routes:\n` +
+    `- describe_saved_route: Look up a saved route by name and return its details (distance, duration, departure time).\n` +
+    `- load_saved_route: Load a saved route into Trip Planner so the rider can view, edit, or navigate it.\n` +
     `- save_current_route: Save the current route to My Routes.\n` +
     `- generate_ride_summary: Generate a name and summary for a completed ride.\n\n` +
     `IMPORTANT:\n` +
     `- The route line on the map is calculated automatically whenever origin and destination are set. ` +
     `You do NOT need a separate "calculate" step — just set origin and destination (and optionally waypoints) and the route will appear.\n` +
-    `- After you modify the route, the panel will automatically close so the rider can see the map. ` +
-    `Their conversation is preserved — they can reopen Scout anytime to continue.\n` +
-    `- When confirming a route change, keep it brief. Do NOT ask "would you like to see the map" — it will show automatically.`
+    `- A "Head to Trip Planner" link is automatically appended after every route change. Do NOT add your own navigation hints like "close Scout", "head to Trip Planner", "check the map", etc. — it is handled for you.\n` +
+    `- When the rider closes Scout after a route change, the app automatically navigates them to Trip Planner.\n` +
+    `- If the rider asks to see the map, just say "Close me and you'll land on Trip Planner." Do not repeat the auto-appended hint.\n` +
+    `- If you cannot complete a route or trip action (missing Home, missing origin, etc.), suggest the rider set it up in Trip Planner or Garage — always use those exact names so they render as tappable links.\n` +
+    `- Their conversation is preserved — they can reopen Scout anytime to continue.\n` +
+    `- When confirming a route change, keep it brief.`
   );
 
   return sections.join('\n\n');

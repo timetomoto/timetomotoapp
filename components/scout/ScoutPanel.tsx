@@ -41,6 +41,7 @@ const ROUTE_MODIFYING_TOOLS = new Set([
   'avoid_road', 'set_route_preference', 'make_loop', 'clear_route',
   'remove_waypoint', 'reorder_waypoints', 'set_origin_to_home',
   'set_origin_to_current_location',
+  'load_saved_route',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -166,6 +167,7 @@ export default function ScoutPanel() {
   const [input, setInput] = useState('');
   const flatListRef = useRef<FlatList>(null);
   const initialSent = useRef(false);
+  const routeModifiedThisSession = useRef(false);
   const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
@@ -205,10 +207,15 @@ export default function ScoutPanel() {
     }
   }, [isScoutOpen, storeInitialMessage, favoritesLoaded]);
 
-  // Reset initialMessage guard when panel closes (keep conversation)
+  // On close: reset guards, navigate to Trip Planner if route was modified
   useEffect(() => {
     if (!isScoutOpen) {
       initialSent.current = false;
+      if (routeModifiedThisSession.current && currentScreen !== 'trip') {
+        routeModifiedThisSession.current = false;
+        router.navigate('/(tabs)/trip' as any);
+      }
+      routeModifiedThisSession.current = false;
     }
   }, [isScoutOpen]);
 
@@ -290,10 +297,17 @@ export default function ScoutPanel() {
       const history = useScoutStore.getState().messages;
       const result = await sendScoutMessage(msg, history.slice(0, -1), ctx);
 
+      // Append nav hint before adding to store
+      let content = result.text;
+      const routeModified = result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t));
+      if (routeModified) {
+        content += '\n\nHead to Trip Planner to see your route.';
+      }
+
       const assistantMsg: ScoutMessage = {
         id: `a_${Date.now()}`,
         role: 'assistant',
-        content: result.text,
+        content,
         timestamp: new Date(),
         toolCalls: result.toolsExecuted.map((n) => ({ name: n, parameters: {} })),
       };
@@ -306,13 +320,10 @@ export default function ScoutPanel() {
         if (remaining <= 0) setQuotaExhausted(true);
       }
 
-      // Notify if route was modified (TripPlanner registers callback via store)
-      if (result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t))) {
+      // Notify TripPlanner if route was modified
+      if (routeModified) {
+        routeModifiedThisSession.current = true;
         useScoutStore.getState().onRouteUpdated?.();
-        // Append nav hint if user isn't on the trip screen
-        if (currentScreen !== 'trip') {
-          assistantMsg.content += '\n\nYour route is ready — head to Trip Planner to navigate.';
-        }
       }
     } catch {
       const errMsg: ScoutMessage = {
@@ -346,12 +357,12 @@ export default function ScoutPanel() {
       </View>
       <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
         <Text style={[st.bubbleText, { color: theme.textPrimary }]}>
-          {'Hey! I\'m Scout — your riding assistant. I can help you:\n\n'}
-          {'• Plan routes and trips from anywhere\n'}
-          {'• Check weather and road conditions along your route\n'}
-          {'• Answer questions about your bike — specs, maintenance, service intervals\n'}
-          {'• Add stops, avoid roads, adjust your route on the fly\n\n'}
-          {'Try asking me:'}
+          {'I\'m Scout. I can help you:\n\n'}
+          {'Plan routes\n'}
+          {'Check weather\n'}
+          {'Answer bike questions\n'}
+          {'Update your trip\n\n'}
+          {'Try:'}
         </Text>
         <View style={{ marginTop: 8, gap: 6 }}>
           {welcomeExamples.map((ex, i) => (
@@ -365,7 +376,7 @@ export default function ScoutPanel() {
           ))}
         </View>
         <Text style={[st.bubbleText, { color: theme.textPrimary, marginTop: 10 }]}>
-          What are we riding today?
+          Where are we riding today?
         </Text>
       </View>
     </View>
