@@ -13,7 +13,6 @@ import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import type { Bike, BikeSpecs } from '../../lib/store';
 import ScoutPanel from '../scout/ScoutPanel';
-import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -651,7 +650,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
           {lookupDone && (
             <Pressable
               style={[st.scoutBtn, { borderColor: theme.red }]}
-              onPress={() => { useScoutStore.getState().clearSession(); setScoutOpen(true); }}
+              onPress={() => setScoutOpen(true)}
             >
               <View style={{ width: 16, height: 16 }}>
                 <View style={{ position: 'absolute', width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: theme.red }} />

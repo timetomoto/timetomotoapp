@@ -441,10 +441,8 @@ export async function executeScoutTool(
       // ── Route Shaping ───────────────────────────────────────────────
       case 'set_route_preference': {
         const pref = parameters.preference as string;
-        // Store preference in trip context — the trip planner reacts to this
-        // Map backroads → offroad for the Mapbox profile
         const mapped = PREFERENCE_MAP[pref] ?? 'fastest';
-        // Preference is consumed by the trip planner on next route calc
+        tripStore.setTripRoutePreference(pref as any);
         return `Route preference set to "${pref}". The route will recalculate using ${mapped === 'offroad' ? 'back roads' : mapped} routing.`;
       }
 

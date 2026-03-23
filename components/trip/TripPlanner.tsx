@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
   ActivityIndicator,
@@ -40,13 +40,18 @@ import { fetchHEREConditions, type RoadCondition } from '../../lib/discoverStore
 import { darkTheme } from '../../lib/theme';
 import type { Route } from '../../lib/routes';
 import ScoutPanel from '../scout/ScoutPanel';
-import { useScoutStore } from '../../lib/scoutStore';
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 const { height: SCREEN_H } = Dimensions.get('window');
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
 
 interface Loc { name: string; lat: number; lng: number; }
+
+type StorePref = 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null;
+const PREF_MAP: Record<string, string> = { scenic: 'scenic', backroads: 'offroad', no_highway: 'no_highway', fastest: 'fastest' };
+function mapPref(p: StorePref): 'fastest' | 'scenic' | 'no_highway' | 'offroad' {
+  return (p ? PREF_MAP[p] ?? 'fastest' : 'fastest') as any;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -150,6 +155,7 @@ export default function TripPlanner() {
     tripConditions: conditions, tripConditionsFetchedAt: conditionsFetchedAt,
     setTripConditions,
     tripSaved: saved, setTripSaved: setSaved,
+    tripRoutePreference: routePreference, setTripRoutePreference: setRoutePreference,
     clearTrip,
   } = useTripPlannerStore();
 
@@ -189,6 +195,18 @@ export default function TripPlanner() {
   const [constructionOn, setConstructionOn] = useState(false);
   const [constructionLoading, setConstructionLoading] = useState(false);
   const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
+
+  const constructionGeoJSON = useMemo(() => {
+    const capped = constructionIncidents.slice(0, 50);
+    return {
+      type: 'FeatureCollection' as const,
+      features: capped.map((c) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+        properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
+      })),
+    };
+  }, [constructionIncidents]);
 
   // Stale TTLs
   const WEATHER_TTL = 30 * 60 * 1000;
@@ -335,7 +353,7 @@ export default function TripPlanner() {
     routeDebounceRef.current = setTimeout(async () => {
       try {
         const wps = waypoints.map((w) => ({ lng: w.lng, lat: w.lat }));
-        const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, 'fastest', wps.length > 0 ? wps : undefined);
+        const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
         if (routes.length > 0) {
           const r = routes[0];
           setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);
@@ -382,7 +400,7 @@ export default function TripPlanner() {
       setRouteLoading(false);
     }, 800);
     return () => { if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current); };
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length, waypoints.map((w) => `${w.lat},${w.lng}`).join('|')]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length, waypoints.map((w) => `${w.lat},${w.lng}`).join('|'), routePreference]);
 
   // Map tap
   function handleMapPress(e: any) {
@@ -468,7 +486,7 @@ export default function TripPlanner() {
         : waypoints.map((w) => ({ lng: w.lng, lat: w.lat }))
       );
       try {
-        const routes = await fetchDirections(o.lng, o.lat, d.lng, d.lat, 'fastest', wps.length > 0 ? wps : undefined);
+        const routes = await fetchDirections(o.lng, o.lat, d.lng, d.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
         if (routes.length > 0) {
           setTripRoute(routes[0].geometry, routes[0].distanceMiles, routes[0].durationSeconds);
         }
@@ -693,17 +711,10 @@ export default function TripPlanner() {
           ))}
           {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
           {/* Construction layer */}
-          {mapStyleReady && constructionOn && constructionIncidents.length > 0 && (
+          {mapStyleReady && constructionOn && constructionGeoJSON.features.length > 0 && (
             <ShapeSource
               id="tp-construction-src"
-              shape={{
-                type: 'FeatureCollection',
-                features: constructionIncidents.map((c) => ({
-                  type: 'Feature' as const,
-                  geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
-                  properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
-                })),
-              }}
+              shape={constructionGeoJSON}
               onPress={(e) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
@@ -756,10 +767,32 @@ export default function TripPlanner() {
         >
           <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={theme.textPrimary} />
         </Pressable>
-        {/* Scout FAB */}
+        {/* Construction layer toggle */}
         <Pressable
-          style={st.scoutFab}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); useScoutStore.getState().clearSession(); setScoutOpen(true); }}
+          style={[st.constructionBtn, { backgroundColor: constructionOn ? 'rgba(255,152,0,0.15)' : theme.bgPanel, borderColor: constructionOn ? '#FF9800' : theme.border }]}
+          onPress={handleToggleConstruction}
+          disabled={constructionLoading}
+        >
+          {constructionLoading
+            ? <ActivityIndicator size="small" color="#FF9800" />
+            : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textMuted} />
+          }
+        </Pressable>
+        {/* Scout FAB */}
+        <Animated.View
+          style={[st.scoutFab, {
+            opacity: panelY.interpolate({
+              inputRange: [SCREEN_H - SNAP_EXPANDED, SCREEN_H - SNAP_EXPANDED + 80],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
+            }),
+          }]}
+          pointerEvents={fullScreen ? 'auto' : 'box-none'}
+        >
+        <Pressable
+          style={st.scoutFabInner}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setScoutOpen(true); }}
+
         >
           <View style={st.scoutFabCircle}>
             <View style={{ width: 22, height: 22 }}>
@@ -774,6 +807,7 @@ export default function TripPlanner() {
           </View>
           <Text style={st.scoutFabLabel}>SCOUT</Text>
         </Pressable>
+        </Animated.View>
       </View>
 
       {/* Bottom sheet panel */}
@@ -1238,6 +1272,7 @@ const st = StyleSheet.create({
   fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fullScreenBtn: { position: 'absolute', top: 58, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  constructionBtn: { position: 'absolute', top: 106, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',
@@ -1299,6 +1334,7 @@ const st = StyleSheet.create({
   importMeta: { fontSize: 11, marginTop: 1 },
   emptyText: { fontSize: 13, textAlign: 'center', paddingVertical: 40 },
   scoutFab: { position: 'absolute', bottom: 90, right: 16, alignItems: 'center', zIndex: 10 },
+  scoutFabInner: { alignItems: 'center' },
   scoutFabCircle: {
     width: 52, height: 52, borderRadius: 26, backgroundColor: '#C62828',
     alignItems: 'center', justifyContent: 'center',

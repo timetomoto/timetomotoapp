@@ -16,7 +16,6 @@ import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage } fro
 import { codeMeta } from '../../lib/weather';
 import RideSettingsBlock, { type RideSettingsValues } from '../ride/RideSettingsBlock';
 import ScoutPanel from '../scout/ScoutPanel';
-import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +84,10 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
   const tripRouteGeojson = useTripPlannerStore((s) => s.tripRouteGeojson);
   const tripOrigin = useTripPlannerStore((s) => s.tripOrigin);
   const tripDest = useTripPlannerStore((s) => s.tripDestination);
+  const tripWeatherFetchedAt = useTripPlannerStore((s) => s.tripWeatherFetchedAt);
+  const tripWeatherHasConcern = useTripPlannerStore((s) => s.tripWeatherHasConcern);
+  const tripWeatherMsg = useTripPlannerStore((s) => s.tripWeatherMsg);
+  const tripWeatherPoints = useTripPlannerStore((s) => s.tripWeatherPoints);
   const hasRoute = !!tripRouteGeojson?.coordinates && tripRouteGeojson.coordinates.length > 1;
   const [scoutWeatherMsg, setScoutWeatherMsg] = useState<string | null>(null);
   const [scoutWeatherSeverity, setScoutWeatherSeverity] = useState<'green' | 'yellow' | 'red'>('green');
@@ -107,11 +110,37 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
   useEffect(() => {
     if (!visible || !hasRoute || scoutWeatherFetched.current) return;
     scoutWeatherFetched.current = true;
-    setScoutWeatherLoading(true);
 
+    // Check if trip planner already has fresh weather data (< 5 min)
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    const isFresh = tripWeatherFetchedAt && (Date.now() - tripWeatherFetchedAt < FIVE_MINUTES) && tripWeatherPoints.length > 0;
+
+    if (isFresh) {
+      // Derive severity from existing store data — skip fetch
+      if (!tripWeatherHasConcern) {
+        setScoutWeatherMsg("Weather looks good for today's ride.");
+        setScoutWeatherSeverity('green');
+      } else if (tripWeatherMsg?.toLowerCase().includes('severe') || tripWeatherMsg?.toLowerCase().includes('thunderstorm')) {
+        setScoutWeatherMsg('Severe weather on this route — review before riding.');
+        setScoutWeatherSeverity('red');
+      } else {
+        const concernPt = tripWeatherPoints.find((p) => p.rainChance > 30 || p.weatherCode >= 51);
+        const mileMark = concernPt ? Math.round(concernPt.distanceKm * 0.621371) : null;
+        setScoutWeatherMsg(
+          mileMark != null
+            ? `Rain possible around mile ${mileMark} — check details.`
+            : 'Rain possible along the route — check details.',
+        );
+        setScoutWeatherSeverity('yellow');
+      }
+      return;
+    }
+
+    // Stale or no data — fetch fresh
+    setScoutWeatherLoading(true);
     const timer = setTimeout(() => {
       setScoutWeatherLoading(false);
-      scoutWeatherFetched.current = false; // allow retry next open
+      scoutWeatherFetched.current = false;
     }, 5000);
 
     fetchRouteWeather(tripRouteGeojson.coordinates)
@@ -127,7 +156,6 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
           setScoutWeatherMsg('Severe weather on this route — review before riding.');
           setScoutWeatherSeverity('red');
         } else {
-          // Find approximate mile marker of concern
           const concernPt = wp.find((p) => p.rainChance > 30 || p.weatherCode >= 51);
           const mileMark = concernPt ? Math.round(concernPt.distanceKm * 0.621371) : null;
           setScoutWeatherMsg(
@@ -286,7 +314,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
                 ? { backgroundColor: 'rgba(255,152,0,0.10)', borderColor: 'rgba(255,152,0,0.3)' }
                 : { backgroundColor: 'rgba(198,40,40,0.10)', borderColor: 'rgba(198,40,40,0.3)' },
           ]}
-          onPress={() => { useScoutStore.getState().clearSession(); setScoutOpen(true); }}
+          onPress={() => setScoutOpen(true)}
         >
           <View style={{ width: 14, height: 14 }}>
             <View style={{

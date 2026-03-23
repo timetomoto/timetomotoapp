@@ -11,6 +11,7 @@ const ENDPOINT =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 const MAX_TOOL_ROUNDS = 3;
 const TIMEOUT_MS = 8000;
+const HISTORY_WINDOW = 10;
 
 // ── Gemini request / response shapes ────────────────────────────────────
 
@@ -63,8 +64,9 @@ export async function sendScoutMessage(
     // 1. Build system prompt
     const systemPrompt = buildScoutSystemPrompt(context);
 
-    // 2. Format conversation history as Gemini messages
-    const contents: GeminiContent[] = conversationHistory.map((msg) => ({
+    // 2. Format conversation history as Gemini messages (windowed)
+    const windowed = conversationHistory.slice(-HISTORY_WINDOW);
+    const contents: GeminiContent[] = windowed.map((msg) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: msg.content }],
     }));
@@ -80,18 +82,21 @@ export async function sendScoutMessage(
       const functionCalls = extractFunctionCalls(response);
       if (functionCalls.length === 0) break;
 
-      // Execute each tool call
-      const responseParts: GeminiPart[] = [];
-      for (const fc of functionCalls) {
-        toolsExecuted.push(fc.name);
-        const result = await executeScoutTool(fc.name, fc.args, context);
-        responseParts.push({
-          functionResponse: {
-            name: fc.name,
-            response: { content: result },
+      // Execute tool calls in parallel
+      functionCalls.forEach((fc) => toolsExecuted.push(fc.name));
+      const settled = await Promise.allSettled(
+        functionCalls.map((fc) => executeScoutTool(fc.name, fc.args, context)),
+      );
+      const responseParts: GeminiPart[] = functionCalls.map((fc, i) => ({
+        functionResponse: {
+          name: fc.name,
+          response: {
+            content: settled[i].status === 'fulfilled'
+              ? (settled[i] as PromiseFulfilledResult<string>).value
+              : `Tool "${fc.name}" failed: ${(settled[i] as PromiseRejectedResult).reason?.message ?? 'unknown error'}`,
           },
-        });
-      }
+        },
+      }));
 
       // Add model's function-call turn + our function-response turn
       const modelParts: GeminiPart[] = functionCalls.map((fc) => ({

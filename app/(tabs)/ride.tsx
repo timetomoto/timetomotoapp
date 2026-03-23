@@ -393,6 +393,17 @@ export default function RideScreen() {
   const [constructionOn, setConstructionOn] = useState(false);
   const [constructionLoading, setConstructionLoading] = useState(false);
   const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
+  const constructionGeoJSON = useMemo(() => {
+    const capped = constructionIncidents.slice(0, 50);
+    return {
+      type: 'FeatureCollection' as const,
+      features: capped.map((c) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+        properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
+      })),
+    };
+  }, [constructionIncidents]);
   const [selectedPlace,  setSelectedPlace]  = useState<PlaceDetail | null>(null);
 
   // Track last fetch center for overlay refresh on pan
@@ -1229,17 +1240,10 @@ export default function RideScreen() {
           )}
 
           {/* ── Construction incidents ── */}
-          {mapStyleReady && constructionOn && constructionIncidents.length > 0 && (
+          {mapStyleReady && constructionOn && constructionGeoJSON.features.length > 0 && (
             <ShapeSource
               id="construction-src"
-              shape={{
-                type: 'FeatureCollection',
-                features: constructionIncidents.map((c) => ({
-                  type: 'Feature' as const,
-                  geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
-                  properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
-                })),
-              }}
+              shape={constructionGeoJSON}
               onPress={(e) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;

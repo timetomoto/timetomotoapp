@@ -448,6 +448,7 @@ interface TripPlannerState {
   tripConditions: RoadCondition[];
   tripConditionsFetchedAt: number | null;
   tripSaved: boolean;
+  tripRoutePreference: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null;
 
   setTripOrigin: (v: TripLoc | null) => void;
   setTripDestination: (v: TripLoc | null) => void;
@@ -458,6 +459,7 @@ interface TripPlannerState {
   setTripWeather: (points: RouteWeatherPoint[], msg: string | null, hasConcern: boolean, checkpoints: number) => void;
   setTripConditions: (conditions: RoadCondition[]) => void;
   setTripSaved: (v: boolean) => void;
+  setTripRoutePreference: (v: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null) => void;
   clearTrip: () => void;
 }
 
@@ -485,6 +487,7 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   tripConditions: [],
   tripConditionsFetchedAt: null,
   tripSaved: false,
+  tripRoutePreference: null,
 
   setTripOrigin: (tripOrigin) => set({ tripOrigin }),
   setTripDestination: (tripDestination) => set({ tripDestination }),
@@ -498,6 +501,7 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   setTripConditions: (tripConditions) =>
     set({ tripConditions, tripConditionsFetchedAt: Date.now() }),
   setTripSaved: (tripSaved) => set({ tripSaved }),
+  setTripRoutePreference: (tripRoutePreference) => set({ tripRoutePreference }),
   clearTrip: () => set({
     tripOrigin: null,
     tripDestination: null,
@@ -515,6 +519,7 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
     tripConditions: [],
     tripConditionsFetchedAt: null,
     tripSaved: false,
+    tripRoutePreference: null,
   }),
 }));
 
