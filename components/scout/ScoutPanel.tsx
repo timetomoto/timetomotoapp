@@ -16,7 +16,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+// Lazy-loaded — expo-av requires a dev build (crashes Expo Go)
+let Audio: typeof import('expo-av').Audio | null = null;
+try { Audio = require('expo-av').Audio; } catch {}
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import {
@@ -168,7 +170,7 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
   // Voice input state
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'transcribing'>('idle');
   const [micPermDenied, setMicPermDenied] = useState(false);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [voiceToast, setVoiceToast] = useState<string | null>(null);
   const voiceToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -284,6 +286,7 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     if (voiceState === 'transcribing') return;
 
     // Request permission
+    if (!Audio) { showVoiceToast('Voice input not available'); return; }
     const { status } = await Audio.requestPermissionsAsync();
     if (status !== 'granted') {
       setMicPermDenied(true);
@@ -294,12 +297,12 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
     // Start recording
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await Audio.setAudioModeAsync({
+      await Audio!.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      const recording = new Audio!.Recording();
+      await recording.prepareToRecordAsync(Audio!.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
       recordingRef.current = recording;
       setVoiceState('listening');
@@ -318,7 +321,7 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      await Audio?.setAudioModeAsync({ allowsRecordingIOS: false });
 
       if (!uri) {
         showVoiceToast("Couldn't hear that — try again");
@@ -607,7 +610,7 @@ export default function ScoutPanel({ visible, onClose, initialMessage, onRouteUp
       {!atLimit && (
         <View style={[st.inputRow, { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
           {/* Mic button */}
-          {!micPermDenied && !isLoading && (
+          {Audio && !micPermDenied && !isLoading && (
             <Pressable
               style={st.micBtn}
               onPress={voiceState === 'listening' ? handleMicRelease : handleMicPress}
