@@ -31,9 +31,12 @@ interface Props {
   fuelLoading: boolean;
   foodOn: boolean;
   foodLoading: boolean;
+  constructionOn?: boolean;
+  constructionLoading?: boolean;
   onToggleWeather: () => void;
   onToggleFuel: () => void;
   onToggleFood: () => void;
+  onToggleConstruction?: () => void;
 }
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -56,6 +59,9 @@ export default function MapControlDrawer({
   onToggleWeather,
   onToggleFuel,
   onToggleFood,
+  constructionOn = false,
+  constructionLoading = false,
+  onToggleConstruction,
 }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -175,6 +181,27 @@ export default function MapControlDrawer({
                 />
               </View>
             </View>
+
+            {onToggleConstruction && (
+              <View style={[s.row, { borderBottomColor: theme.border }]}>
+                {constructionLoading ? (
+                  <ActivityIndicator size="small" color="#FF9800" />
+                ) : (
+                  <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textSecondary} />
+                )}
+                <Text style={[s.rowLabel, { color: constructionOn ? theme.textPrimary : theme.textSecondary }]}>Construction</Text>
+                <View style={s.rowRight}>
+                  <Switch
+                    value={constructionOn}
+                    onValueChange={onToggleConstruction}
+                    trackColor={{ false: theme.toggleTrackOff, true: '#FF9800' }}
+                    thumbColor={constructionOn ? theme.toggleThumbOn : theme.toggleThumbOff}
+                    ios_backgroundColor={theme.toggleTrackOff}
+                    disabled={constructionLoading}
+                  />
+                </View>
+              </View>
+            )}
           </ScrollView>
         </View>
       </View>

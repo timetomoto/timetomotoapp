@@ -234,46 +234,10 @@ async function fetchAllConditions(lat: number, lng: number): Promise<RoadConditi
 }
 
 // ---------------------------------------------------------------------------
-// Geocoding helpers (Mapbox)
+// Geocoding helpers — re-exported from shared module
 // ---------------------------------------------------------------------------
 
-export async function geocodeLocation(query: string, userLocation?: { lat: number; lng: number } | null): Promise<Array<{ name: string; lat: number; lng: number }>> {
-  const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-  if (!token || !query.trim()) return [];
-  const proxLng = userLocation?.lng ?? -97.7431;
-  const proxLat = userLocation?.lat ?? 30.2672;
-  const url =
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-    `?access_token=${token}&types=place,address,postcode&country=us&limit=5&proximity=${proxLng},${proxLat}`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.features ?? []).map((f: any) => ({
-      name: f.place_name ?? '',
-      lat: f.center[1],
-      lng: f.center[0],
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
-  if (!token) return 'Your location';
-  const url =
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
-    `?access_token=${token}&types=place`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return 'Your location';
-    const json = await res.json();
-    return json.features?.[0]?.place_name ?? 'Your location';
-  } catch {
-    return 'Your location';
-  }
-}
+export { geocodeLocation, reverseGeocode } from './geocode';
 
 // ---------------------------------------------------------------------------
 // Store

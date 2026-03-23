@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -8,11 +10,13 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSafetyStore, useGarageStore, bikeLabel } from '../../lib/store';
+import { useSafetyStore, useGarageStore, useTripPlannerStore, bikeLabel } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
 import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage } from '../../lib/routeWeather';
 import { codeMeta } from '../../lib/weather';
 import RideSettingsBlock, { type RideSettingsValues } from '../ride/RideSettingsBlock';
+import ScoutPanel from '../scout/ScoutPanel';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,6 +80,77 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
       .catch(() => setWeatherMsg(null))
       .finally(() => setWeatherLoading(false));
   }, [visible, lastKnownLocation]);
+
+  // Scout route weather badge
+  const tripRouteGeojson = useTripPlannerStore((s) => s.tripRouteGeojson);
+  const tripOrigin = useTripPlannerStore((s) => s.tripOrigin);
+  const tripDest = useTripPlannerStore((s) => s.tripDestination);
+  const hasRoute = !!tripRouteGeojson?.coordinates && tripRouteGeojson.coordinates.length > 1;
+  const [scoutWeatherMsg, setScoutWeatherMsg] = useState<string | null>(null);
+  const [scoutWeatherSeverity, setScoutWeatherSeverity] = useState<'green' | 'yellow' | 'red'>('green');
+  const [scoutWeatherLoading, setScoutWeatherLoading] = useState(false);
+  const [scoutOpen, setScoutOpen] = useState(false);
+  const scoutWeatherFetched = useRef(false);
+
+  // Shimmer animation for loading
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (scoutWeatherLoading) {
+      Animated.loop(
+        Animated.timing(shimmerAnim, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true }),
+      ).start();
+    } else {
+      shimmerAnim.setValue(0);
+    }
+  }, [scoutWeatherLoading]);
+
+  useEffect(() => {
+    if (!visible || !hasRoute || scoutWeatherFetched.current) return;
+    scoutWeatherFetched.current = true;
+    setScoutWeatherLoading(true);
+
+    const timer = setTimeout(() => {
+      setScoutWeatherLoading(false);
+      scoutWeatherFetched.current = false; // allow retry next open
+    }, 5000);
+
+    fetchRouteWeather(tripRouteGeojson.coordinates)
+      .then(({ points: wp, useCelsius }) => {
+        clearTimeout(timer);
+        if (wp.length === 0) { setScoutWeatherLoading(false); return; }
+        const concern = hasRouteWeatherConcern(wp, useCelsius);
+        const warning = getRouteWarningMessage(wp, useCelsius);
+        if (!concern) {
+          setScoutWeatherMsg("Weather looks good for today's ride.");
+          setScoutWeatherSeverity('green');
+        } else if (warning?.toLowerCase().includes('severe') || warning?.toLowerCase().includes('thunderstorm')) {
+          setScoutWeatherMsg('Severe weather on this route — review before riding.');
+          setScoutWeatherSeverity('red');
+        } else {
+          // Find approximate mile marker of concern
+          const concernPt = wp.find((p) => p.rainChance > 30 || p.weatherCode >= 51);
+          const mileMark = concernPt ? Math.round(concernPt.distanceKm * 0.621371) : null;
+          setScoutWeatherMsg(
+            mileMark != null
+              ? `Rain possible around mile ${mileMark} — check details.`
+              : 'Rain possible along the route — check details.',
+          );
+          setScoutWeatherSeverity('yellow');
+        }
+      })
+      .catch(() => setScoutWeatherMsg(null))
+      .finally(() => setScoutWeatherLoading(false));
+
+    return () => clearTimeout(timer);
+  }, [visible, hasRoute]);
+
+  // Reset on close
+  useEffect(() => {
+    if (!visible) {
+      scoutWeatherFetched.current = false;
+      setScoutWeatherMsg(null);
+    }
+  }, [visible]);
 
   const settingsRef = useRef<RideSettingsValues>({
     crashOn: false, crashOverride: false,
@@ -187,6 +262,59 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
         </View>
       )}
 
+      {/* ── Scout route weather badge ── */}
+      {hasRoute && scoutWeatherLoading && (
+        <Animated.View style={[
+          styles.scoutBadge,
+          { backgroundColor: theme.bgCard, borderColor: theme.border },
+          { opacity: shimmerAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.4, 1, 0.4] }) },
+        ]}>
+          <View style={{ width: 14, height: 14 }}>
+            <View style={{ position: 'absolute', width: 14, height: 14, borderRadius: 7, borderWidth: 1.2, borderColor: theme.textMuted }} />
+          </View>
+          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 0.5, color: theme.textMuted }}>SCOUT</Text>
+          <Text style={{ fontSize: 12, color: theme.textMuted, flex: 1 }}>Checking route weather…</Text>
+        </Animated.View>
+      )}
+      {hasRoute && !scoutWeatherLoading && scoutWeatherMsg && (
+        <Pressable
+          style={[
+            styles.scoutBadge,
+            scoutWeatherSeverity === 'green'
+              ? { backgroundColor: 'rgba(46,125,50,0.10)', borderColor: 'rgba(46,125,50,0.3)' }
+              : scoutWeatherSeverity === 'yellow'
+                ? { backgroundColor: 'rgba(255,152,0,0.10)', borderColor: 'rgba(255,152,0,0.3)' }
+                : { backgroundColor: 'rgba(198,40,40,0.10)', borderColor: 'rgba(198,40,40,0.3)' },
+          ]}
+          onPress={() => { useScoutStore.getState().clearSession(); setScoutOpen(true); }}
+        >
+          <View style={{ width: 14, height: 14 }}>
+            <View style={{
+              position: 'absolute', width: 14, height: 14, borderRadius: 7, borderWidth: 1.2,
+              borderColor: scoutWeatherSeverity === 'green' ? theme.green : scoutWeatherSeverity === 'yellow' ? theme.orange : theme.red,
+            }} />
+            <View style={{
+              position: 'absolute', left: 6, top: 2, width: 1.5, height: 4.5, borderRadius: 1,
+              backgroundColor: scoutWeatherSeverity === 'green' ? theme.green : scoutWeatherSeverity === 'yellow' ? theme.orange : theme.red,
+            }} />
+          </View>
+          <Text style={{
+            fontSize: 10, fontWeight: '700', letterSpacing: 0.5,
+            color: scoutWeatherSeverity === 'green' ? theme.green : scoutWeatherSeverity === 'yellow' ? theme.orange : theme.red,
+          }}>SCOUT</Text>
+          <Text style={{
+            fontSize: 12, flex: 1,
+            color: scoutWeatherSeverity === 'green' ? theme.green : scoutWeatherSeverity === 'yellow' ? theme.orange : theme.red,
+          }}>{scoutWeatherMsg}</Text>
+          <Feather name="chevron-right" size={14} color={theme.textMuted} />
+        </Pressable>
+      )}
+
+      {/* Scout Panel */}
+      <Modal visible={scoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setScoutOpen(false)}>
+        <ScoutPanel visible={scoutOpen} onClose={() => setScoutOpen(false)} initialMessage="Give me a detailed weather briefing for my route." />
+      </Modal>
+
       {/* ── Shared ride settings + contacts ── */}
       <RideSettingsBlock
         onChange={(v) => { settingsRef.current = v; }}
@@ -225,6 +353,17 @@ const styles = StyleSheet.create({
   emptyCard: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10 },
   emptyText: { fontSize: 11, lineHeight: 16 },
   weatherBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  scoutBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

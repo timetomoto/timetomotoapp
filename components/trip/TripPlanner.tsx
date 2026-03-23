@@ -22,7 +22,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import Mapbox, { Camera, LineLayer, MapView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+import Mapbox, { Camera, CircleLayer, LineLayer, MapView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -39,6 +39,8 @@ import { codeMeta } from '../../lib/weather';
 import { fetchHEREConditions, type RoadCondition } from '../../lib/discoverStore';
 import { darkTheme } from '../../lib/theme';
 import type { Route } from '../../lib/routes';
+import ScoutPanel from '../scout/ScoutPanel';
+import { useScoutStore } from '../../lib/scoutStore';
 
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 const { height: SCREEN_H } = Dimensions.get('window');
@@ -177,6 +179,17 @@ export default function TripPlanner() {
   // Date picker UI
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Scout
+  const [scoutOpen, setScoutOpen] = useState(false);
+
+  // Full-screen map mode
+  const [fullScreen, setFullScreen] = useState(false);
+
+  // Construction layer
+  const [constructionOn, setConstructionOn] = useState(false);
+  const [constructionLoading, setConstructionLoading] = useState(false);
+  const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
+
   // Stale TTLs
   const WEATHER_TTL = 30 * 60 * 1000;
   const ROAD_TTL = 15 * 60 * 1000;
@@ -205,6 +218,49 @@ export default function TripPlanner() {
     const lngs = coords.map((c: number[]) => c[0]);
     // Bottom padding accounts for the collapsed panel covering the lower portion
     cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, SNAP_COLLAPSED * 0.7, 40], 600);
+  }
+
+  function enterFullScreen() {
+    if (scoutOpen) setScoutOpen(false);
+    setFullScreen(true);
+    Animated.spring(panelY, { toValue: SCREEN_H + 100, useNativeDriver: false, tension: 80, friction: 14 }).start();
+  }
+
+  function exitFullScreen() {
+    setFullScreen(false);
+    Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+  }
+
+  async function handleToggleConstruction() {
+    if (constructionOn) {
+      setConstructionOn(false);
+      setConstructionIncidents([]);
+      return;
+    }
+    setConstructionLoading(true);
+    setConstructionOn(true);
+    try {
+      // Get center from route midpoint or fallback to Austin
+      const geojson = routeGeojsonRef.current;
+      let lat = AUSTIN[1];
+      let lng = AUSTIN[0];
+      if (geojson?.coordinates?.length > 1) {
+        const mid = geojson.coordinates[Math.floor(geojson.coordinates.length / 2)];
+        lng = mid[0]; lat = mid[1];
+      } else if (origin) {
+        lat = origin.lat; lng = origin.lng;
+      }
+      const conds = await fetchHEREConditions(lat, lng);
+      setConstructionIncidents(
+        conds
+          .filter((r) => r.type === 'construction')
+          .map((r) => ({ id: r.id, title: r.title, description: r.description, lat: r.lat, lng: r.lng, severity: r.severity })),
+      );
+    } catch {
+      setConstructionOn(false);
+    } finally {
+      setConstructionLoading(false);
+    }
   }
 
   const [toastMsg, setToastMsg] = useState('');
@@ -636,6 +692,30 @@ export default function TripPlanner() {
             </PointAnnotation>
           ))}
           {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
+          {/* Construction layer */}
+          {mapStyleReady && constructionOn && constructionIncidents.length > 0 && (
+            <ShapeSource
+              id="tp-construction-src"
+              shape={{
+                type: 'FeatureCollection',
+                features: constructionIncidents.map((c) => ({
+                  type: 'Feature' as const,
+                  geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+                  properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
+                })),
+              }}
+              onPress={(e) => {
+                const props = e.features?.[0]?.properties;
+                if (!props) return;
+                Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);
+              }}
+            >
+              <CircleLayer
+                id="tp-construction-dots"
+                style={{ circleColor: '#FF9800', circleRadius: 7, circleStrokeColor: '#000', circleStrokeWidth: 1.5 }}
+              />
+            </ShapeSource>
+          )}
         </MapView>
         {routeLoading && <View style={st.mapOverlay}><ActivityIndicator size="small" color="#FFFFFF" /></View>}
         {/* Fit route button */}
@@ -668,6 +748,31 @@ export default function TripPlanner() {
           }}
         >
           <Feather name="layers" size={18} color={theme.textPrimary} />
+        </Pressable>
+        {/* Full-screen toggle */}
+        <Pressable
+          style={[st.fullScreenBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          onPress={fullScreen ? exitFullScreen : enterFullScreen}
+        >
+          <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={theme.textPrimary} />
+        </Pressable>
+        {/* Scout FAB */}
+        <Pressable
+          style={st.scoutFab}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); useScoutStore.getState().clearSession(); setScoutOpen(true); }}
+        >
+          <View style={st.scoutFabCircle}>
+            <View style={{ width: 22, height: 22 }}>
+              <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
+              <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
+              <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+              <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+              <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+            </View>
+            {/* Weather alert dot */}
+            {weatherHasConcern && <View style={st.scoutAlertDot} />}
+          </View>
+          <Text style={st.scoutFabLabel}>SCOUT</Text>
         </Pressable>
       </View>
 
@@ -1110,6 +1215,11 @@ export default function TripPlanner() {
         </View>
       </Modal>
 
+      {/* Scout Panel */}
+      <Modal visible={scoutOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setScoutOpen(false)}>
+        <ScoutPanel visible={scoutOpen} onClose={() => setScoutOpen(false)} onRouteUpdated={() => showToast('Scout updated your route')} />
+      </Modal>
+
       {/* Toast */}
       {!!toastMsg && (
         <View style={[st.toast, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
@@ -1127,6 +1237,7 @@ const st = StyleSheet.create({
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fullScreenBtn: { position: 'absolute', top: 58, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',
@@ -1187,6 +1298,14 @@ const st = StyleSheet.create({
   importName: { fontSize: 14, fontWeight: '600' },
   importMeta: { fontSize: 11, marginTop: 1 },
   emptyText: { fontSize: 13, textAlign: 'center', paddingVertical: 40 },
+  scoutFab: { position: 'absolute', bottom: 90, right: 16, alignItems: 'center', zIndex: 10 },
+  scoutFabCircle: {
+    width: 52, height: 52, borderRadius: 26, backgroundColor: '#C62828',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8,
+  },
+  scoutFabLabel: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1, marginTop: 3 },
+  scoutAlertDot: { position: 'absolute', top: 2, right: 2, width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF9800', borderWidth: 1.5, borderColor: '#C62828' },
   toast: { position: 'absolute', bottom: 140, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 14 },
   toastText: { fontSize: 13, fontWeight: '600' },
   flexOne: { flex: 1 },

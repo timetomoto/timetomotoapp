@@ -58,6 +58,7 @@ import SearchSheet from '../../components/ride/SearchSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
 import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type RouteWeatherPoint } from '../../lib/routeWeather';
+import { fetchHEREConditions } from '../../lib/discoverStore';
 import StatsBar from '../../components/ride/StatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
@@ -389,6 +390,9 @@ export default function RideScreen() {
   const [foodPlaces,     setFoodPlaces]     = useState<FoodPlace[]>([]);
   const [foodLoading,    setFoodLoading]    = useState(false);
   const [weatherOn,      setWeatherOn]      = useState(false);
+  const [constructionOn, setConstructionOn] = useState(false);
+  const [constructionLoading, setConstructionLoading] = useState(false);
+  const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
   const [selectedPlace,  setSelectedPlace]  = useState<PlaceDetail | null>(null);
 
   // Track last fetch center for overlay refresh on pan
@@ -481,6 +485,29 @@ export default function RideScreen() {
       foodOnRef.current = false;
     } finally {
       setFoodLoading(false);
+    }
+  }
+
+  async function handleToggleConstruction() {
+    if (constructionOn) {
+      setConstructionOn(false);
+      setConstructionIncidents([]);
+      return;
+    }
+    setConstructionLoading(true);
+    setConstructionOn(true);
+    try {
+      const c = await getMapCenter();
+      const conds = await fetchHEREConditions(c.lat, c.lng);
+      setConstructionIncidents(
+        conds
+          .filter((r) => r.type === 'construction')
+          .map((r) => ({ id: r.id, title: r.title, description: r.description, lat: r.lat, lng: r.lng, severity: r.severity })),
+      );
+    } catch {
+      setConstructionOn(false);
+    } finally {
+      setConstructionLoading(false);
     }
   }
 
@@ -1201,6 +1228,36 @@ export default function RideScreen() {
             </ShapeSource>
           )}
 
+          {/* ── Construction incidents ── */}
+          {mapStyleReady && constructionOn && constructionIncidents.length > 0 && (
+            <ShapeSource
+              id="construction-src"
+              shape={{
+                type: 'FeatureCollection',
+                features: constructionIncidents.map((c) => ({
+                  type: 'Feature' as const,
+                  geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+                  properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
+                })),
+              }}
+              onPress={(e) => {
+                const props = e.features?.[0]?.properties;
+                if (!props) return;
+                Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);
+              }}
+            >
+              <CircleLayer
+                id="construction-dots"
+                style={{
+                  circleColor: '#FF9800',
+                  circleRadius: 7,
+                  circleStrokeColor: '#000',
+                  circleStrokeWidth: 1.5,
+                }}
+              />
+            </ShapeSource>
+          )}
+
           {/* ── Saved / imported route overlay ── */}
           {mapStyleReady && overlayGeoJson && (
             <ShapeSource id="overlay-route" shape={overlayGeoJson}>
@@ -1669,7 +1726,9 @@ export default function RideScreen() {
         onToggleWeather={() => setWeatherOn((v) => !v)}
         onToggleFuel={handleToggleFuelStations}
         onToggleFood={handleToggleFood}
-
+        constructionOn={constructionOn}
+        constructionLoading={constructionLoading}
+        onToggleConstruction={handleToggleConstruction}
       />
 
       {/* ── Search Sheet ── */}
