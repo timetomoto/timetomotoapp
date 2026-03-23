@@ -267,14 +267,14 @@ export default function TripPlanner() {
     placingTimeoutRef.current = setTimeout(() => { userIsPlacingPoints.current = false; }, 2000);
   }
 
-  function fitRoute() {
+  function fitRoute(isFullScreenMode?: boolean) {
     const geojson = routeGeojsonRef.current;
     if (!geojson?.coordinates || geojson.coordinates.length < 2) return;
     const coords = geojson.coordinates;
     const lats = coords.map((c: number[]) => c[1]);
     const lngs = coords.map((c: number[]) => c[0]);
-    // Bottom padding accounts for the collapsed panel covering the lower portion
-    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, SNAP_COLLAPSED * 0.7, 40], 600);
+    const bottomPad = (isFullScreenMode ?? fullScreen) ? 80 : SNAP_COLLAPSED * 0.7;
+    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, bottomPad, 40], 600);
   }
 
   /** Poll for route geometry then fit — used after Scout closes */
@@ -295,11 +295,13 @@ export default function TripPlanner() {
     if (isScoutOpen) useScoutStore.getState().closeScout();
     setFullScreen(true);
     Animated.spring(panelY, { toValue: SCREEN_H + 100, useNativeDriver: false, tension: 80, friction: 14 }).start();
+    setTimeout(() => fitRoute(true), 400);
   }
 
   function exitFullScreen() {
     setFullScreen(false);
     Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+    setTimeout(() => fitRoute(false), 400);
   }
 
   async function handleToggleConstruction() {
@@ -794,7 +796,7 @@ export default function TripPlanner() {
         {routeLoading && <View style={st.mapOverlay}><ActivityIndicator size="small" color="#FFFFFF" /></View>}
         {/* Fit route button */}
         {routeGeojson && (
-          <Pressable style={[st.fitRouteBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]} onPress={fitRoute}>
+          <Pressable style={[st.fitRouteBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]} onPress={() => fitRoute()}>
             <Text style={[st.fitRouteBtnText, { color: theme.textMuted }]}>FIT ROUTE</Text>
           </Pressable>
         )}

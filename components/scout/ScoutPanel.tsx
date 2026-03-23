@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -328,42 +327,104 @@ export default function ScoutPanel() {
     }
   }, [input, isLoading, messages.length, addMessage, setLoading, setError, buildContext]);
 
-  // ── Suggested prompts ──────────────────────────────────────────────────
 
-  const getSuggestedPrompts = useCallback((): string[] => {
-    const hasOrigin = !!tripStore.tripOrigin;
-    const hasDest = !!tripStore.tripDestination;
-    const hasRoute = !!tripStore.tripRouteGeojson;
-    const bikeLabel = activeBike?.nickname ?? activeBike?.model ?? 'my bike';
+  // ── Welcome message (display-only, not stored) ─────────────────────────
 
-    if (!hasOrigin && !hasDest) {
-      return [
-        'Plan a loop from here',
-        `Ask about my ${bikeLabel}`,
-        'Plan a back roads trip',
-        'Ride to my favorites',
-      ];
-    }
-    if (hasRoute && tripStore.tripCustomDate) {
-      return [
-        'Try a different road',
-        'Check road conditions',
-        'What time should I leave?',
-        'Save this route',
-      ];
-    }
-    return [
-      'Check weather for this Saturday',
-      'Check weather tomorrow morning',
-      'Add a fuel stop',
-      'Avoid highways',
-      'Make it a loop',
-    ];
-  }, [tripStore, activeBike]);
+  const bikeLabel = activeBike?.nickname ?? (activeBike ? [activeBike.year, activeBike.make, activeBike.model].filter(Boolean).join(' ') : null) ?? 'my bike';
+
+  const welcomeExamples = [
+    'Plan a 2-hour loop from here on back roads',
+    'Check weather for my route this Saturday',
+    `What oil does ${bikeLabel} take?`,
+    'Add a fuel stop halfway through my trip',
+  ];
+
+  const WelcomeMessage = () => (
+    <View style={[st.bubbleRow, st.bubbleRowLeft, { maxWidth: '92%' }]}>
+      <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+        <CompassIcon size={12} color={theme.red} />
+      </View>
+      <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
+        <Text style={[st.bubbleText, { color: theme.textPrimary }]}>
+          {'Hey! I\'m Scout — your riding assistant. I can help you:\n\n'}
+          {'• Plan routes and trips from anywhere\n'}
+          {'• Check weather and road conditions along your route\n'}
+          {'• Answer questions about your bike — specs, maintenance, service intervals\n'}
+          {'• Add stops, avoid roads, adjust your route on the fly\n\n'}
+          {'Try asking me:'}
+        </Text>
+        <View style={{ marginTop: 8, gap: 6 }}>
+          {welcomeExamples.map((ex, i) => (
+            <Pressable
+              key={i}
+              style={[st.promptChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+              onPress={() => handleSend(ex)}
+            >
+              <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{ex}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={[st.bubbleText, { color: theme.textPrimary, marginTop: 10 }]}>
+          What are we riding today?
+        </Text>
+      </View>
+    </View>
+  );
 
   // ── Render (always mounted, display toggled) ───────────────────────────
 
   const atLimit = messages.length >= MAX_MESSAGES_PER_SESSION;
+
+  // Screen link map for tappable navigation in messages
+  const screenLinks: Array<{ pattern: RegExp; route: string }> = [
+    { pattern: /Trip Planner/g, route: '/(tabs)/trip' },
+    { pattern: /Garage/g, route: '/(tabs)/garage' },
+    { pattern: /Ride screen/g, route: '/(tabs)/ride' },
+  ];
+
+  /** Parse message text and replace screen names with tappable links */
+  const renderLinkedText = (text: string, textColor: string) => {
+    // Build a combined regex
+    const combined = /(Trip Planner|Garage|Ride screen)/g;
+    const parts: Array<{ text: string; link?: string }> = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = combined.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({ text: text.slice(lastIndex, match.index) });
+      }
+      const route = screenLinks.find((l) => l.pattern.test(match![0]))?.route;
+      parts.push({ text: match[0], link: route });
+      // Reset the per-link pattern lastIndex
+      screenLinks.forEach((l) => { l.pattern.lastIndex = 0; });
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+      parts.push({ text: text.slice(lastIndex) });
+    }
+
+    if (parts.length <= 1 && !parts[0]?.link) {
+      return <Text style={[st.bubbleText, { color: textColor }]}>{text}</Text>;
+    }
+
+    return (
+      <Text style={[st.bubbleText, { color: textColor }]}>
+        {parts.map((p, i) =>
+          p.link ? (
+            <Text
+              key={i}
+              style={{ textDecorationLine: 'underline', color: theme.red }}
+              onPress={() => { closeScout(); router.navigate(p.link as any); }}
+            >
+              {p.text}
+            </Text>
+          ) : (
+            <Text key={i}>{p.text}</Text>
+          ),
+        )}
+      </Text>
+    );
+  };
 
   const renderMessage = ({ item }: { item: ScoutMessage }) => {
     const isUser = item.role === 'user';
@@ -380,12 +441,10 @@ export default function ScoutPanel() {
             ? { backgroundColor: theme.red, borderBottomRightRadius: 4 }
             : { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 },
         ]}>
-          <Text style={[
-            st.bubbleText,
-            { color: isUser ? theme.white : theme.textPrimary },
-          ]}>
-            {item.content}
-          </Text>
+          {isUser
+            ? <Text style={[st.bubbleText, { color: theme.white }]}>{item.content}</Text>
+            : renderLinkedText(item.content, theme.textPrimary)
+          }
         </View>
       </View>
     );
@@ -399,6 +458,11 @@ export default function ScoutPanel() {
       style={[StyleSheet.absoluteFillObject, { display: isScoutOpen ? 'flex' : 'none', zIndex: 100 }]}
       pointerEvents={isScoutOpen ? 'auto' : 'none'}
     >
+      {/* Tap backdrop to close */}
+      <Pressable
+        style={{ height: insets.top + 60 }}
+        onPress={closeScout}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={[st.container, { backgroundColor: theme.bgPanel }]}
@@ -450,22 +514,7 @@ export default function ScoutPanel() {
               renderItem={renderMessage}
               contentContainerStyle={[st.messageList, { paddingBottom: 8 }]}
               ListHeaderComponent={
-                messages.length === 0 ? (
-                  <View style={st.promptsWrap}>
-                    <Text style={[st.promptsLabel, { color: theme.textMuted }]}>SUGGESTIONS</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.promptsScroll}>
-                      {getSuggestedPrompts().map((p, i) => (
-                        <Pressable
-                          key={i}
-                          style={[st.promptChip, { backgroundColor: theme.bgCard, borderColor: theme.border }]}
-                          onPress={() => handleSend(p)}
-                        >
-                          <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{p}</Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : null
+                messages.length === 0 ? <WelcomeMessage /> : null
               }
               ListFooterComponent={
                 isLoading ? (
@@ -587,10 +636,7 @@ const st = StyleSheet.create({
   },
   bubbleText: { fontSize: 14, lineHeight: 20 },
 
-  // Suggestions
-  promptsWrap: { paddingTop: 20, paddingBottom: 8 },
-  promptsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, paddingHorizontal: 4, marginBottom: 10 },
-  promptsScroll: { gap: 8, paddingHorizontal: 4 },
+  // Prompt chips (used in welcome message)
   promptChip: {
     borderWidth: 1, borderRadius: 16,
     paddingHorizontal: 14, paddingVertical: 8,

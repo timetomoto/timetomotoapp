@@ -26,32 +26,31 @@ export default function FloatingTabBar() {
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
-      <View style={s.row}>
-        {/* Scout FAB */}
-        {!isScoutOpen && (
-          <Pressable
-            style={s.scoutFab}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              openScout();
-            }}
-          >
-            <View style={[s.scoutCircle, { backgroundColor: theme.red }]}>
-              <View style={{ width: 22, height: 22 }}>
-                <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
-                <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
-                <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-                <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-                <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-              </View>
-              {weatherHasConcern && <View style={s.alertDot} />}
+      {/* Scout FAB — positioned absolutely so pill stays centered */}
+      {!isScoutOpen && (
+        <Pressable
+          style={s.scoutFab}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            openScout();
+          }}
+        >
+          <View style={[s.scoutCircle, { backgroundColor: theme.red }]}>
+            <View style={{ width: 22, height: 22 }}>
+              <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
+              <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
+              <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+              <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+              <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
             </View>
-            <Text style={s.scoutLabel}>SCOUT</Text>
-          </Pressable>
-        )}
+            {weatherHasConcern && <View style={s.alertDot} />}
+          </View>
+          <Text style={s.scoutLabel}>SCOUT</Text>
+        </Pressable>
+      )}
 
-        {/* Tab pill */}
-        <View style={[s.pill, { backgroundColor: theme.bgCard }, theme.bg === darkTheme.bg && { borderWidth: 1, borderColor: '#000000' }]}>
+      {/* Tab pill — centered */}
+      <View style={[s.pill, { backgroundColor: theme.bgCard }, theme.bg === darkTheme.bg && { borderWidth: 1, borderColor: '#000000' }]}>
           {TABS.map((tab) => {
             const isActive = pathname.includes(tab.name);
             const color = isActive ? theme.red : theme.textMuted;
@@ -76,7 +75,6 @@ export default function FloatingTabBar() {
             );
           })}
         </View>
-      </View>
     </View>
   );
 }
@@ -87,11 +85,6 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
   },
   pill: {
     flexDirection: 'row',
@@ -120,10 +113,11 @@ const s = StyleSheet.create({
 
   // Scout FAB
   scoutFab: {
+    position: 'absolute',
+    left: 12,
+    bottom: 20,
     alignItems: 'center',
     gap: 3,
-    marginTop: 5,
-    marginLeft: -20,
   },
   scoutCircle: {
     width: 44,

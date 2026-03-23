@@ -228,11 +228,12 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'ask_garage',
     description:
-      'Retrieve structured bike context (specs, maintenance logs, service intervals, recall count) so Scout can answer a garage question.',
+      'Retrieve structured bike context (specs, maintenance logs, service intervals) so Scout can answer a garage question. Can query any bike in the garage by nickname or model — defaults to the active bike if not specified.',
     parameters: {
       type: 'object',
       properties: {
         question: { type: 'string', description: 'The garage-related question the rider asked.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike to query. Omit to use the active bike.' },
       },
       required: ['question'],
     },
@@ -621,22 +622,47 @@ export async function executeScoutTool(
 
       // ── Garage ──────────────────────────────────────────────────────
       case 'ask_garage': {
-        const bike = context.activeBike;
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        let isActive = true;
+
+        // If a specific bike was requested, look it up
+        if (bikeName) {
+          const query = bikeName.toLowerCase();
+          const allBikes = garageStore.bikes;
+          const match = allBikes.find(
+            (b) =>
+              b.nickname?.toLowerCase().includes(query) ||
+              b.model?.toLowerCase().includes(query) ||
+              b.make?.toLowerCase().includes(query),
+          );
+          if (match) {
+            bike = match;
+            isActive = match.id === (context.activeBike?.id ?? null);
+          } else {
+            return `No bike matching "${bikeName}" found in your garage.`;
+          }
+        }
+
         if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
         const specs = bike.specs ?? {};
-        const maintenance = context.recentMaintenanceLogs.slice(0, 10);
-        const intervals = context.serviceIntervals;
         const parts: string[] = [];
-        parts.push(`Bike: ${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}${bike.nickname ? ` "${bike.nickname}"` : ''}`);
+        const label = `${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}${bike.nickname ? ` "${bike.nickname}"` : ''}`;
+        parts.push(`Bike: ${label}${isActive ? ' (active)' : ' (not active)'}`);
         if (bike.odometer) parts.push(`Odometer: ${bike.odometer.toLocaleString()} mi`);
         if (Object.keys(specs).length > 0) parts.push(`Specs: ${JSON.stringify(specs)}`);
-        if (maintenance.length > 0) {
-          const mList = maintenance
-            .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`)
-            .join('; ');
-          parts.push(`Recent maintenance: ${mList}`);
+        // Only include maintenance/intervals for the active bike (they're loaded per-bike)
+        if (isActive) {
+          const maintenance = context.recentMaintenanceLogs.slice(0, 10);
+          if (maintenance.length > 0) {
+            const mList = maintenance
+              .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`)
+              .join('; ');
+            parts.push(`Recent maintenance: ${mList}`);
+          }
+          const intervals = context.serviceIntervals;
+          if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
         }
-        if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
         parts.push(`Question: ${parameters.question}`);
         return parts.join('\n');
       }

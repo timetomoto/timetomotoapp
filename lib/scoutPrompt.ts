@@ -158,7 +158,7 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- get_road_conditions: Fetch construction, closures, and hazards along the route.\n` +
     `- get_route_eta_check: Check if the rider can make it by a deadline.\n` +
     `Garage:\n` +
-    `- ask_garage: Answer questions about bike specs, maintenance, or service intervals.\n` +
+    `- ask_garage: Answer questions about any bike's specs, maintenance, or service intervals. Pass bike_name to query a specific bike, or omit for the active bike.\n` +
     `- set_active_bike: Switch the active bike by nickname or model name.\n` +
     `Saving:\n` +
     `- save_current_route: Save the current route to My Routes.\n` +
