@@ -51,7 +51,7 @@ export default function PlanScreen() {
               <Feather name="x" size={20} color={theme.textMuted} />
             </Pressable>
           </View>
-          <DiscoverRoutes />
+          <DiscoverRoutes onDismiss={() => setRoutesModalOpen(false)} />
         </View>
       </Modal>
 

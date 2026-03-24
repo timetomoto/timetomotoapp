@@ -189,6 +189,7 @@ export default function SearchSheet({ visible, onClose, onSelectDestination, ini
 
       <ScrollView
         style={styles.list}
+        contentContainerStyle={{ paddingBottom: 100 }}
         keyboardShouldPersistTaps="always"
         showsVerticalScrollIndicator={false}
       >

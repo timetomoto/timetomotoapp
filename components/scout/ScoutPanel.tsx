@@ -5,7 +5,6 @@ import {
   Easing,
   FlatList,
   KeyboardAvoidingView,
-  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -28,6 +27,7 @@ import {
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
 import { useActiveBike } from '../../lib/useActiveBike';
+import SlideUpWrapper from '../ui/SlideUpWrapper';
 import { loadFavorites } from '../../lib/favorites';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
@@ -141,19 +141,15 @@ function relativeTime(date: Date): string {
 /** Outer shell — only reads isScoutOpen to avoid re-renders when hidden */
 export default function ScoutPanel() {
   const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const closeScout = useScoutStore((s) => s.closeScout);
+  const insets = useSafeAreaInsets();
 
   return (
-    <View
-      style={[StyleSheet.absoluteFillObject, { display: isScoutOpen ? 'flex' : 'none', zIndex: 100 }]}
-      pointerEvents={isScoutOpen ? 'auto' : 'none'}
-    >
-      {/* Tap backdrop to close */}
-      <Pressable style={{ height: insets.top + 60 }} onPress={closeScout} />
+    <SlideUpWrapper visible={isScoutOpen} onClose={closeScout} bottomOffset={0}>
+      {/* Top spacer so panel starts below status bar */}
+      <View style={{ height: insets.top + 60 }} />
       {isScoutOpen && <ScoutPanelContent />}
-    </View>
+    </SlideUpWrapper>
   );
 }
 
@@ -516,24 +512,13 @@ function ScoutPanelContent() {
   // No bikes empty state
   const noBikes = bikes.length === 0;
 
-  // Swipe-down to close
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => g.dy > 10,
-      onPanResponderRelease: (_, g) => {
-        if (g.dy > 50) closeScout();
-      },
-    }),
-  ).current;
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[st.container, { backgroundColor: theme.bgPanel }]}
     >
-        {/* Drag handle — swipe down to close */}
-        <View {...panResponder.panHandlers} style={st.dragHandleWrap}>
+        {/* Drag handle */}
+        <View style={st.dragHandleWrap}>
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 

@@ -97,7 +97,7 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-        <View style={[fm.sheet, { flex: 1, backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+        <View style={[fm.sheet, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
           <View style={[fm.handle, { backgroundColor: theme.border }]} />
           <View style={fm.header}>
             <View style={{ width: 20 }} />
@@ -291,7 +291,7 @@ export default function ModificationsSection({ bikeId, userId, onCountChange }: 
 
 const fm = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40 },
+  sheet: { flex: 1, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   heading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },

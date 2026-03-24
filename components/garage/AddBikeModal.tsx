@@ -524,12 +524,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleClose}>
       <View style={[styles.sheet, { backgroundColor: theme.bgPanel, paddingBottom: insets.bottom + 16 }]}>
         {/* Drag handle */}
         <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
@@ -548,7 +543,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
           >
             {/* Photo section — only show in edit mode */}
             {isEdit && (

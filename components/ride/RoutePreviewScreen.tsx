@@ -210,12 +210,7 @@ export default function RoutePreviewScreen({
   const displayMeta = selectedRoute ? formatRouteMeta(selectedRoute.distanceMiles, selectedRoute.durationSeconds) : '';
 
   return (
-    <Modal
-      visible
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onCancel}
-    >
+    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
       <View style={[st.root, { backgroundColor: theme.bgPanel }]}>
         <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
         {/* Header */}

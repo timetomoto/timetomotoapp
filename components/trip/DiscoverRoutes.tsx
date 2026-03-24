@@ -9,7 +9,7 @@ import { parseGpx, calcDistance, calcElevationGain } from '../../lib/gpx';
 import { useNavigationStore } from '../../lib/navigationStore';
 import RouteList from '../routes/RouteList';
 
-export default function DiscoverRoutes() {
+export default function DiscoverRoutes({ onDismiss }: { onDismiss?: () => void } = {}) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuthStore();
   const { setRoutes, setLoading, setPendingNavigateRoute } = useRoutesStore();
@@ -47,8 +47,11 @@ export default function DiscoverRoutes() {
       );
       return;
     }
-    setPendingNavigateRoute(route);
-    router.navigate('/(tabs)/ride');
+    onDismiss?.();
+    setTimeout(() => {
+      setPendingNavigateRoute(route);
+      router.navigate('/(tabs)/ride');
+    }, 100);
   }
 
   async function handleImport() {
@@ -82,6 +85,7 @@ export default function DiscoverRoutes() {
 
   function handleViewInPlanner(route: Route) {
     if (route.points.length < 2) return;
+    onDismiss?.();
     const tripStore = useTripPlannerStore.getState();
     const pts = route.points;
     const first = pts[0];

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Dimensions,
   Easing,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import SlideUpWrapper from '../ui/SlideUpWrapper';
 import { Feather } from '@expo/vector-icons';
 import { useSafetyStore, useGarageStore, useTripPlannerStore, bikeLabel } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
@@ -206,12 +207,8 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <SlideUpWrapper visible={visible} onClose={onClose}>
+      <View style={styles.rootOuter}>
       <View style={[styles.root, { backgroundColor: theme.bg }]}>
         {/* Drag handle */}
         <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
@@ -357,7 +354,8 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
       </Pressable>
     </ScrollView>
       </View>
-    </Modal>
+      </View>
+    </SlideUpWrapper>
   );
 }
 
@@ -365,12 +363,15 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
 // Styles
 // ---------------------------------------------------------------------------
 
+const SCREEN_H = Dimensions.get('window').height;
+
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  rootOuter: { flex: 1, justifyContent: 'flex-end' },
+  root: { height: SCREEN_H * 0.95, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
   dragHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
-  content: { padding: 14, paddingBottom: 20 },
+  content: { padding: 14, paddingBottom: 124 },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 20 },
   bikeChipRow: { marginBottom: 10 },
   bikeChipContent: { gap: 8, paddingHorizontal: 2 },
