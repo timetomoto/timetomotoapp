@@ -87,3 +87,30 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
     return 'Unknown location';
   }
 }
+
+/**
+ * Reverse geocode to a street address (more detailed than reverseGeocode).
+ * Returns full address if available, falls back to place name, then coordinates.
+ */
+export async function reverseGeocodeAddress(lat: number, lng: number): Promise<string> {
+  const token = process.env.EXPO_PUBLIC_MAPBOX_TOKEN;
+  if (!token) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+  const cacheKey = `addr_${lat.toFixed(4)},${lng.toFixed(4)}`;
+  const cached = reverseCache.get(cacheKey);
+  if (cached) return cached;
+
+  const url =
+    `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
+    `?access_token=${token}&types=address,poi,place&limit=1`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    const json = await res.json();
+    const name = json.features?.[0]?.place_name ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    cacheSet(reverseCache, cacheKey, name);
+    return name;
+  } catch {
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  }
+}

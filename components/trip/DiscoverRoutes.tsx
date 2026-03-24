@@ -101,7 +101,7 @@ export default function DiscoverRoutes() {
         const idx = Math.round(step * i);
         if (idx > 0 && idx < pts.length - 1) {
           const p = pts[idx];
-          waypoints.push({ name: `WP ${i}`, lat: p.lat, lng: p.lng });
+          waypoints.push({ name: `Waypoint ${i}`, lat: p.lat, lng: p.lng });
         }
       }
     }

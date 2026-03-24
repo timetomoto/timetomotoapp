@@ -33,6 +33,7 @@ import { useAuthStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTrip
 import { useNavigationStore } from '../../lib/navigationStore';
 import { loadFavorites, type FavoriteLocation } from '../../lib/favorites';
 import { fetchDirections } from '../../lib/directions';
+import { reverseGeocodeAddress } from '../../lib/geocode';
 import { createRoute, fetchUserRoutes, seedRoutes } from '../../lib/routes';
 import { serializeGpx } from '../../lib/gpx';
 import { fetchRouteWeather, hasRouteWeatherConcern, getRouteWarningMessage, haversineKm, sampleRouteCoordinates, type RouteWeatherPoint } from '../../lib/routeWeather';
@@ -269,6 +270,38 @@ export default function TripPlanner() {
       })),
     };
   }, [constructionIncidents]);
+
+  // Reverse geocoded addresses for panel display
+  const [addressCache, setAddressCache] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const allPoints = [
+      ...(origin ? [{ key: `o_${origin.lat}_${origin.lng}`, lat: origin.lat, lng: origin.lng }] : []),
+      ...waypoints.map((w, i) => ({ key: `w${i}_${w.lat}_${w.lng}`, lat: w.lat, lng: w.lng })),
+      ...(destination ? [{ key: `d_${destination.lat}_${destination.lng}`, lat: destination.lat, lng: destination.lng }] : []),
+    ];
+    const missing = allPoints.filter((p) => !addressCache[p.key]);
+    if (missing.length === 0) return;
+    // Fetch up to 5 at a time to avoid flooding
+    (async () => {
+      const batch = missing.slice(0, 5);
+      const results: Record<string, string> = {};
+      for (const p of batch) {
+        const addr = await reverseGeocodeAddress(p.lat, p.lng);
+        results[p.key] = addr;
+      }
+      setAddressCache((prev) => ({ ...prev, ...results }));
+    })();
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length]);
+
+  function getAddress(type: 'origin' | 'destination' | 'waypoint', idx?: number): string | null {
+    if (type === 'origin' && origin) return addressCache[`o_${origin.lat}_${origin.lng}`] ?? null;
+    if (type === 'destination' && destination) return addressCache[`d_${destination.lat}_${destination.lng}`] ?? null;
+    if (type === 'waypoint' && idx != null && waypoints[idx]) {
+      const w = waypoints[idx];
+      return addressCache[`w${idx}_${w.lat}_${w.lng}`] ?? null;
+    }
+    return null;
+  }
 
   // Stale TTLs
   const WEATHER_TTL = 30 * 60 * 1000;
@@ -760,7 +793,7 @@ export default function TripPlanner() {
       for (let i = 1; i <= intermediateCount; i++) {
         const idx = Math.round(step * i);
         if (idx > 0 && idx < pts.length - 1) {
-          wps.push({ name: `WP ${i}`, lat: pts[idx].lat, lng: pts[idx].lng });
+          wps.push({ name: `Waypoint ${i}`, lat: pts[idx].lat, lng: pts[idx].lng });
         }
       }
     }
@@ -1154,7 +1187,10 @@ export default function TripPlanner() {
                     <View style={[st.fieldBadge, { backgroundColor: theme.green }]}>
                       <Text style={st.fieldBadgeText}>A</Text>
                     </View>
-                    <Text style={[st.fieldText, { color: origin ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{origin?.name ?? 'Starting point'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.fieldText, { color: origin ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{origin?.name ?? 'Starting point'}</Text>
+                      {origin && <Text style={{ fontSize: 9, color: theme.textMuted, marginTop: 1 }} numberOfLines={1}>{getAddress('origin') ?? `${origin.lat.toFixed(4)}, ${origin.lng.toFixed(4)}`}</Text>}
+                    </View>
                     {origin && <Pressable onPress={() => setOrigin(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
 
@@ -1181,8 +1217,8 @@ export default function TripPlanner() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                   <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
-                                  <Text style={{ fontSize: 9, color: isAtLimit ? '#FF9800' : theme.textMuted, marginTop: 1 }}>
-                                    {isAtLimit ? `${idx + 1} of ${MAX_WAYPOINTS} — limit reached` : `Stop ${idx + 1} of ${MAX_WAYPOINTS}`}
+                                  <Text style={{ fontSize: 9, color: theme.textMuted, marginTop: 1 }} numberOfLines={1}>
+                                    {getAddress('waypoint', idx) ?? `${wp.lat.toFixed(4)}, ${wp.lng.toFixed(4)}`}
                                   </Text>
                                 </View>
                               </Pressable>
@@ -1197,12 +1233,23 @@ export default function TripPlanner() {
                     </GestureHandlerRootView>
                   )}
 
+                  {/* Waypoint limit warning */}
+                  {waypoints.length >= MAX_WAYPOINTS && (
+                    <Text style={{ fontSize: 11, color: '#FF9800', textAlign: 'center', marginBottom: 8, fontWeight: '600' }}>Stop limit reached</Text>
+                  )}
+                  {waypoints.length >= 20 && waypoints.length < MAX_WAYPOINTS && (
+                    <Text style={{ fontSize: 11, color: theme.textMuted, textAlign: 'center', marginBottom: 8 }}>{MAX_WAYPOINTS - waypoints.length} stop{MAX_WAYPOINTS - waypoints.length === 1 ? '' : 's'} remaining</Text>
+                  )}
+
                   {/* Destination */}
                   <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('destination')}>
                     <View style={[st.fieldBadge, { backgroundColor: theme.red }]}>
                       <Text style={st.fieldBadgeText}>B</Text>
                     </View>
-                    <Text style={[st.fieldText, { color: destination ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{destination?.name ?? 'Destination'}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.fieldText, { color: destination ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{destination?.name ?? 'Destination'}</Text>
+                      {destination && <Text style={{ fontSize: 9, color: theme.textMuted, marginTop: 1 }} numberOfLines={1}>{getAddress('destination') ?? `${destination.lat.toFixed(4)}, ${destination.lng.toFixed(4)}`}</Text>}
+                    </View>
                     {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
 

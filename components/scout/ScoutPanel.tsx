@@ -407,11 +407,7 @@ function ScoutPanelContent() {
       </View>
       <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
         <Text style={[st.bubbleText, { color: theme.textPrimary }]}>
-          {'I\'m Scout. I can help you:\n\n'}
-          {'Plan routes\n'}
-          {'Check weather\n'}
-          {'Answer bike questions\n'}
-          {'Update your trip\n\n'}
+          {'I\'m Scout. I can plan routes, check weather and road conditions, log maintenance and mods to your bikes, and answer questions about your ride.\n\n'}
           {'Try:'}
         </Text>
         <View style={{ marginTop: 8, gap: 6 }}>
@@ -540,10 +536,14 @@ function ScoutPanelContent() {
 
         {/* Header */}
         <View style={[st.header, { borderBottomColor: theme.border }]}>
-          <View style={st.headerLeft}>
+          {/* Left spacer to balance right icons */}
+          <View style={{ width: 56 }} />
+          {/* Centered title */}
+          <View style={st.headerCenter}>
             <CompassIcon size={18} color={theme.red} />
             <Text style={[st.headerTitle, { color: theme.textPrimary }]}>SCOUT</Text>
           </View>
+          {/* Right actions */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
             {messages.length > 0 && (
               <Pressable onPress={clearSession} hitSlop={12}>
@@ -680,7 +680,7 @@ const st = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
 
   // Messages

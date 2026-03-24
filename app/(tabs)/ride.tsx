@@ -1687,7 +1687,7 @@ export default function RideScreen() {
                 for (let i = 1; i <= count; i++) {
                   const idx = Math.round(step * i);
                   if (idx > 0 && idx < pts.length - 1) {
-                    wps.push({ name: `WP ${i}`, lat: pts[idx][1], lng: pts[idx][0] });
+                    wps.push({ name: `Waypoint ${i}`, lat: pts[idx][1], lng: pts[idx][0] });
                   }
                 }
               }

@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/useTheme';
+import { reverseGeocodeAddress } from '../../lib/geocode';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,12 +51,32 @@ export default function MarkerDetailModal({
 }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
+  const [address, setAddress] = useState<string | null>(null);
+
+  // Reverse geocode to get address when marker changes
+  useEffect(() => {
+    if (!marker) { setAddress(null); return; }
+    setAddress(null);
+    reverseGeocodeAddress(marker.coordinate[1], marker.coordinate[0])
+      .then((addr) => { if (addr) setAddress(addr); })
+      .catch(() => {});
+  }, [marker?.coordinate[0], marker?.coordinate[1]]);
 
   if (!marker) return null;
 
   const isWaypoint = marker.type === 'waypoint';
   const isOrigin = marker.type === 'origin';
   const idx = marker.index ?? 0;
+
+  // Better display name
+  const isGenericName = /^WP \d+$/i.test(marker.name);
+  const displayName = isOrigin
+    ? (marker.name || 'Start')
+    : marker.type === 'destination'
+      ? (marker.name || 'Destination')
+      : isGenericName
+        ? `Waypoint ${idx + 1}`
+        : marker.name;
 
   // Badge
   const badgeLabel = isOrigin ? 'A' : marker.type === 'destination' ? 'B' : `${idx + 1}`;
@@ -104,10 +126,14 @@ export default function MarkerDetailModal({
             <Text style={s.badgeText}>{badgeLabel}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.name, { color: theme.textPrimary }]} numberOfLines={2}>{marker.name}</Text>
-            <Text style={[s.coords, { color: theme.textMuted }]}>
-              {marker.coordinate[1].toFixed(4)}, {marker.coordinate[0].toFixed(4)}
-            </Text>
+            <Text style={[s.name, { color: theme.textPrimary }]} numberOfLines={2}>{displayName}</Text>
+            {address ? (
+              <Text style={[s.coords, { color: theme.textMuted }]} numberOfLines={2}>{address}</Text>
+            ) : (
+              <Text style={[s.coords, { color: theme.textMuted }]}>
+                {marker.coordinate[1].toFixed(4)}, {marker.coordinate[0].toFixed(4)}
+              </Text>
+            )}
           </View>
           <Pressable onPress={onClose} hitSlop={12} style={s.closeBtn}>
             <Feather name="x" size={18} color={theme.textMuted} />
