@@ -101,11 +101,30 @@ async function fetchPointWeather(
   lat: number,
   lng: number,
   tempUnit: 'fahrenheit' | 'celsius',
+  departureDate?: Date,
+  hourOffset?: number,
 ): Promise<PointWeather> {
   const windUnit = tempUnit === 'celsius' ? 'kmh' : 'mph';
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
-    `&current=temperature_2m,weathercode,precipitation_probability,windspeed_10m` +
-    `&temperature_unit=${tempUnit}&windspeed_unit=${windUnit}&timezone=auto`;
+
+  // If departure is provided and not right now, use hourly forecast for that time
+  const useHourly = departureDate && (
+    departureDate.toDateString() !== new Date().toDateString() ||
+    Math.abs(departureDate.getTime() - Date.now()) > 2 * 3600_000
+  );
+
+  let url: string;
+  if (useHourly) {
+    const targetDate = new Date(departureDate.getTime() + (hourOffset ?? 0) * 3600_000);
+    const dateStr = targetDate.toISOString().split('T')[0];
+    url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+      `&hourly=temperature_2m,weathercode,precipitation_probability,windspeed_10m` +
+      `&start_date=${dateStr}&end_date=${dateStr}` +
+      `&temperature_unit=${tempUnit}&windspeed_unit=${windUnit}&timezone=auto`;
+  } else {
+    url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+      `&current=temperature_2m,weathercode,precipitation_probability,windspeed_10m` +
+      `&temperature_unit=${tempUnit}&windspeed_unit=${windUnit}&timezone=auto`;
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
@@ -114,6 +133,20 @@ async function fetchPointWeather(
     clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
+
+    if (useHourly && json.hourly) {
+      const targetDate = new Date(departureDate.getTime() + (hourOffset ?? 0) * 3600_000);
+      const targetHour = targetDate.getHours();
+      const h = json.hourly;
+      const idx = Math.min(targetHour, (h.time?.length ?? 1) - 1);
+      return {
+        temp: Math.round(Number(h.temperature_2m?.[idx]) || 0),
+        weatherCode: Number(h.weathercode?.[idx]) || 0,
+        rainChance: Number(h.precipitation_probability?.[idx]) || 0,
+        wind: Math.round(Number(h.windspeed_10m?.[idx]) || 0),
+      };
+    }
+
     const c = json.current ?? {};
     return {
       temp: Math.round(Number(c.temperature_2m) || 0),
@@ -133,6 +166,8 @@ async function fetchPointWeather(
 
 export async function fetchRouteWeather(
   coordinates: [number, number][],
+  departureDate?: Date,
+  routeDurationSec?: number,
 ): Promise<{ points: RouteWeatherPoint[]; useCelsius: boolean; useMiles: boolean }> {
   const samples = sampleRouteCoordinates(coordinates);
   if (samples.length === 0) return { points: [], useCelsius: false, useMiles: true };
@@ -142,10 +177,16 @@ export async function fetchRouteWeather(
   const useCelsius = tempUnit === 'celsius';
   const useMiles = distUnit === 'miles';
 
+  const totalDistKm = samples[samples.length - 1]?.distanceKm ?? 1;
+  const totalHours = (routeDurationSec ?? 0) / 3600;
+
   // Fetch sequentially with 300ms delay to be polite to free API
   const weatherData: PointWeather[] = [];
   for (let i = 0; i < samples.length; i++) {
-    const w = await fetchPointWeather(samples[i].lat, samples[i].lng, tempUnit);
+    // Estimate hours into the ride for this checkpoint
+    const progress = totalDistKm > 0 ? (samples[i].distanceKm / totalDistKm) : 0;
+    const hourOffset = totalHours > 0 ? progress * totalHours : 0;
+    const w = await fetchPointWeather(samples[i].lat, samples[i].lng, tempUnit, departureDate, hourOffset);
     weatherData.push(w);
     if (i < samples.length - 1) await new Promise((r) => setTimeout(r, 300));
   }

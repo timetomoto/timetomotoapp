@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -15,6 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import type { TrackPoint } from '../../lib/gpx';
 import { calcDistance, calcElevationGain } from '../../lib/gpx';
+import { reverseGeocode } from '../../lib/geocode';
+import { useGarageStore } from '../../lib/store';
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -49,14 +51,97 @@ function defaultName() {
 // SaveRideSheet
 // ---------------------------------------------------------------------------
 
+const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
+
 export default function SaveRideSheet({ visible, points, durationSeconds, onSave, onDiscard }: Props) {
   const { theme } = useTheme();
   const [name, setName]     = useState(defaultName);
   const [saving, setSaving] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const summaryFetched = useRef(false);
 
   const distanceMiles   = calcDistance(points);
   const elevationGainFt = calcElevationGain(points);
   const avgSpeedMph     = durationSeconds > 0 ? (distanceMiles / durationSeconds) * 3600 : 0;
+
+  // Bike info
+  const bikes = useGarageStore((s) => s.bikes);
+  const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
+  const activeBike = bikes.find((b) => b.id === selectedBikeId);
+  const bikeNickname = activeBike?.nickname ?? activeBike?.model ?? 'bike';
+
+  // Auto-generate ride name + summary via Gemini on mount
+  useEffect(() => {
+    if (!visible || summaryFetched.current || !GEMINI_KEY) return;
+    summaryFetched.current = true;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+
+    (async () => {
+      try {
+        // Reverse geocode start city
+        let startCity = '';
+        if (points.length > 0) {
+          startCity = await reverseGeocode(points[0].lat, points[0].lng);
+          startCity = startCity.split(',')[0] ?? startCity;
+        }
+
+        if (cancelled) return;
+
+        const hrs = Math.floor(durationSeconds / 3600);
+        const mins = Math.round((durationSeconds % 3600) / 60);
+        const durationStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+
+        const prompt =
+          `Return JSON only: { "suggestedName": string, "summary": string }\n` +
+          `Ride stats: ${distanceMiles.toFixed(1)}mi, ${durationStr}, ${Math.round(elevationGainFt)}ft gain, ` +
+          `${Math.round(avgSpeedMph)}mph avg, on ${bikeNickname}, starting near ${startCity}.\n` +
+          `Name should be 3-5 words, evocative of the ride.\n` +
+          `Summary should be 1-2 sentences, rider-tone, no fluff.`;
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.8, maxOutputTokens: 200 },
+            }),
+            signal: controller.signal,
+          },
+        );
+        clearTimeout(timer);
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const raw: string = json.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        const cleaned = raw.replace(/```json\s*/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (!cancelled) {
+          if (parsed.suggestedName) setName(parsed.suggestedName);
+          if (parsed.summary) setSummary(parsed.summary);
+        }
+      } catch {
+        // Fail silently — keep default name
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [visible]);
+
+  // Reset on close
+  useEffect(() => {
+    if (!visible) {
+      summaryFetched.current = false;
+      setSummary(null);
+    }
+  }, [visible]);
 
   async function handleSave() {
     setSaving(true);
@@ -78,6 +163,18 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
           <View style={[s.handle, { backgroundColor: theme.border }]} />
 
           <Text style={[s.title, { color: theme.textPrimary }]}>SAVE THIS RIDE?</Text>
+
+          {/* Scout summary */}
+          {summary && (
+            <View style={[s.summaryCard, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+              <View style={{ width: 14, height: 14 }}>
+                <View style={{ position: 'absolute', width: 14, height: 14, borderRadius: 7, borderWidth: 1.2, borderColor: theme.red }} />
+                <View style={{ position: 'absolute', left: 6, top: 2, width: 1.5, height: 4.5, backgroundColor: theme.red, borderRadius: 1 }} />
+                <View style={{ position: 'absolute', left: 6, top: 7.5, width: 1.5, height: 4.5, backgroundColor: theme.red, opacity: 0.4, borderRadius: 1 }} />
+              </View>
+              <Text style={[s.summaryText, { color: theme.textSecondary }]}>{summary}</Text>
+            </View>
+          )}
 
           {/* Stats */}
           <View style={[s.statsRow, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
@@ -174,6 +271,16 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
 
+  summaryCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  summaryText: { flex: 1, fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
   statsRow: {
     flexDirection: 'row',
     borderWidth: 1,

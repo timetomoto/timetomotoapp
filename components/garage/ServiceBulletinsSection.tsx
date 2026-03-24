@@ -9,7 +9,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../../lib/useTheme';
-import type { Bike } from '../../lib/store';
+import { useGarageStore, type Bike } from '../../lib/store';
 import {
   useServiceBulletinsStore,
   bulletinKey,
@@ -184,13 +184,14 @@ export default function ServiceBulletinsSection({ bike, onCountChange }: { bike:
 
   // Auto-check on first expand if no cached data
   const hasTriggered = useRef(false);
+  const garageDataRefresh = useGarageStore((s) => s.garageDataRefresh);
   useEffect(() => {
     if (collapsed || isLoading || hasTriggered.current) return;
     if (!result && make && model) {
       hasTriggered.current = true;
       handleCheck();
     }
-  }, [collapsed]);
+  }, [collapsed, garageDataRefresh]);
 
   async function handleCheck() {
     await fetchBulletins(year, make, model);

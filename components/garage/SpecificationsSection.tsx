@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
-import type { Bike, BikeSpecs } from '../../lib/store';
+import { useGarageStore, type Bike, type BikeSpecs } from '../../lib/store';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -295,7 +295,7 @@ ${fieldList}`;
   });
 
   const endpoints = [
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
   ];
 
@@ -491,13 +491,14 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
   const hasTriggered = useRef(false);
 
   // Sync when bike changes
+  const garageDataRefresh = useGarageStore((s) => s.garageDataRefresh);
   useEffect(() => {
     const s = bike.specs ?? {};
     setSpecs(s);
     setLookupDone(s.specsLookedUp === true);
     setLookedUpAt(s.specsLookedUpAt ?? null);
     hasTriggered.current = false;
-  }, [bike.id]);
+  }, [bike.id, garageDataRefresh]);
 
   // Auto-lookup on first expand if not already done (or if previous lookup returned empty)
   useEffect(() => {
@@ -643,7 +644,10 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
+
         </View>
+
+        {/* Scout panel now global in _layout.tsx */}
     </View>
   );
 }

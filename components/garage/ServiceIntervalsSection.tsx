@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../lib/useTheme';
-import type { Bike } from '../../lib/store';
+import { useGarageStore, type Bike } from '../../lib/store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,7 +62,7 @@ If the model name is ambiguous use the closest known variant and note it in assu
 
   // Try endpoints in order until one succeeds (fast non-thinking models first)
   const endpoints = [
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent',
   ];
   let lastError = 'No models available';
@@ -134,6 +134,7 @@ export default function ServiceIntervalsSection({ bike, onCountChange }: { bike:
 
   // Load cached result on mount / bike change; invalidate if make/model/year changed
   const bikeDesc = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
+  const garageDataRefresh = useGarageStore((s) => s.garageDataRefresh);
   useEffect(() => {
     const key = cacheKey(bike.id);
     AsyncStorage.getItem(key).then((v) => {
@@ -151,7 +152,7 @@ export default function ServiceIntervalsSection({ bike, onCountChange }: { bike:
       }
     });
     setError(null);
-  }, [bike.id, bike.make, bike.model, bike.year]);
+  }, [bike.id, bike.make, bike.model, bike.year, garageDataRefresh]);
 
   async function handleLookup() {
     setLoading(true);

@@ -38,6 +38,7 @@ interface Props {
   isTripPlannerRoute?: boolean;
   tripPlannerName?: string;
   onSaveRoute?: (name: string, route: NavRoute) => void;
+  onViewInPlanner?: () => void;
   savedRouteStart?: { lat: number; lng: number } | null;
   onGeometryChange?: (geometry: NavRoute['geometry']) => void;
 }
@@ -92,6 +93,7 @@ export default function RoutePreviewScreen({
   isTripPlannerRoute = false,
   tripPlannerName,
   onSaveRoute,
+  onViewInPlanner,
   savedRouteStart,
   onGeometryChange,
 }: Props) {
@@ -99,13 +101,15 @@ export default function RoutePreviewScreen({
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
-  const { bikes, selectedBikeId } = useGarageStore();
+  const { bikes, selectedBikeId, selectBike } = useGarageStore();
   const {
     isMonitoring, setMonitoring, shareActive,
     setCrashDetectionOverride, setLocationSharingOverride,
   } = useSafetyStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
-  const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
+  // Use global selectedBikeId directly — changes propagate everywhere
+  const navBikeId = selectedBikeId;
+  const setNavBikeId = (id: string | null) => { if (id) selectBike(id); };
   const rideSettingsRef = useRef<RideSettingsValues>({
     crashOn: false, crashOverride: false,
     shareEnabled: false, shareOverride: false,
@@ -411,9 +415,16 @@ export default function RoutePreviewScreen({
                   </Text>
                 </Pressable>
               )}
-              <Pressable style={st.cancelBtn} onPress={onCancel}>
-                <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24 }}>
+                {onViewInPlanner && (
+                  <Pressable style={st.cancelBtn} onPress={onViewInPlanner}>
+                    <Text style={[st.cancelBtnText, { color: theme.red }]}>View in Trip Planner</Text>
+                  </Pressable>
+                )}
+                <Pressable style={st.cancelBtn} onPress={onCancel}>
+                  <Text style={[st.cancelBtnText, { color: theme.textMuted }]}>Cancel</Text>
+                </Pressable>
+              </View>
             </View>
           )}
         </ScrollView>

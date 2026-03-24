@@ -255,17 +255,23 @@ interface GarageState {
   bikes: Bike[];
   selectedBikeId: string | null;
   loading: boolean;
+  maintenanceRefresh: number;
+  garageDataRefresh: number;
   fetchBikes: (userId: string) => Promise<void>;
   addBike: (bike: Bike) => void;
   updateBike: (bike: Bike) => void;
   removeBike: (id: string, local?: boolean) => Promise<void>;
   selectBike: (id: string) => void;
+  bumpMaintenanceRefresh: () => void;
+  bumpGarageDataRefresh: () => void;
 }
 
 export const useGarageStore = create<GarageState>((set, get) => ({
   bikes: [],
   selectedBikeId: null,
   loading: false,
+  maintenanceRefresh: 0,
+  garageDataRefresh: 0,
 
   fetchBikes: async (userId) => {
     set({ loading: true });
@@ -315,6 +321,8 @@ export const useGarageStore = create<GarageState>((set, get) => ({
   },
 
   selectBike: (id) => set({ selectedBikeId: id }),
+  bumpMaintenanceRefresh: () => set((s) => ({ maintenanceRefresh: s.maintenanceRefresh + 1 })),
+  bumpGarageDataRefresh: () => set((s) => ({ garageDataRefresh: s.garageDataRefresh + 1 })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -448,16 +456,19 @@ interface TripPlannerState {
   tripConditions: RoadCondition[];
   tripConditionsFetchedAt: number | null;
   tripSaved: boolean;
+  tripRoutePreference: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null;
+  tripRouteIsManual: boolean;
 
   setTripOrigin: (v: TripLoc | null) => void;
   setTripDestination: (v: TripLoc | null) => void;
   setTripWaypoints: (v: TripLoc[]) => void;
   setTripDeparture: (v: Date) => void;
   setTripCustomDate: (v: Date | null) => void;
-  setTripRoute: (geojson: any, distance: number, duration: number) => void;
+  setTripRoute: (geojson: any, distance: number, duration: number, isManual?: boolean) => void;
   setTripWeather: (points: RouteWeatherPoint[], msg: string | null, hasConcern: boolean, checkpoints: number) => void;
   setTripConditions: (conditions: RoadCondition[]) => void;
   setTripSaved: (v: boolean) => void;
+  setTripRoutePreference: (v: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null) => void;
   clearTrip: () => void;
 }
 
@@ -485,19 +496,22 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   tripConditions: [],
   tripConditionsFetchedAt: null,
   tripSaved: false,
+  tripRoutePreference: null,
+  tripRouteIsManual: false,
 
   setTripOrigin: (tripOrigin) => set({ tripOrigin }),
   setTripDestination: (tripDestination) => set({ tripDestination }),
   setTripWaypoints: (tripWaypoints) => set({ tripWaypoints }),
   setTripDeparture: (tripDeparture) => set({ tripDeparture }),
   setTripCustomDate: (tripCustomDate) => set({ tripCustomDate }),
-  setTripRoute: (tripRouteGeojson, tripRouteDistance, tripRouteDuration) =>
-    set({ tripRouteGeojson, tripRouteDistance, tripRouteDuration }),
+  setTripRoute: (tripRouteGeojson, tripRouteDistance, tripRouteDuration, isManual) =>
+    set({ tripRouteGeojson, tripRouteDistance, tripRouteDuration, tripRouteIsManual: isManual ?? false }),
   setTripWeather: (tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints) =>
     set({ tripWeatherPoints, tripWeatherMsg, tripWeatherHasConcern, tripWeatherCheckpoints, tripWeatherFetchedAt: Date.now() }),
   setTripConditions: (tripConditions) =>
     set({ tripConditions, tripConditionsFetchedAt: Date.now() }),
   setTripSaved: (tripSaved) => set({ tripSaved }),
+  setTripRoutePreference: (tripRoutePreference) => set({ tripRoutePreference }),
   clearTrip: () => set({
     tripOrigin: null,
     tripDestination: null,
@@ -515,6 +529,8 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
     tripConditions: [],
     tripConditionsFetchedAt: null,
     tripSaved: false,
+    tripRoutePreference: null,
+    tripRouteIsManual: false,
   }),
 }));
 

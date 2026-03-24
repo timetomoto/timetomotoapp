@@ -21,6 +21,7 @@ import { CrashDetector } from '../lib/safety';
 import { endShare } from '../lib/liveShare';
 import { stopBackgroundLocation } from '../lib/backgroundTasks';
 import CrashAlertModal from '../components/safety/CrashAlertModal';
+import ScoutPanel from '../components/scout/ScoutPanel';
 import { useTheme } from '../lib/useTheme';
 
 // Configure how notifications are presented when the app is in the foreground
@@ -268,6 +269,7 @@ function RootLayoutInner() {
         <Stack.Screen name="help-contact" />
       </Stack>
       <CrashAlertModal />
+      <ScoutPanel />
     </GestureHandlerRootView>
   );
 }

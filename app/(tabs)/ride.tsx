@@ -25,7 +25,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -58,6 +58,7 @@ import SearchSheet from '../../components/ride/SearchSheet';
 import RoutePreviewScreen from '../../components/ride/RoutePreviewScreen';
 import TurnCard from '../../components/ride/TurnCard';
 import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type RouteWeatherPoint } from '../../lib/routeWeather';
+import { fetchHEREConditions } from '../../lib/discoverStore';
 import StatsBar from '../../components/ride/StatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
 
@@ -174,6 +175,19 @@ const wl = StyleSheet.create({
 // ---------------------------------------------------------------------------
 // Sub-screens
 // ---------------------------------------------------------------------------
+
+/** Text with 1px black stroke — renders 8 offset copies behind the white text */
+function StrokedLabel({ children, style }: { children: string; style?: any }) {
+  const offsets = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+  return (
+    <View style={{ position: 'relative' }}>
+      {offsets.map(([x,y],i) => (
+        <Text key={i} style={[style, { color: '#000', position: 'absolute', left: x, top: y }]}>{children}</Text>
+      ))}
+      <Text style={style}>{children}</Text>
+    </View>
+  );
+}
 
 function RecordScreen({
   onStopRequested,
@@ -389,6 +403,20 @@ export default function RideScreen() {
   const [foodPlaces,     setFoodPlaces]     = useState<FoodPlace[]>([]);
   const [foodLoading,    setFoodLoading]    = useState(false);
   const [weatherOn,      setWeatherOn]      = useState(false);
+  const [constructionOn, setConstructionOn] = useState(false);
+  const [constructionLoading, setConstructionLoading] = useState(false);
+  const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
+  const constructionGeoJSON = useMemo(() => {
+    const capped = constructionIncidents.slice(0, 50);
+    return {
+      type: 'FeatureCollection' as const,
+      features: capped.map((c) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [c.lng, c.lat] },
+        properties: { id: c.id, title: c.title, description: c.description, severity: c.severity },
+      })),
+    };
+  }, [constructionIncidents]);
   const [selectedPlace,  setSelectedPlace]  = useState<PlaceDetail | null>(null);
 
   // Track last fetch center for overlay refresh on pan
@@ -481,6 +509,29 @@ export default function RideScreen() {
       foodOnRef.current = false;
     } finally {
       setFoodLoading(false);
+    }
+  }
+
+  async function handleToggleConstruction() {
+    if (constructionOn) {
+      setConstructionOn(false);
+      setConstructionIncidents([]);
+      return;
+    }
+    setConstructionLoading(true);
+    setConstructionOn(true);
+    try {
+      const c = await getMapCenter();
+      const conds = await fetchHEREConditions(c.lat, c.lng);
+      setConstructionIncidents(
+        conds
+          .filter((r) => r.type === 'construction')
+          .map((r) => ({ id: r.id, title: r.title, description: r.description, lat: r.lat, lng: r.lng, severity: r.severity })),
+      );
+    } catch {
+      setConstructionOn(false);
+    } finally {
+      setConstructionLoading(false);
     }
   }
 
@@ -1201,6 +1252,29 @@ export default function RideScreen() {
             </ShapeSource>
           )}
 
+          {/* ── Construction incidents ── */}
+          {mapStyleReady && constructionOn && constructionGeoJSON.features.length > 0 && (
+            <ShapeSource
+              id="construction-src"
+              shape={constructionGeoJSON}
+              onPress={(e) => {
+                const props = e.features?.[0]?.properties;
+                if (!props) return;
+                Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);
+              }}
+            >
+              <CircleLayer
+                id="construction-dots"
+                style={{
+                  circleColor: '#FF9800',
+                  circleRadius: 7,
+                  circleStrokeColor: '#000',
+                  circleStrokeWidth: 1.5,
+                }}
+              />
+            </ShapeSource>
+          )}
+
           {/* ── Saved / imported route overlay ── */}
           {mapStyleReady && overlayGeoJson && (
             <ShapeSource id="overlay-route" shape={overlayGeoJson}>
@@ -1414,7 +1488,7 @@ export default function RideScreen() {
               >
                 <PlayIcon />
               </Pressable>
-              <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>START & RECORD</Text>
+              <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>START & RECORD</StrokedLabel>
             </View>
           </View>
         )}
@@ -1431,7 +1505,7 @@ export default function RideScreen() {
                   >
                     {isRidePaused ? <PlayIcon /> : <PauseIcon />}
                   </Pressable>
-                  <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</Text>
+                  <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>{isRidePaused ? 'RESUME' : 'PAUSE'}</StrokedLabel>
                 </View>
               )}
               <View style={styles.rideBtnCol}>
@@ -1451,7 +1525,7 @@ export default function RideScreen() {
                 >
                   <StopIcon />
                 </Pressable>
-                <Text style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>STOP</Text>
+                <StrokedLabel style={[styles.rideBtnLabel, { color: '#FFFFFF' }]}>STOP</StrokedLabel>
               </View>
             </View>
           </View>
@@ -1597,6 +1671,46 @@ export default function RideScreen() {
                 if (saved) { addRoute(saved); showToast('Route saved to Planned Rides'); }
               } catch { showToast('Could not save route'); }
             }}
+            onViewInPlanner={isSavedRoutePreview && activeRoute ? () => {
+              const pts = activeRoute.geometry.coordinates;
+              if (pts.length < 2) return;
+              const tripStore = useTripPlannerStore.getState();
+              const first = pts[0];
+              const last = pts[pts.length - 1];
+              tripStore.setTripOrigin({ name: destination?.name?.split('→')[0]?.trim() || 'Start', lat: first[1], lng: first[0] });
+              tripStore.setTripDestination({ name: destination?.name?.split('→')[1]?.trim() || 'End', lat: last[1], lng: last[0] });
+              // Sample up to 23 intermediate waypoints
+              const maxWp = 20;
+              const count = Math.min(pts.length - 2, maxWp);
+              const wps: Array<{ name: string; lat: number; lng: number }> = [];
+              if (pts.length > 2 && count > 0) {
+                const step = (pts.length - 1) / (count + 1);
+                for (let i = 1; i <= count; i++) {
+                  const idx = Math.round(step * i);
+                  if (idx > 0 && idx < pts.length - 1) {
+                    wps.push({ name: `WP ${i}`, lat: pts[idx][1], lng: pts[idx][0] });
+                  }
+                }
+              }
+              tripStore.setTripWaypoints(wps);
+              tripStore.setTripRoute(activeRoute.geometry, activeRoute.distanceMiles, activeRoute.durationSeconds, true);
+              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
+              const wasSampled = pts.length - 2 > maxWp;
+              setNavMode('idle');
+              setDestination(null);
+              setActiveRoute(null);
+              setIsSavedRoutePreview(false);
+              router.navigate('/(tabs)/trip' as any);
+              if (wasSampled) {
+                const totalPoints = pts.length - 2;
+                setTimeout(() => {
+                  Alert.alert(
+                    'Route Simplified',
+                    `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWp} waypoints. We placed ${maxWp} evenly-spaced markers along the route so you can drag and adjust them.\n\nThe full route line is shown on the map.`,
+                  );
+                }, 1500);
+              }
+            } : undefined}
             savedRouteStart={savedRouteStartRef.current}
             onGeometryChange={(geo) => setNavRouteGeojson(geo)}
           />
@@ -1669,7 +1783,9 @@ export default function RideScreen() {
         onToggleWeather={() => setWeatherOn((v) => !v)}
         onToggleFuel={handleToggleFuelStations}
         onToggleFood={handleToggleFood}
-
+        constructionOn={constructionOn}
+        constructionLoading={constructionLoading}
+        onToggleConstruction={handleToggleConstruction}
       />
 
       {/* ── Search Sheet ── */}
@@ -1856,6 +1972,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.3,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   pausedBadge: {
     position: 'absolute',
