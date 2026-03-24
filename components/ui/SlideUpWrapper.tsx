@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -50,19 +50,19 @@ export default function SlideUpWrapper({
   bottomOffset = 0,
 }: SlideUpWrapperProps) {
   const translateY = useSharedValue(SCREEN_HEIGHT);
-  const active = useSharedValue(false);
+  const [mounted, setMounted] = useState(false);
 
   // Open / close
   useEffect(() => {
     if (visible) {
-      active.value = true;
+      setMounted(true);
       translateY.value = withSpring(0, springConfig);
-    } else if (active.value) {
+    } else if (mounted) {
       translateY.value = withTiming(
         SCREEN_HEIGHT,
         { duration: CLOSE_DURATION, easing: Easing.in(Easing.ease) },
         (finished) => {
-          if (finished) active.value = false;
+          if (finished) runOnJS(setMounted)(false);
         },
       );
     }
@@ -87,7 +87,6 @@ export default function SlideUpWrapper({
           { duration: CLOSE_DURATION, easing: Easing.in(Easing.ease) },
           (finished) => {
             if (finished) {
-              active.value = false;
               runOnJS(onClose)();
             }
           },
@@ -114,7 +113,7 @@ export default function SlideUpWrapper({
   }));
 
   // Don't render when fully hidden
-  if (!visible && !active.value) return null;
+  if (!visible && !mounted) return null;
 
   return (
     <>

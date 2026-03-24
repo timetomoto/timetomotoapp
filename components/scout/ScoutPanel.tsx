@@ -144,11 +144,13 @@ export default function ScoutPanel() {
   const closeScout = useScoutStore((s) => s.closeScout);
   const insets = useSafeAreaInsets();
 
+  if (!isScoutOpen) return null;
+
   return (
     <SlideUpWrapper visible={isScoutOpen} onClose={closeScout} bottomOffset={0}>
       {/* Top spacer so panel starts below status bar */}
       <View style={{ height: insets.top + 60 }} />
-      {isScoutOpen && <ScoutPanelContent />}
+      <ScoutPanelContent />
     </SlideUpWrapper>
   );
 }
