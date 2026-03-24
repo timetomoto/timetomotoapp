@@ -271,36 +271,36 @@ export default function TripPlanner() {
     };
   }, [constructionIncidents]);
 
-  // Reverse geocoded addresses for panel display
+  // Reverse geocoded addresses for panel display (keyed by coordinates, survives reorder)
   const [addressCache, setAddressCache] = useState<Record<string, string>>({});
   useEffect(() => {
-    const allPoints = [
-      ...(origin ? [{ key: `o_${origin.lat}_${origin.lng}`, lat: origin.lat, lng: origin.lng }] : []),
-      ...waypoints.map((w, i) => ({ key: `w${i}_${w.lat}_${w.lng}`, lat: w.lat, lng: w.lng })),
-      ...(destination ? [{ key: `d_${destination.lat}_${destination.lng}`, lat: destination.lat, lng: destination.lng }] : []),
-    ];
-    const missing = allPoints.filter((p) => !addressCache[p.key]);
-    if (missing.length === 0) return;
-    // Fetch up to 5 at a time to avoid flooding
+    const points: Array<{ lat: number; lng: number }> = [];
+    if (origin) points.push(origin);
+    for (const w of waypoints) points.push(w);
+    if (destination) points.push(destination);
+
+    const toFetch = points.filter((p) => !addressCache[`${p.lat.toFixed(4)}_${p.lng.toFixed(4)}`]);
+    if (toFetch.length === 0) return;
+
+    let cancelled = false;
     (async () => {
-      const batch = missing.slice(0, 5);
+      const batch = toFetch.slice(0, 5);
       const results: Record<string, string> = {};
       for (const p of batch) {
-        const addr = await reverseGeocodeAddress(p.lat, p.lng);
-        results[p.key] = addr;
+        if (cancelled) break;
+        results[`${p.lat.toFixed(4)}_${p.lng.toFixed(4)}`] = await reverseGeocodeAddress(p.lat, p.lng);
       }
-      setAddressCache((prev) => ({ ...prev, ...results }));
+      if (!cancelled) setAddressCache((prev) => ({ ...prev, ...results }));
     })();
+    return () => { cancelled = true; };
   }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length]);
 
-  function getAddress(type: 'origin' | 'destination' | 'waypoint', idx?: number): string | null {
-    if (type === 'origin' && origin) return addressCache[`o_${origin.lat}_${origin.lng}`] ?? null;
-    if (type === 'destination' && destination) return addressCache[`d_${destination.lat}_${destination.lng}`] ?? null;
-    if (type === 'waypoint' && idx != null && waypoints[idx]) {
-      const w = waypoints[idx];
-      return addressCache[`w${idx}_${w.lat}_${w.lng}`] ?? null;
-    }
-    return null;
+  function getAddress(_type: string, idx?: number): string | null {
+    const point = _type === 'origin' ? origin
+      : _type === 'destination' ? destination
+      : idx != null ? waypoints[idx] : null;
+    if (!point) return null;
+    return addressCache[`${point.lat.toFixed(4)}_${point.lng.toFixed(4)}`] ?? null;
   }
 
   // Stale TTLs
@@ -1142,18 +1142,26 @@ export default function TripPlanner() {
             /* Fields mode */
             <View style={st.fieldsWrap}>
               {/* Clear trip — always show when data exists */}
-              {(origin || destination || waypoints.length > 0) && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 6 }}>
                 <Pressable
-                  style={{ alignSelf: 'flex-end', paddingHorizontal: 4, paddingBottom: 6 }}
-                  onPress={() => clearTrip()}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  onPress={() => setImportModalOpen(true)}
                   hitSlop={8}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Feather name="bookmark" size={11} color={theme.textMuted} />
+                  <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>IMPORT ROUTE</Text>
+                </Pressable>
+                {(origin || destination || waypoints.length > 0) && (
+                  <Pressable
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    onPress={() => clearTrip()}
+                    hitSlop={8}
+                  >
                     <Feather name="rotate-ccw" size={11} color={theme.textMuted} />
                     <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>CLEAR TRIP</Text>
-                  </View>
-                </Pressable>
-              )}
+                  </Pressable>
+                )}
+              </View>
 
               {/* Too many points notice — routes with 26+ waypoints can't be edited */}
               {tripRouteIsManual && waypoints.length > 23 && (
@@ -1233,12 +1241,18 @@ export default function TripPlanner() {
                     </GestureHandlerRootView>
                   )}
 
-                  {/* Waypoint limit warning */}
+                  {/* Add Stop + limit warning */}
+                  {waypoints.length < MAX_WAYPOINTS && (
+                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: -2, marginBottom: 2 }} onPress={() => { setActiveField(waypoints.length); }}>
+                      <Feather name="plus" size={13} color={theme.textSecondary} />
+                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
+                    </Pressable>
+                  )}
                   {waypoints.length >= MAX_WAYPOINTS && (
-                    <Text style={{ fontSize: 11, color: '#FF9800', textAlign: 'center', marginBottom: 8, fontWeight: '600' }}>Stop limit reached</Text>
+                    <Text style={{ fontSize: 11, color: '#FF9800', textAlign: 'center', marginTop: -2, marginBottom: 2, fontWeight: '600' }}>Stop limit reached</Text>
                   )}
                   {waypoints.length >= 20 && waypoints.length < MAX_WAYPOINTS && (
-                    <Text style={{ fontSize: 11, color: theme.textMuted, textAlign: 'center', marginBottom: 8 }}>{MAX_WAYPOINTS - waypoints.length} stop{MAX_WAYPOINTS - waypoints.length === 1 ? '' : 's'} remaining</Text>
+                    <Text style={{ fontSize: 10, color: theme.textMuted, textAlign: 'center', marginBottom: 2 }}>{MAX_WAYPOINTS - waypoints.length} stop{MAX_WAYPOINTS - waypoints.length === 1 ? '' : 's'} remaining</Text>
                   )}
 
                   {/* Destination */}
@@ -1253,30 +1267,15 @@ export default function TripPlanner() {
                     {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
 
-                  {/* Add Stop | Reverse | Import */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
-                    {waypoints.length >= MAX_WAYPOINTS ? (
-                      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.4 }} onPress={showWaypointLimitAlert}>
-                        <Feather name="alert-circle" size={13} color={theme.textMuted} />
-                        <Text style={{ fontSize: 12, color: theme.textMuted }}>Stop Limit Reached</Text>
-                      </Pressable>
-                    ) : (
-                      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
-                        <Feather name="plus" size={13} color={theme.textSecondary} />
-                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
-                      </Pressable>
-                    )}
-                    {origin && destination && (
+                  {/* Reverse Route */}
+                  {origin && destination && (
+                    <View style={{ alignItems: 'center', marginVertical: 12 }}>
                       <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleReverse}>
                         <Feather name="refresh-cw" size={13} color={theme.textSecondary} />
-                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>Reverse</Text>
+                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>Reverse Route</Text>
                       </Pressable>
-                    )}
-                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
-                      <Feather name="bookmark" size={13} color={theme.textSecondary} />
-                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import from My Routes</Text>
-                    </Pressable>
-                  </View>
+                    </View>
+                  )}
                 </>
               )}
 
@@ -1598,7 +1597,8 @@ export default function TripPlanner() {
         <View style={[st.importModal, { backgroundColor: theme.bgPanel }]}>
           <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: 'center', marginTop: 8, marginBottom: 4 }} />
           <View style={[st.importHeader, { borderBottomColor: theme.border }]}>
-            <Text style={[st.importTitle, { color: theme.textPrimary }]}>Import from Routes</Text>
+            <View style={{ width: 22 }} />
+            <Text style={[st.importTitle, { color: theme.textPrimary }]}>Import from My Routes</Text>
             <Pressable onPress={() => setImportModalOpen(false)}><Feather name="x" size={22} color={theme.textSecondary} /></Pressable>
           </View>
           {routesStoreLoading ? (
@@ -1713,8 +1713,8 @@ const st = StyleSheet.create({
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 112, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   layersBtn: { position: 'absolute', top: 50, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  fullScreenBtn: { position: 'absolute', top: 146, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  constructionBtn: { position: 'absolute', top: 98, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fullScreenBtn: { position: 'absolute', top: 98, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  constructionBtn: { position: 'absolute', top: 146, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',
