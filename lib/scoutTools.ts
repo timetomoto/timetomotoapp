@@ -446,6 +446,11 @@ export async function executeScoutTool(
       }
 
       case 'add_waypoint': {
+        // Check waypoint limit
+        const currentWaypoints = useTripPlannerStore.getState().tripWaypoints;
+        if (currentWaypoints.length >= 24) {
+          return "You've reached the 24-stop limit. For longer routes, plan at kurviger.de and import the GPX into My Routes.";
+        }
         // Read LIVE store state for proximity (context may be stale after load_saved_route)
         const routeProximity = (() => {
           const ts = useTripPlannerStore.getState();

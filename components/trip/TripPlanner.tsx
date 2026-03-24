@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Linking,
   Dimensions,
   FlatList,
   Keyboard,
@@ -22,7 +23,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import Mapbox, { Camera, CircleLayer, LineLayer, MapView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+import Mapbox, { Camera, CircleLayer, LineLayer, MapView, MarkerView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -90,6 +91,23 @@ function getRouteMileMarker(routeCoords: [number, number][], lat: number, lng: n
     }
   }
   return { distanceKm: bestCumDist, offsetKm: bestDist };
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_WAYPOINTS = 24;
+
+function showWaypointLimitAlert() {
+  Alert.alert(
+    'Stop Limit Reached',
+    'Time to Moto supports up to 24 stops per route. For longer multi-stop routes, plan online at kurviger.de — it\'s free and built specifically for motorcycle trips. Export your route as a GPX file and import it directly into My Routes.',
+    [
+      { text: 'Open Kurviger', onPress: () => Linking.openURL('https://kurviger.de') },
+      { text: 'OK', style: 'cancel' },
+    ],
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -454,7 +472,9 @@ export default function TripPlanner() {
   }
 
   useEffect(() => {
-    if (!origin || !destination) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
+    // Need at least origin + one other point (destination or waypoint)
+    const effectiveDest = destination ?? (waypoints.length > 0 ? waypoints[waypoints.length - 1] : null);
+    if (!origin || !effectiveDest) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
 
     // For manual routes (loaded from saved), skip Mapbox but still fetch weather/conditions
     if (tripRouteIsManual) {
@@ -465,29 +485,33 @@ export default function TripPlanner() {
       return;
     }
 
+    // Build intermediate waypoints (exclude last waypoint if it's acting as destination)
+    const intermediateWps = destination
+      ? waypoints.map((w) => ({ lng: w.lng, lat: w.lat }))
+      : waypoints.slice(0, -1).map((w) => ({ lng: w.lng, lat: w.lat }));
+
     if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current);
     setRouteLoading(true);
     routeDebounceRef.current = setTimeout(async () => {
       try {
         // Mapbox Directions API supports max 25 coordinates (origin + waypoints + destination)
-        const allWps = waypoints.map((w) => ({ lng: w.lng, lat: w.lat }));
         const maxMapboxWps = 23;
-        const wps = allWps.length > maxMapboxWps
-          ? allWps.filter((_, i) => {
-              const step = allWps.length / maxMapboxWps;
+        const wps = intermediateWps.length > maxMapboxWps
+          ? intermediateWps.filter((_, i) => {
+              const step = intermediateWps.length / maxMapboxWps;
               return Math.floor(i / step) !== Math.floor((i - 1) / step) || i === 0;
             }).slice(0, maxMapboxWps)
-          : allWps;
-        const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
+          : intermediateWps;
+        const routes = await fetchDirections(origin.lng, origin.lat, effectiveDest.lng, effectiveDest.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
         if (routes.length > 0) {
           const r = routes[0];
           setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);
           setSaved(false);
           fetchWeatherAndConditions(r.geometry.coordinates, r.durationSeconds);
-          // Auto-fit camera to new route (skip if user is actively placing points)
-          if (!userIsPlacingPoints.current) {
-            // Update ref immediately so fitRoute has geometry
-            routeGeojsonRef.current = r.geometry;
+          // Auto-fit only on first route calculation (not when adding/editing waypoints)
+          const hadPreviousRoute = routeGeojsonRef.current?.coordinates?.length > 1;
+          routeGeojsonRef.current = r.geometry;
+          if (!hadPreviousRoute) {
             fitRoute();
           }
         }
@@ -497,20 +521,66 @@ export default function TripPlanner() {
     return () => { if (routeDebounceRef.current) clearTimeout(routeDebounceRef.current); };
   }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, waypoints.length, waypoints.map((w) => `${w.lat},${w.lng}`).join('|'), routePreference, departure.getTime()]);
 
-  // Map tap
-  function handleMapPress(e: any) {
+  // Map long press — context menu to add points
+  function handleMapLongPress(e: any) {
     const geom = e.geometry as any;
     if (!geom?.coordinates) return;
     const [lng, lat] = geom.coordinates;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    markUserPlacing();
-    (async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const placePoint = async (type: 'origin' | 'destination' | 'waypoint') => {
+      markUserPlacing();
       const name = await reverseGeocodeLoc(lat, lng);
       const loc: Loc = { name, lat, lng };
-      if (!origin) { setOrigin(loc); return; }
-      if (!destination) { setDestination(loc); return; }
-      setWaypoints([...waypoints, loc]);
-    })();
+      if (type === 'origin') setOrigin(loc);
+      else if (type === 'destination') setDestination(loc);
+      else {
+        if (waypoints.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
+        const insertIdx = findInsertionIndex(lat, lng);
+        const newWps = [...waypoints];
+        newWps.splice(insertIdx, 0, loc);
+        setWaypoints(newWps);
+      }
+    };
+
+    // Build context menu options based on current state
+    let options: string[];
+    let handlers: Array<() => void>;
+
+    if (!origin) {
+      options = ['Set as Start', 'Set as Stop', 'Set as Destination', 'Cancel'];
+      handlers = [
+        () => placePoint('origin'),
+        () => placePoint('waypoint'),
+        () => placePoint('destination'),
+        () => {},
+      ];
+    } else if (!destination) {
+      options = ['Set as Stop', 'Set as Destination', 'Cancel'];
+      handlers = [
+        () => placePoint('waypoint'),
+        () => placePoint('destination'),
+        () => {},
+      ];
+    } else {
+      options = ['Add as Stop', 'Cancel'];
+      handlers = [
+        () => placePoint('waypoint'),
+        () => {},
+      ];
+    }
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex: options.length - 1, title: 'Add to Route' },
+        (idx) => { handlers[idx]?.(); },
+      );
+    } else {
+      Alert.alert('Add to Route', undefined, [
+        ...options.slice(0, -1).map((label, i) => ({ text: label, onPress: handlers[i] })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ]);
+    }
   }
 
   // Long press marker
@@ -602,15 +672,54 @@ export default function TripPlanner() {
   }
 
   // Route line press → insert waypoint
+  /** Find the best insertion index for a new waypoint based on proximity to route segments */
+  function findInsertionIndex(lat: number, lng: number): number {
+    // Build ordered list of all route points: [origin, ...waypoints, destination?]
+    const points: Array<{ lat: number; lng: number }> = [];
+    if (origin) points.push(origin);
+    points.push(...waypoints);
+    if (destination) points.push(destination);
+
+    if (points.length < 2) return waypoints.length; // append
+
+    // Point-to-segment squared distance
+    function segDistSq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+      const dx = bx - ax, dy = by - ay;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return (px - ax) ** 2 + (py - ay) ** 2;
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+      const projX = ax + t * dx, projY = ay + t * dy;
+      return (px - projX) ** 2 + (py - projY) ** 2;
+    }
+
+    // Find which segment is closest to the pressed location
+    let bestSegIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < points.length - 1; i++) {
+      const d = segDistSq(lng, lat, points[i].lng, points[i].lat, points[i + 1].lng, points[i + 1].lat);
+      if (d < bestDist) { bestDist = d; bestSegIdx = i; }
+    }
+
+    // Segment 0 = origin→WP0 → insert at waypoint index 0
+    // Segment 1 = WP0→WP1 → insert at waypoint index 1
+    // Segment N (last, to destination) → insert at waypoints.length
+    const insertIdx = origin ? bestSegIdx : bestSegIdx;
+    return Math.min(insertIdx, waypoints.length);
+  }
+
   function handleRouteLinePress(e: any) {
     const geom = e.geometry as any;
     if (!geom?.coordinates) return;
     const [lng, lat] = geom.coordinates;
+    if (waypoints.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     markUserPlacing();
+    const insertIdx = findInsertionIndex(lat, lng);
     (async () => {
       const name = await reverseGeocodeLoc(lat, lng);
-      setWaypoints([...waypoints, { name, lat, lng }]);
+      const newWps = [...waypoints];
+      newWps.splice(insertIdx, 0, { name, lat, lng });
+      setWaypoints(newWps);
     })();
   }
 
@@ -830,36 +939,51 @@ export default function TripPlanner() {
     <View style={{ flex: 1 }}>
       {/* Map — always full screen behind panel */}
       <View style={StyleSheet.absoluteFillObject}>
-        <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onPress={handleMapPress} onDidFinishLoadingStyle={() => setMapStyleReady(true)} onWillStartLoadingMap={() => setMapStyleReady(false)}>
+        <MapView style={StyleSheet.absoluteFillObject} styleURL={mapStyle} scrollEnabled zoomEnabled rotateEnabled={false} attributionEnabled={false} logoEnabled={false} scaleBarEnabled={false} onLongPress={handleMapLongPress} onDidFinishLoadingStyle={() => setMapStyleReady(true)} onWillStartLoadingMap={() => setMapStyleReady(false)}>
           <Camera ref={cameraRef} defaultSettings={{ centerCoordinate: AUSTIN, zoomLevel: 9 }} />
+          {/* Origin — green pin with "A" */}
+          {origin && (
+            <MarkerView id="tp-origin-label" coordinate={[origin.lng, origin.lat]}>
+              <View style={[st.numberedPin, { backgroundColor: theme.green }]}>
+                <Text style={st.pinText}>A</Text>
+              </View>
+            </MarkerView>
+          )}
           {origin && (
             <PointAnnotation id="tp-origin" coordinate={[origin.lng, origin.lat]} draggable onDragStart={() => handleMarkerDragStart('origin')} onDrag={(e: any) => handleMarkerDrag('origin', e)} onDragEnd={(e: any) => handleMarkerDragEnd('origin', e)}>
-              <Pressable onLongPress={() => handleMarkerLongPress('origin')}>
-                <View style={[st.marker, { backgroundColor: theme.green }, draggingMarker === 'origin' && st.markerDragging]} />
-              </Pressable>
+              <View style={{ width: 26, height: 26, opacity: 0 }} />
             </PointAnnotation>
+          )}
+          {/* Destination — red pin with "B" */}
+          {destination && (
+            <MarkerView id="tp-dest-label" coordinate={[destination.lng, destination.lat]}>
+              <View style={[st.numberedPin, { backgroundColor: theme.red }]}>
+                <Text style={st.pinText}>B</Text>
+              </View>
+            </MarkerView>
           )}
           {destination && (
             <PointAnnotation id="tp-dest" coordinate={[destination.lng, destination.lat]} draggable onDragStart={() => handleMarkerDragStart('destination')} onDrag={(e: any) => handleMarkerDrag('destination', e)} onDragEnd={(e: any) => handleMarkerDragEnd('destination', e)}>
-              <Pressable onLongPress={() => handleMarkerLongPress('destination')}>
-                <View style={[st.marker, { backgroundColor: theme.red }, draggingMarker === 'destination' && st.markerDragging]} />
-              </Pressable>
+              <View style={{ width: 26, height: 26, opacity: 0 }} />
             </PointAnnotation>
           )}
+          {/* Waypoints — numbered pins (Calimoto style) */}
           {waypoints.map((wp, i) => {
             const isFuel = /gas|fuel|station|petrol|7-eleven|7eleven|shell|exxon|chevron|bp\b|circle k|qt\b|quiktrip|love'?s|pilot|flying j|casey|wawa|sheetz|racetrac|murphy|speedway|valero|sunoco|marathon|conoco|phillips|sinclair|citgo|hess|arco|mobil|texaco|costco gas|sam'?s gas|buc-ee/i.test(wp.name);
+            const isFood = /restaurant|cafe|diner|grill|burger|pizza|taco|bbq|barbecue|steakhouse|mcdonald|wendy|subway|chick-fil|whataburger|waffle|ihop|denny|cracker barrel|sonic|arby|jack in the box|panda express|chipotle|five guys/i.test(wp.name);
+            const pinColor = isFuel ? '#FFD600' : isFood ? '#FF9800' : theme.red;
+            const textColor = isFuel || isFood ? '#000' : '#fff';
             return (
-              <PointAnnotation key={`tp-wp-${i}`} id={`tp-wp-${i}`} coordinate={[wp.lng, wp.lat]} draggable onDragStart={() => handleMarkerDragStart(i)} onDrag={(e: any) => handleMarkerDrag(i, e)} onDragEnd={(e: any) => handleMarkerDragEnd(i, e)}>
-                <Pressable onLongPress={() => handleMarkerLongPress(i)}>
-                  {isFuel ? (
-                    <View style={[st.marker, { backgroundColor: '#FFD600', width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, draggingMarker === i && st.markerDragging]}>
-                      <Feather name="droplet" size={10} color="#000" />
-                    </View>
-                  ) : (
-                    <View style={[st.marker, { backgroundColor: theme.orange }, draggingMarker === i && st.markerDragging]} />
-                  )}
-                </Pressable>
-              </PointAnnotation>
+              <View key={`tp-wp-group-${i}`}>
+                <MarkerView id={`tp-wp-label-${i}`} coordinate={[wp.lng, wp.lat]}>
+                  <View style={[st.numberedPin, { backgroundColor: pinColor }]}>
+                    <Text style={[st.pinText, { color: textColor }]}>{i + 1}</Text>
+                  </View>
+                </MarkerView>
+                <PointAnnotation id={`tp-wp-${i}`} coordinate={[wp.lng, wp.lat]} draggable onDragStart={() => handleMarkerDragStart(i)} onDrag={(e: any) => handleMarkerDrag(i, e)} onDragEnd={(e: any) => handleMarkerDragEnd(i, e)}>
+                  <View style={{ width: 26, height: 26, opacity: 0 }} />
+                </PointAnnotation>
+              </View>
             );
           })}
           {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
@@ -1016,7 +1140,9 @@ export default function TripPlanner() {
                 <>
                   {/* Origin */}
                   <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('origin')}>
-                    <View style={[st.dot, { backgroundColor: theme.green }]} />
+                    <View style={[st.fieldBadge, { backgroundColor: theme.green }]}>
+                      <Text style={st.fieldBadgeText}>A</Text>
+                    </View>
                     <Text style={[st.fieldText, { color: origin ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{origin?.name ?? 'Starting point'}</Text>
                     {origin && <Pressable onPress={() => setOrigin(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
@@ -1031,11 +1157,23 @@ export default function TripPlanner() {
                         onDragEnd={({ data }) => setWaypoints(data)}
                         renderItem={({ item: wp, drag, isActive, getIndex }: RenderItemParams<Loc>) => {
                           const idx = getIndex() ?? 0;
+                          const isAtLimit = waypoints.length >= MAX_WAYPOINTS && idx === waypoints.length - 1;
+                          const wpIsFuel = /gas|fuel|station|petrol|7-eleven|7eleven|shell|exxon|chevron|bp\b|circle k|qt\b|quiktrip|love'?s|pilot|flying j|casey|wawa|sheetz|racetrac|murphy|speedway|valero|sunoco|marathon|conoco|phillips|sinclair|citgo|hess|arco|mobil|texaco|costco gas|sam'?s gas|buc-ee/i.test(wp.name);
+                          const wpIsFood = /restaurant|cafe|diner|grill|burger|pizza|taco|bbq|barbecue|steakhouse|mcdonald|wendy|subway|chick-fil|whataburger|waffle|ihop|denny|cracker barrel|sonic|arby|jack in the box|panda express|chipotle|five guys/i.test(wp.name);
+                          const badgeColor = isAtLimit ? '#FF9800' : wpIsFuel ? '#FFD600' : wpIsFood ? '#FF9800' : theme.red;
+                          const badgeTextColor = wpIsFuel || wpIsFood ? '#000' : '#fff';
                           return (
                             <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, opacity: isActive ? 0.8 : 1, transform: [{ scale: isActive ? 1.03 : 1 }] }]}>
                               <Pressable style={[st.field, { backgroundColor: isActive ? theme.bgPanel : theme.bgCard, borderColor: theme.border, flex: 1 }]} onPress={() => setActiveField(idx)}>
-                                <View style={[st.dot, { backgroundColor: theme.orange }]} />
-                                <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
+                                <View style={[st.fieldBadge, { backgroundColor: badgeColor }]}>
+                                  <Text style={[st.fieldBadgeText, { color: badgeTextColor }]}>{idx + 1}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
+                                  <Text style={{ fontSize: 9, color: isAtLimit ? '#FF9800' : theme.textMuted, marginTop: 1 }}>
+                                    {isAtLimit ? `${idx + 1} of ${MAX_WAYPOINTS} — limit reached` : `Stop ${idx + 1} of ${MAX_WAYPOINTS}`}
+                                  </Text>
+                                </View>
                               </Pressable>
                               <Pressable onPress={() => setWaypoints(waypoints.filter((_, i) => i !== idx))} hitSlop={6}><Feather name="x-circle" size={16} color={theme.textMuted} /></Pressable>
                               <Pressable onLongPress={drag} delayLongPress={150} hitSlop={6} style={{ paddingVertical: 8, paddingHorizontal: 4 }}>
@@ -1050,17 +1188,26 @@ export default function TripPlanner() {
 
                   {/* Destination */}
                   <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('destination')}>
-                    <View style={[st.dot, { backgroundColor: theme.red }]} />
+                    <View style={[st.fieldBadge, { backgroundColor: theme.red }]}>
+                      <Text style={st.fieldBadgeText}>B</Text>
+                    </View>
                     <Text style={[st.fieldText, { color: destination ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{destination?.name ?? 'Destination'}</Text>
                     {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
 
                   {/* Add Stop | Reverse | Import */}
                   <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
-                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
-                      <Feather name="plus" size={13} color={theme.textSecondary} />
-                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
-                    </Pressable>
+                    {waypoints.length >= MAX_WAYPOINTS ? (
+                      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: 0.4 }} onPress={showWaypointLimitAlert}>
+                        <Feather name="alert-circle" size={13} color={theme.textMuted} />
+                        <Text style={{ fontSize: 12, color: theme.textMuted }}>Stop Limit Reached</Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
+                        <Feather name="plus" size={13} color={theme.textSecondary} />
+                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
+                      </Pressable>
+                    )}
                     {origin && destination && (
                       <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleReverse}>
                         <Feather name="refresh-cw" size={13} color={theme.textSecondary} />
@@ -1478,7 +1625,19 @@ export default function TripPlanner() {
 
 const st = StyleSheet.create({
   marker: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
-  markerDragging: { width: 20, height: 20, borderRadius: 10, borderWidth: 3, opacity: 0.85 },
+  markerDragging: { width: 32, height: 32, borderRadius: 16, borderWidth: 3, opacity: 0.85 },
+  numberedPin: {
+    width: 26, height: 26, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 3, elevation: 5,
+  },
+  pinText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  fieldBadge: {
+    width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fieldBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
