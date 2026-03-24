@@ -90,7 +90,7 @@ export default function DiscoverRoutes() {
     tripStore.setTripDestination({ name: route.name.split('→')[1]?.trim() || 'End', lat: last.lat, lng: last.lng });
 
     // Sample up to 23 intermediate waypoints (25 total with origin+destination = Mapbox limit)
-    const maxWaypoints = 100;
+    const maxWaypoints = 20;
     const intermediateCount = Math.min(pts.length - 2, maxWaypoints);
     const waypoints: Array<{ name: string; lat: number; lng: number }> = [];
     if (pts.length > 2 && intermediateCount > 0) {
@@ -112,9 +112,8 @@ export default function DiscoverRoutes() {
     };
     tripStore.setTripRoute(geometry, route.distance_miles, route.duration_seconds ?? 0, true);
 
-    // Switch to Trip Planner tab in full-screen map view
+    // Switch to Trip Planner tab
     useTabResetStore.getState().setPendingTripSubTab('trip-planner');
-    useTabResetStore.getState().setPendingTripFullScreen(true);
 
     // Notify user if route was sampled (delay to let navigation + full-screen settle)
     if (pts.length - 2 > maxWaypoints) {

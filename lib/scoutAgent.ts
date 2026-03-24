@@ -13,6 +13,18 @@ const MAX_TOOL_ROUNDS = 6;
 const TIMEOUT_MS = 30000;
 const HISTORY_WINDOW = 10;
 
+// ── Request cancellation ─────────────────────────────────────────────────
+
+let activeAbortController: AbortController | null = null;
+
+/** Abort any in-flight Scout request (called on panel close or new message). */
+export function abortScoutRequest(): void {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+}
+
 // ── Gemini request / response shapes ────────────────────────────────────
 
 interface GeminiPart {
@@ -46,7 +58,7 @@ interface GeminiResponse {
 
 /**
  * Send a user message through Scout's Gemini-powered agent.
- * Handles function-calling loops (up to 3 rounds) and always returns
+ * Handles function-calling loops (up to 6 rounds) and always returns
  * a plain text result — never throws.
  */
 export async function sendScoutMessage(
@@ -54,6 +66,11 @@ export async function sendScoutMessage(
   conversationHistory: ScoutMessage[],
   context: ScoutContext,
 ): Promise<{ text: string; toolsExecuted: string[] }> {
+  // Abort any previous in-flight request
+  abortScoutRequest();
+
+  const controller = new AbortController();
+  activeAbortController = controller;
   const toolsExecuted: string[] = [];
 
   try {
@@ -75,14 +92,14 @@ export async function sendScoutMessage(
     contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
     // 3. First Gemini call
-    let response = await callGemini(systemPrompt, contents);
-    console.log('[Scout] Initial response parts:', JSON.stringify(response.candidates?.[0]?.content?.parts?.map((p) => p.functionCall ? `fn:${p.functionCall.name}` : p.text ? `text:${p.text.slice(0, 50)}` : 'other')));
+    let response = await callGemini(systemPrompt, contents, controller.signal);
 
     // 4. Function-calling loop
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
       const functionCalls = extractFunctionCalls(response);
       if (functionCalls.length === 0) break;
-      console.log('[Scout] Tool round', round + 1, functionCalls.map((fc) => fc.name));
 
       // Execute tool calls in parallel
       functionCalls.forEach((fc) => toolsExecuted.push(fc.name));
@@ -108,7 +125,7 @@ export async function sendScoutMessage(
       contents.push({ role: 'user', parts: responseParts });
 
       // Next Gemini call with tool results
-      response = await callGemini(systemPrompt, contents);
+      response = await callGemini(systemPrompt, contents, controller.signal);
     }
 
     // 5. Extract final text
@@ -119,14 +136,19 @@ export async function sendScoutMessage(
 
     return { text, toolsExecuted };
   } catch (err: any) {
-    console.error('[Scout] sendScoutMessage error:', err);
-    if (err?.name === 'AbortError' || err?.message?.includes('timeout')) {
-      return { text: 'That took too long. Try a simpler request or check your connection.', toolsExecuted };
+    // Silent return on abort (user closed Scout or sent a new message)
+    if (err?.name === 'AbortError') {
+      return { text: '', toolsExecuted };
     }
+    console.error('[Scout] sendScoutMessage error:', err);
     if (err?.message?.includes('Network') || err?.message?.includes('fetch')) {
       return { text: "I'm having trouble connecting. Check your signal and try again.", toolsExecuted };
     }
     return { text: 'Something went wrong on my end. Try again in a moment.', toolsExecuted };
+  } finally {
+    if (activeAbortController === controller) {
+      activeAbortController = null;
+    }
   }
 }
 
@@ -135,25 +157,38 @@ export async function sendScoutMessage(
 async function callGemini(
   systemPrompt: string,
   contents: GeminiContent[],
+  signal: AbortSignal,
 ): Promise<GeminiResponse> {
   const body: GeminiRequest = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
     tools: { functionDeclarations: SCOUT_TOOL_DEFINITIONS },
-    generationConfig: { maxOutputTokens: 2048, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 1024 } },
   };
 
+  const timer = setTimeout(() => {
+    // Only abort via timeout if this specific signal isn't already aborted
+    if (!signal.aborted) {
+      // Create a timeout-specific error by aborting with reason
+    }
+  }, TIMEOUT_MS);
+
+  // Combine the external abort signal with a timeout
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  signal.addEventListener('abort', onExternalAbort);
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
+    clearTimeout(timer);
     const res = await fetch(`${ENDPOINT}?key=${GEMINI_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    clearTimeout(timer);
+    clearTimeout(timeoutId);
+    signal.removeEventListener('abort', onExternalAbort);
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
@@ -162,7 +197,8 @@ async function callGemini(
 
     return (await res.json()) as GeminiResponse;
   } catch (err) {
-    clearTimeout(timer);
+    clearTimeout(timeoutId);
+    signal.removeEventListener('abort', onExternalAbort);
     throw err;
   }
 }

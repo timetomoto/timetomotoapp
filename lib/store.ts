@@ -491,8 +491,8 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   tripRoutePreference: null,
   tripRouteIsManual: false,
 
-  setTripOrigin: (tripOrigin) => set({ tripOrigin, tripRouteIsManual: false }),
-  setTripDestination: (tripDestination) => set({ tripDestination, tripRouteIsManual: false }),
+  setTripOrigin: (tripOrigin) => set({ tripOrigin }),
+  setTripDestination: (tripDestination) => set({ tripDestination }),
   setTripWaypoints: (tripWaypoints) => set({ tripWaypoints }),
   setTripDeparture: (tripDeparture) => set({ tripDeparture }),
   setTripCustomDate: (tripCustomDate) => set({ tripCustomDate }),

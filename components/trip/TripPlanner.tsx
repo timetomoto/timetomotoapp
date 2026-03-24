@@ -229,16 +229,6 @@ export default function TripPlanner() {
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
-  const pendingTripFullScreen = useTabResetStore((s) => s.pendingTripFullScreen);
-
-  // Enter full-screen when requested from My Routes VIEW button
-  useEffect(() => {
-    if (pendingTripFullScreen) {
-      useTabResetStore.getState().setPendingTripFullScreen(false);
-      setTimeout(() => enterFullScreen(), 300);
-    }
-  }, [pendingTripFullScreen]);
-
   // Construction layer
   const [constructionOn, setConstructionOn] = useState(false);
   const [constructionLoading, setConstructionLoading] = useState(false);
@@ -282,12 +272,8 @@ export default function TripPlanner() {
     const coords = geojson.coordinates;
     const lats = coords.map((c: number[]) => c[1]);
     const lngs = coords.map((c: number[]) => c[0]);
-    // Bottom padding: account for how much the panel covers
-    // panelY is the top of the panel from screen top — SCREEN_H - panelY = panel height
-    const currentPanelY = (lastPanelY.current as number) ?? (SCREEN_H - SNAP_COLLAPSED);
-    const panelHeight = SCREEN_H - currentPanelY;
-    const bottomPad = (isFullScreenMode ?? fullScreen) ? 80 : Math.max(panelHeight + 40, 80);
-    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [40, 40, bottomPad, 40], 600);
+    const bottomPad = (isFullScreenMode ?? fullScreen) ? 80 : SNAP_COLLAPSED + 20;
+    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [60, 40, bottomPad, 40], 600);
   }
 
   /** Poll for route geometry then fit — used after Scout closes */
@@ -419,7 +405,6 @@ export default function TripPlanner() {
   // Debounced route fetch + weather + conditions
   const tripRouteIsManual = useTripPlannerStore((s) => s.tripRouteIsManual);
   useEffect(() => {
-    console.log('[TripPlanner] Route useEffect fired', { origin: origin?.name, destination: destination?.name, waypointCount: waypoints.length, isManual: tripRouteIsManual });
     if (!origin || !destination) { setTripRoute(null, 0, 0); setTripConditions([]); return; }
     // Skip Mapbox recalculation if geometry was set directly (saved route)
     if (tripRouteIsManual) return;
@@ -427,10 +412,16 @@ export default function TripPlanner() {
     setRouteLoading(true);
     routeDebounceRef.current = setTimeout(async () => {
       try {
-        const wps = waypoints.map((w) => ({ lng: w.lng, lat: w.lat }));
-        console.log('[TripPlanner] Calling fetchDirections', { origin: `${origin.lat},${origin.lng}`, dest: `${destination.lat},${destination.lng}`, wps: wps.length });
+        // Mapbox Directions API supports max 25 coordinates (origin + waypoints + destination)
+        const allWps = waypoints.map((w) => ({ lng: w.lng, lat: w.lat }));
+        const maxMapboxWps = 23;
+        const wps = allWps.length > maxMapboxWps
+          ? allWps.filter((_, i) => {
+              const step = allWps.length / maxMapboxWps;
+              return Math.floor(i / step) !== Math.floor((i - 1) / step) || i === 0;
+            }).slice(0, maxMapboxWps)
+          : allWps;
         const routes = await fetchDirections(origin.lng, origin.lat, destination.lng, destination.lat, mapPref(routePreference), wps.length > 0 ? wps : undefined);
-        console.log('[TripPlanner] fetchDirections returned', routes.length, 'routes', routes.length > 0 ? `coords: ${routes[0].geometry?.coordinates?.length}` : '');
         if (routes.length > 0) {
           const r = routes[0];
           setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);

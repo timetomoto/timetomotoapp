@@ -27,7 +27,7 @@ import {
   useTabResetStore,
 } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
-import { sendScoutMessage } from '../../lib/scoutAgent';
+import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
 import { loadFavorites } from '../../lib/favorites';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
@@ -228,10 +228,11 @@ function ScoutPanelContent() {
     }
   }, [isScoutOpen, storeInitialMessage, favoritesLoaded]);
 
-  // Reset guards when panel closes (keep conversation)
+  // Reset guards + abort in-flight requests when panel closes
   useEffect(() => {
     if (!isScoutOpen) {
       initialSent.current = false;
+      abortScoutRequest();
     }
   }, [isScoutOpen]);
 
@@ -313,16 +314,23 @@ function ScoutPanelContent() {
       const history = useScoutStore.getState().messages;
       const result = await sendScoutMessage(msg, history.slice(0, -1), ctx);
 
+      // Silent return if request was aborted (empty string from abortScoutRequest)
+      if (!result.text) { setLoading(false); return; }
+
       // Append nav hint before adding to store
       let content = result.text;
       const routeModified = result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t));
       if (routeModified) {
         // Strip any Gemini-generated nav hints before appending ours
         content = content
-          .replace(/\n*Head to (the )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*Head (over )?(to|on over to) (the )?Trip Planner[^\n]*/gi, '')
           .replace(/\n*Close Scout[^\n]*/gi, '')
           .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
           .replace(/\n*Your route is ready[^\n]*/gi, '')
+          .replace(/\n*Check (the |your )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
+          .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
           .trimEnd();
         content += '\n\nHead to Trip Planner to see your route.';
       }

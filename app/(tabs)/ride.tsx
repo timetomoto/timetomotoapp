@@ -1680,7 +1680,7 @@ export default function RideScreen() {
               tripStore.setTripOrigin({ name: destination?.name?.split('→')[0]?.trim() || 'Start', lat: first[1], lng: first[0] });
               tripStore.setTripDestination({ name: destination?.name?.split('→')[1]?.trim() || 'End', lat: last[1], lng: last[0] });
               // Sample up to 23 intermediate waypoints
-              const maxWp = 100;
+              const maxWp = 20;
               const count = Math.min(pts.length - 2, maxWp);
               const wps: Array<{ name: string; lat: number; lng: number }> = [];
               if (pts.length > 2 && count > 0) {
