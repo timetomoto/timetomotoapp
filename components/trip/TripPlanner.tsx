@@ -42,6 +42,8 @@ import { darkTheme } from '../../lib/theme';
 import type { Route } from '../../lib/routes';
 import { useScoutStore } from '../../lib/scoutStore';
 
+import MarkerDetailModal, { type SelectedMarker } from './MarkerDetailModal';
+
 const TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
 const { height: SCREEN_H } = Dimensions.get('window');
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
@@ -247,6 +249,7 @@ export default function TripPlanner() {
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
+  const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
   // Construction layer
   const [constructionOn, setConstructionOn] = useState(false);
   const [constructionLoading, setConstructionLoading] = useState(false);
@@ -944,9 +947,11 @@ export default function TripPlanner() {
           {/* Origin — green pin with "A" */}
           {origin && (
             <MarkerView id="tp-origin-label" coordinate={[origin.lng, origin.lat]}>
-              <View style={[st.numberedPin, { backgroundColor: theme.green }]}>
-                <Text style={st.pinText}>A</Text>
-              </View>
+              <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedMarker({ type: 'origin', name: origin.name, coordinate: [origin.lng, origin.lat] }); }}>
+                <View style={[st.numberedPin, { backgroundColor: theme.green }]}>
+                  <Text style={st.pinText}>A</Text>
+                </View>
+              </Pressable>
             </MarkerView>
           )}
           {origin && (
@@ -957,9 +962,11 @@ export default function TripPlanner() {
           {/* Destination — red pin with "B" */}
           {destination && (
             <MarkerView id="tp-dest-label" coordinate={[destination.lng, destination.lat]}>
-              <View style={[st.numberedPin, { backgroundColor: theme.red }]}>
-                <Text style={st.pinText}>B</Text>
-              </View>
+              <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedMarker({ type: 'destination', name: destination.name, coordinate: [destination.lng, destination.lat] }); }}>
+                <View style={[st.numberedPin, { backgroundColor: theme.red }]}>
+                  <Text style={st.pinText}>B</Text>
+                </View>
+              </Pressable>
             </MarkerView>
           )}
           {destination && (
@@ -976,9 +983,11 @@ export default function TripPlanner() {
             return (
               <View key={`tp-wp-group-${i}`}>
                 <MarkerView id={`tp-wp-label-${i}`} coordinate={[wp.lng, wp.lat]}>
-                  <View style={[st.numberedPin, { backgroundColor: pinColor }]}>
-                    <Text style={[st.pinText, { color: textColor }]}>{i + 1}</Text>
-                  </View>
+                  <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedMarker({ type: 'waypoint', index: i, name: wp.name, coordinate: [wp.lng, wp.lat] }); }}>
+                    <View style={[st.numberedPin, { backgroundColor: pinColor }]}>
+                      <Text style={[st.pinText, { color: textColor }]}>{i + 1}</Text>
+                    </View>
+                  </Pressable>
                 </MarkerView>
                 <PointAnnotation id={`tp-wp-${i}`} coordinate={[wp.lng, wp.lat]} draggable onDragStart={() => handleMarkerDragStart(i)} onDrag={(e: any) => handleMarkerDrag(i, e)} onDragEnd={(e: any) => handleMarkerDragEnd(i, e)}>
                   <View style={{ width: 26, height: 26, opacity: 0 }} />
@@ -1619,6 +1628,34 @@ export default function TripPlanner() {
           <Text style={[st.toastText, { color: theme.textPrimary }]}>{toastMsg}</Text>
         </View>
       )}
+
+      {/* Marker detail modal */}
+      <MarkerDetailModal
+        marker={selectedMarker}
+        onClose={() => setSelectedMarker(null)}
+        onRemove={(type, index) => {
+          if (type === 'origin') setOrigin(null);
+          else if (type === 'destination') setDestination(null);
+          else if (type === 'waypoint' && index != null) setWaypoints(waypoints.filter((_, i) => i !== index));
+        }}
+        onMoveToStart={(index) => {
+          const wp = waypoints[index];
+          if (!wp) return;
+          const newWps = waypoints.filter((_, i) => i !== index);
+          newWps.unshift(wp);
+          setWaypoints(newWps);
+        }}
+        onMoveToEnd={(index) => {
+          const wp = waypoints[index];
+          if (!wp) return;
+          const newWps = waypoints.filter((_, i) => i !== index);
+          newWps.push(wp);
+          setWaypoints(newWps);
+        }}
+        totalWaypoints={waypoints.length}
+        routeDistance={routeDistance}
+        routeDuration={routeDuration}
+      />
     </View>
   );
 }
@@ -1641,8 +1678,8 @@ const st = StyleSheet.create({
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  fullScreenBtn: { position: 'absolute', top: 58, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  constructionBtn: { position: 'absolute', top: 106, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fullScreenBtn: { position: 'absolute', top: 106, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  constructionBtn: { position: 'absolute', top: 58, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',
