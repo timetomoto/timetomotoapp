@@ -33,6 +33,8 @@
 - [ ] Scout — store selector optimization in ScoutPanelContent (useTripPlannerStore subscribes to full store)
 - [ ] Scout — voice input re-implement in dev build (expo-av stubbed out)
 - [x] fitRoute padding — reads actual panelY._value, verify on device
+- [ ] Scout — detect truncated responses (ends mid-sentence) and append "Sorry, my response was cut short. Try again or simplify your request."
+- [ ] Scout — "plan a loop" workflow: suggest waypoints in a radius around origin to create actual loop shape, not just destination=origin
 - [ ] SlideUpWrapper animation — build and apply to all modals (work started, not completed)
 - [ ] Scout quota bypass — configure with Supabase user ID before launch
 - [ ] Onboarding redesign — keep the simple 3-screen flow but update screen 1
