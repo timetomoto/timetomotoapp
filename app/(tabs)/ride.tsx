@@ -1651,7 +1651,6 @@ export default function RideScreen() {
             onNavigateToRideWindow={() => {
               resetNavigation();
               setPendingWeatherSubTab('ride-window');
-              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
               router.navigate('/(tabs)/trip' as any);
             }}
             onTryDifferentRoute={() => {
@@ -1694,7 +1693,6 @@ export default function RideScreen() {
               }
               tripStore.setTripWaypoints(wps);
               tripStore.setTripRoute(activeRoute.geometry, activeRoute.distanceMiles, activeRoute.durationSeconds, true);
-              useTabResetStore.getState().setPendingTripSubTab('trip-planner');
               const wasSampled = pts.length - 2 > maxWp;
               setNavMode('idle');
               setDestination(null);

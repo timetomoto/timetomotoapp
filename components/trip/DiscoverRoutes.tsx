@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { useRoutesStore, useAuthStore, useSafetyStore, useTripPlannerStore, useTabResetStore } from '../../lib/store';
+import { useRoutesStore, useAuthStore, useSafetyStore, useTripPlannerStore } from '../../lib/store';
 import { fetchUserRoutes, seedRoutes, createRoute, type Route } from '../../lib/routes';
 import { parseGpx, calcDistance, calcElevationGain } from '../../lib/gpx';
 import { useNavigationStore } from '../../lib/navigationStore';
@@ -14,6 +14,7 @@ export default function DiscoverRoutes() {
   const { user, loading: authLoading } = useAuthStore();
   const { setRoutes, setLoading, setPendingNavigateRoute } = useRoutesStore();
   const [importing, setImporting] = useState(false);
+  const [newRouteId, setNewRouteId] = useState<string | null>(null);
 
   // Load routes — wait for auth, then seed + fetch
   useEffect(() => {
@@ -68,9 +69,10 @@ export default function DiscoverRoutes() {
       const userId = user?.id ?? 'local';
       const distMiles = calcDistance(parsed.points);
       const elevFt = calcElevationGain(parsed.points);
-      await createRoute(userId, parsed.name, parsed.points, distMiles, elevFt, null, null, 'imported');
+      const saved = await createRoute(userId, parsed.name, parsed.points, distMiles, elevFt, null, null, 'imported');
       const fetched = await fetchUserRoutes(userId);
       setRoutes(fetched);
+      if (saved) setNewRouteId(saved.id);
     } catch {
       Alert.alert('Import failed', 'Could not read this GPX file.');
     } finally {
@@ -112,10 +114,7 @@ export default function DiscoverRoutes() {
     };
     tripStore.setTripRoute(geometry, route.distance_miles, route.duration_seconds ?? 0, true);
 
-    // Switch to Trip Planner tab
-    useTabResetStore.getState().setPendingTripSubTab('trip-planner');
-
-    // Notify user if route was sampled (delay to let navigation + full-screen settle)
+    // Notify user if route was sampled (delay to let navigation settle)
     if (pts.length - 2 > maxWaypoints) {
       const totalPoints = pts.length - 2;
       setTimeout(() => {
@@ -142,6 +141,7 @@ export default function DiscoverRoutes() {
       onImport={handleImport}
       onNewCategory={handleNewCategory}
       importing={importing}
+      highlightRouteId={newRouteId}
     />
   );
 }

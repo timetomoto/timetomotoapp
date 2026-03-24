@@ -132,7 +132,7 @@ export default function TripPlanner() {
 
   // Bottom sheet snap points
   const SNAP_COLLAPSED = SCREEN_H * 0.50 + 45;
-  const SNAP_EXPANDED = SCREEN_H - 65;
+  const SNAP_EXPANDED = SCREEN_H - 140;
   const panelY = useRef(new Animated.Value(SCREEN_H - SNAP_COLLAPSED)).current;
   const lastPanelY = useRef(SCREEN_H - SNAP_COLLAPSED);
 
@@ -151,9 +151,11 @@ export default function TripPlanner() {
         if (g.dy < -threshold) {
           // Swipe up → expand panel
           Animated.spring(panelY, { toValue: SCREEN_H - SNAP_EXPANDED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+          setPanelExpanded(true);
         } else {
           // Swipe down → collapse panel
           Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+          setPanelExpanded(false);
         }
       },
     })
@@ -249,6 +251,7 @@ export default function TripPlanner() {
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
+  const [panelExpanded, setPanelExpanded] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
   // Construction layer
   const [constructionOn, setConstructionOn] = useState(false);
@@ -1074,7 +1077,7 @@ export default function TripPlanner() {
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 200 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>
@@ -1105,18 +1108,8 @@ export default function TripPlanner() {
           ) : (
             /* Fields mode */
             <View style={st.fieldsWrap}>
-              {/* Top row: imported banner or clear trip */}
-              {tripRouteIsManual ? (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, paddingBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Feather name="map" size={12} color={theme.textMuted} />
-                    <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>IMPORTED ROUTE</Text>
-                  </View>
-                  <Pressable onPress={() => clearTrip()} hitSlop={8}>
-                    <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>CLEAR</Text>
-                  </Pressable>
-                </View>
-              ) : (origin || destination || waypoints.length > 0) ? (
+              {/* Clear trip — always show when data exists */}
+              {(origin || destination || waypoints.length > 0) && (
                 <Pressable
                   style={{ alignSelf: 'flex-end', paddingHorizontal: 4, paddingBottom: 6 }}
                   onPress={() => clearTrip()}
@@ -1124,17 +1117,23 @@ export default function TripPlanner() {
                 >
                   <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>CLEAR TRIP</Text>
                 </Pressable>
-              ) : null}
+              )}
 
-              {tripRouteIsManual ? (
-                /* Imported route — no editable fields, just info + actions */
+              {/* Too many points notice — routes with 26+ waypoints can't be edited */}
+              {tripRouteIsManual && waypoints.length > 23 && (
+                <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
+                    This route has too many stops to edit ({waypoints.length + 2} points). You can navigate it, save a copy, or clear it to plan a new route.
+                  </Text>
+                </View>
+              )}
+
+              {tripRouteIsManual && waypoints.length > 23 ? (
+                /* View-only for large routes */
                 <>
                   <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
-                    <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
-                      {origin?.name ?? 'Imported Route'}
-                    </Text>
-                    <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
-                      This route was imported and can't be edited here. You can navigate it, save a copy, or clear it to plan a new route.
+                    <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '600' }}>
+                      {origin?.name ?? 'Imported Route'} → {destination?.name ?? 'End'}
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 4 }}>
@@ -1514,7 +1513,7 @@ export default function TripPlanner() {
 
               {/* Bottom action buttons */}
               {canNavigate && activeField === null && (
-                <View style={{ marginTop: 8, marginBottom: 220, gap: 8, marginHorizontal: 16 }}>
+                <View style={{ marginTop: 8, marginBottom: panelExpanded ? 60 : 300, gap: 8, marginHorizontal: 16 }}>
                   <Pressable
                     onPress={handleNavigate}
                     style={{ backgroundColor: theme.red, borderRadius: 8, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -1676,10 +1675,10 @@ const st = StyleSheet.create({
   },
   fieldBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
-  fitRouteBtn: { position: 'absolute', top: 12, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
-  layersBtn: { position: 'absolute', top: 10, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  fullScreenBtn: { position: 'absolute', top: 106, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  constructionBtn: { position: 'absolute', top: 58, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fitRouteBtn: { position: 'absolute', top: 112, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  layersBtn: { position: 'absolute', top: 50, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fullScreenBtn: { position: 'absolute', top: 146, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  constructionBtn: { position: 'absolute', top: 98, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',

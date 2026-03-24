@@ -10,7 +10,7 @@ import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 
 const TABS = [
   { name: 'ride', label: 'RIDE' },
-  { name: 'trip', label: 'TRIP', icon: 'map' },
+  { name: 'trip', label: 'PLAN', icon: 'map' },
   { name: 'garage', label: 'GARAGE', icon: 'tool' },
 ] as const;
 

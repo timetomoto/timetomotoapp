@@ -24,7 +24,6 @@ import {
   useRoutesStore,
   useSafetyStore,
   useAuthStore,
-  useTabResetStore,
 } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
@@ -478,9 +477,6 @@ function ScoutPanelContent() {
               style={{ textDecorationLine: 'underline', color: theme.red }}
               onPress={() => {
                 closeScout();
-                if (p.link === '/(tabs)/trip') {
-                  useTabResetStore.getState().setPendingTripSubTab('trip-planner');
-                }
                 router.navigate(p.link as any);
               }}
             >

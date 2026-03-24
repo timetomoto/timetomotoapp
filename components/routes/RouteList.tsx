@@ -576,9 +576,10 @@ interface RouteListProps {
   onImport?: () => void;
   onNewCategory?: () => void;
   importing?: boolean;
+  highlightRouteId?: string | null;
 }
 
-export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner, headerExtra, onImport, onNewCategory, importing }: RouteListProps) {
+export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner, headerExtra, onImport, onNewCategory, importing, highlightRouteId }: RouteListProps) {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const {
@@ -656,6 +657,17 @@ export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner,
       autoExpandedRef.current = true;
     }
   }, [orderedKeys, grouped, loading]);
+
+  // Auto-expand category of highlighted (newly imported) route
+  useEffect(() => {
+    if (!highlightRouteId) return;
+    for (const [cat, catRoutes] of grouped.entries()) {
+      if (catRoutes.some((r) => r.id === highlightRouteId)) {
+        setExpandedCategories((prev) => ({ ...prev, [cat]: true }));
+        break;
+      }
+    }
+  }, [highlightRouteId]);
 
   function toggleCategory(category: string) {
     setExpandedCategories((prev) => {
