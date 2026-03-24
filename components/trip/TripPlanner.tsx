@@ -477,8 +477,20 @@ export default function TripPlanner() {
     })();
   }, []);
 
-  // Debounced route fetch + weather + conditions
+  // When a saved route is loaded (tripRouteIsManual), collapse panel and exit fullscreen
   const tripRouteIsManual = useTripPlannerStore((s) => s.tripRouteIsManual);
+  useEffect(() => {
+    if (tripRouteIsManual) {
+      if (fullScreen) {
+        setFullScreen(false);
+      }
+      setPanelExpanded(false);
+      Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
+      fitRouteWhenReady();
+    }
+  }, [tripRouteIsManual]);
+
+  // Debounced route fetch + weather + conditions
   /** Fetch weather + road conditions for a set of route coordinates */
   function fetchWeatherAndConditions(coords: [number, number][], durationSec: number) {
     const dOut = daysBetween(new Date(), departure);
