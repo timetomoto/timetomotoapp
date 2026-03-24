@@ -132,7 +132,7 @@ export default function TripPlanner() {
   const routeGeojsonRef = useRef<any>(null);
 
   // Bottom sheet snap points
-  const SNAP_COLLAPSED = SCREEN_H * 0.50 + 45;
+  const SNAP_COLLAPSED = SCREEN_H * 0.50 - 35;
   const SNAP_EXPANDED = SCREEN_H - 140;
   const panelY = useRef(new Animated.Value(SCREEN_H - SNAP_COLLAPSED)).current;
   const lastPanelY = useRef(SCREEN_H - SNAP_COLLAPSED);
@@ -360,12 +360,14 @@ export default function TripPlanner() {
   function enterFullScreen() {
     if (isScoutOpen) useScoutStore.getState().closeScout();
     setFullScreen(true);
+    setPanelExpanded(false);
     Animated.spring(panelY, { toValue: SCREEN_H + 100, useNativeDriver: false, tension: 80, friction: 14 }).start();
     setTimeout(() => fitRoute(true), 400);
   }
 
   function exitFullScreen() {
     setFullScreen(false);
+    setPanelExpanded(false);
     Animated.spring(panelY, { toValue: SCREEN_H - SNAP_COLLAPSED, useNativeDriver: false, tension: 80, friction: 14 }).start();
     setTimeout(() => fitRoute(false), 400);
   }
@@ -1110,7 +1112,7 @@ export default function TripPlanner() {
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 200 }} keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: panelExpanded ? 140 : 300 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>
@@ -1562,7 +1564,7 @@ export default function TripPlanner() {
 
               {/* Bottom action buttons */}
               {canNavigate && activeField === null && (
-                <View style={{ marginTop: 8, marginBottom: panelExpanded ? 60 : 300, gap: 8, marginHorizontal: 16 }}>
+                <View style={{ marginTop: 8, marginBottom: panelExpanded ? 140 : 300, gap: 8, marginHorizontal: 16 }}>
                   <Pressable
                     onPress={handleNavigate}
                     style={{ backgroundColor: theme.red, borderRadius: 8, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -1712,9 +1714,9 @@ const st = StyleSheet.create({
   fieldBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   mapOverlay: { position: 'absolute', top: 20, left: '50%', transform: [{ translateX: -20 }], zIndex: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: 8 },
   fitRouteBtn: { position: 'absolute', top: 112, left: 12, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
-  layersBtn: { position: 'absolute', top: 50, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  fullScreenBtn: { position: 'absolute', top: 98, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  constructionBtn: { position: 'absolute', top: 146, right: 12, width: 40, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  layersBtn: { position: 'absolute', top: 50, right: 12, width: 44, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  fullScreenBtn: { position: 'absolute', top: 102, right: 12, width: 44, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  constructionBtn: { position: 'absolute', top: 154, right: 12, width: 44, height: 44, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   fitRouteBtnText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   bottomSheet: {
     position: 'absolute',
