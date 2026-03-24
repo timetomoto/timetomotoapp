@@ -3,7 +3,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../lib/useTheme';
-import { useTripPlannerStore } from '../../lib/store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,23 +19,10 @@ interface Props {
   marker: SelectedMarker;
   onClose: () => void;
   onRemove: (type: 'origin' | 'waypoint' | 'destination', index?: number) => void;
-  onMoveToStart: (index: number) => void;
-  onMoveToEnd: (index: number) => void;
   totalWaypoints: number;
   routeDistance: number;
   routeDuration: number;
 }
-
-// ---------------------------------------------------------------------------
-// Route preference pills
-// ---------------------------------------------------------------------------
-
-const PREFS = [
-  { key: 'fastest', label: 'Fast', icon: 'zap' },
-  { key: 'no_highway', label: 'No Hwy', icon: 'slash' },
-  { key: 'scenic', label: 'Scenic', icon: 'sunrise' },
-  { key: 'backroads', label: 'Back Rds', icon: 'git-branch' },
-] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -57,24 +43,18 @@ export default function MarkerDetailModal({
   marker,
   onClose,
   onRemove,
-  onMoveToStart,
-  onMoveToEnd,
   totalWaypoints,
   routeDistance,
   routeDuration,
 }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const segmentPreferences = useTripPlannerStore((s) => s.tripSegmentPreferences);
-  const setSegmentPreference = useTripPlannerStore((s) => s.setTripSegmentPreference);
-  const globalPref = useTripPlannerStore((s) => s.tripRoutePreference);
 
   if (!marker) return null;
 
   const isWaypoint = marker.type === 'waypoint';
   const isOrigin = marker.type === 'origin';
   const idx = marker.index ?? 0;
-  const currentPref = isWaypoint ? (segmentPreferences[idx] ?? globalPref ?? 'fastest') : (globalPref ?? 'fastest');
 
   // Badge
   const badgeLabel = isOrigin ? 'A' : marker.type === 'destination' ? 'B' : `${idx + 1}`;
@@ -116,7 +96,7 @@ export default function MarkerDetailModal({
       <Pressable style={s.backdrop} onPress={onClose} />
 
       {/* Card pinned to bottom */}
-      <View style={[s.card, { backgroundColor: theme.bgPanel, borderColor: theme.border, top: insets.top + 60, paddingBottom: 14 }]}>
+      <View style={[s.card, { backgroundColor: theme.bgPanel, borderColor: theme.border, top: insets.top + 80, paddingBottom: 14 }]}>
 
         {/* Header: badge + name + close */}
         <View style={s.header}>
@@ -133,31 +113,6 @@ export default function MarkerDetailModal({
             <Feather name="x" size={18} color={theme.textMuted} />
           </Pressable>
         </View>
-
-        {/* Route preference (waypoints only) */}
-        {isWaypoint && (
-          <View style={s.prefSection}>
-            <Text style={[s.prefLabel, { color: theme.textSecondary }]}>ROUTE TO HERE</Text>
-            <View style={s.prefRow}>
-              {PREFS.map((p) => {
-                const active = currentPref === p.key;
-                return (
-                  <Pressable
-                    key={p.key}
-                    style={[s.prefPill, { backgroundColor: active ? theme.red : theme.bgCard, borderColor: active ? theme.red : theme.border }]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSegmentPreference(idx, p.key === globalPref ? null : p.key);
-                    }}
-                  >
-                    <Feather name={p.icon as any} size={14} color={active ? '#fff' : theme.textSecondary} />
-                    <Text style={[s.prefPillText, { color: active ? '#fff' : theme.textSecondary }]}>{p.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        )}
 
         {/* Stats */}
         <View style={s.stats}>
@@ -187,25 +142,9 @@ export default function MarkerDetailModal({
           )}
         </View>
 
-        {/* Bottom actions */}
+        {/* Remove action */}
         <View style={s.bottomRow}>
-          {/* Move buttons (waypoints with siblings) */}
-          {isWaypoint && totalWaypoints > 1 && (
-            <View style={s.moveGroup}>
-              {idx > 0 && (
-                <Pressable style={[s.moveBtn, { borderColor: theme.border }]} onPress={() => { onMoveToStart(idx); onClose(); }}>
-                  <Feather name="chevrons-up" size={14} color={theme.textSecondary} />
-                </Pressable>
-              )}
-              {idx < totalWaypoints - 1 && (
-                <Pressable style={[s.moveBtn, { borderColor: theme.border }]} onPress={() => { onMoveToEnd(idx); onClose(); }}>
-                  <Feather name="chevrons-down" size={14} color={theme.textSecondary} />
-                </Pressable>
-              )}
-            </View>
-          )}
           <View style={{ flex: 1 }} />
-          {/* Remove */}
           <Pressable style={[s.removeBtn, { borderColor: theme.border }]} onPress={handleRemove}>
             <Feather name="trash-2" size={16} color="#C62828" />
           </Pressable>
@@ -247,16 +186,6 @@ const s = StyleSheet.create({
   coords: { fontSize: 11, marginTop: 2 },
   closeBtn: { marginTop: 2 },
 
-  // Route preference
-  prefSection: { marginBottom: 14 },
-  prefLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 8 },
-  prefRow: { flexDirection: 'row', gap: 6 },
-  prefPill: {
-    flex: 1, paddingVertical: 10, alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: 10,
-  },
-  prefPillText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
-
   // Stats
   stats: { gap: 6, marginBottom: 16 },
   statRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -264,11 +193,6 @@ const s = StyleSheet.create({
 
   // Bottom actions
   bottomRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  moveGroup: { flexDirection: 'row', gap: 8 },
-  moveBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
-  },
   removeBtn: {
     width: 40, height: 40, borderRadius: 20,
     borderWidth: 1, alignItems: 'center', justifyContent: 'center',

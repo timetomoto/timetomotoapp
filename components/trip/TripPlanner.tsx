@@ -1115,7 +1115,10 @@ export default function TripPlanner() {
                   onPress={() => clearTrip()}
                   hitSlop={8}
                 >
-                  <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>CLEAR TRIP</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Feather name="rotate-ccw" size={11} color={theme.textMuted} />
+                    <Text style={{ color: theme.textMuted, fontSize: 11, fontWeight: '600' }}>CLEAR TRIP</Text>
+                  </View>
                 </Pressable>
               )}
 
@@ -1636,20 +1639,6 @@ export default function TripPlanner() {
           if (type === 'origin') setOrigin(null);
           else if (type === 'destination') setDestination(null);
           else if (type === 'waypoint' && index != null) setWaypoints(waypoints.filter((_, i) => i !== index));
-        }}
-        onMoveToStart={(index) => {
-          const wp = waypoints[index];
-          if (!wp) return;
-          const newWps = waypoints.filter((_, i) => i !== index);
-          newWps.unshift(wp);
-          setWaypoints(newWps);
-        }}
-        onMoveToEnd={(index) => {
-          const wp = waypoints[index];
-          if (!wp) return;
-          const newWps = waypoints.filter((_, i) => i !== index);
-          newWps.push(wp);
-          setWaypoints(newWps);
         }}
         totalWaypoints={waypoints.length}
         routeDistance={routeDistance}

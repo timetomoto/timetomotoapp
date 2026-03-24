@@ -458,7 +458,6 @@ interface TripPlannerState {
   tripSaved: boolean;
   tripRoutePreference: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null;
   tripRouteIsManual: boolean;
-  tripSegmentPreferences: Record<number, string>;
 
   setTripOrigin: (v: TripLoc | null) => void;
   setTripDestination: (v: TripLoc | null) => void;
@@ -470,7 +469,6 @@ interface TripPlannerState {
   setTripConditions: (conditions: RoadCondition[]) => void;
   setTripSaved: (v: boolean) => void;
   setTripRoutePreference: (v: 'scenic' | 'backroads' | 'no_highway' | 'fastest' | null) => void;
-  setTripSegmentPreference: (index: number, pref: string | null) => void;
   clearTrip: () => void;
 }
 
@@ -500,7 +498,6 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
   tripSaved: false,
   tripRoutePreference: null,
   tripRouteIsManual: false,
-  tripSegmentPreferences: {},
 
   setTripOrigin: (tripOrigin) => set({ tripOrigin }),
   setTripDestination: (tripDestination) => set({ tripDestination }),
@@ -515,11 +512,6 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
     set({ tripConditions, tripConditionsFetchedAt: Date.now() }),
   setTripSaved: (tripSaved) => set({ tripSaved }),
   setTripRoutePreference: (tripRoutePreference) => set({ tripRoutePreference }),
-  setTripSegmentPreference: (index, pref) => set((s) => {
-    const next = { ...s.tripSegmentPreferences };
-    if (pref) next[index] = pref; else delete next[index];
-    return { tripSegmentPreferences: next };
-  }),
   clearTrip: () => set({
     tripOrigin: null,
     tripDestination: null,
@@ -539,7 +531,6 @@ export const useTripPlannerStore = create<TripPlannerState>((set) => ({
     tripSaved: false,
     tripRoutePreference: null,
     tripRouteIsManual: false,
-    tripSegmentPreferences: {},
   }),
 }));
 

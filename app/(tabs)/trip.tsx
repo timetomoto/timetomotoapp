@@ -45,6 +45,7 @@ export default function PlanScreen() {
           </View>
           {/* Header */}
           <View style={[s.modalHeader, { borderBottomColor: theme.border }]}>
+            <View style={{ width: 20 }} />
             <Text style={[s.modalTitle, { color: theme.textPrimary }]}>MY ROUTES</Text>
             <Pressable onPress={() => setRoutesModalOpen(false)} hitSlop={12}>
               <Feather name="x" size={20} color={theme.textMuted} />
