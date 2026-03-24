@@ -26,6 +26,7 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useActiveBike } from '../../lib/useActiveBike';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -325,10 +326,7 @@ export default function RideScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { isMonitoring, setMonitoring } = useSafetyStore();
 
-  const selectedBike = useMemo(
-    () => bikes.find((b) => b.id === selectedBikeId) ?? null,
-    [bikes, selectedBikeId],
-  );
+  const selectedBike = useActiveBike();
 
   // ── Navigation store ──
   const {

@@ -23,16 +23,10 @@ export interface ParsedRoute {
 // Maths
 // ---------------------------------------------------------------------------
 
+import { haversineMiles as _haversineMiles } from './distance';
+
 function haversineMiles(a: TrackPoint, b: TrackPoint): number {
-  const R = 3958.8;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const lat1 = (a.lat * Math.PI) / 180;
-  const lat2 = (b.lat * Math.PI) / 180;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.asin(Math.sqrt(h));
+  return _haversineMiles(a.lat, a.lng, b.lat, b.lng);
 }
 
 export function calcDistance(points: TrackPoint[]): number {

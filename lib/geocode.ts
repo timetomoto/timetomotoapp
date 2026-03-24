@@ -3,8 +3,9 @@
 // Extracted from discoverStore.ts for reuse across Scout, Trip Planner, etc.
 // ---------------------------------------------------------------------------
 
-const AUSTIN_LNG = -97.7431;
-const AUSTIN_LAT = 30.2672;
+export const AUSTIN_LNG = -97.7431;
+export const AUSTIN_LAT = 30.2672;
+export const DEFAULT_LOCATION = { lat: AUSTIN_LAT, lng: AUSTIN_LNG } as const;
 const CACHE_MAX = 50;
 
 export interface GeocodedPlace {

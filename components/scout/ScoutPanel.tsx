@@ -27,6 +27,7 @@ import {
 } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
+import { useActiveBike } from '../../lib/useActiveBike';
 import { loadFavorites } from '../../lib/favorites';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
@@ -177,8 +178,7 @@ function ScoutPanelContent() {
 
   // App stores
   const bikes = useGarageStore((s) => s.bikes);
-  const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
-  const activeBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
+  const activeBike = useActiveBike();
   const tripOrigin = useTripPlannerStore((s) => s.tripOrigin);
   const tripDestination = useTripPlannerStore((s) => s.tripDestination);
   const tripWaypoints = useTripPlannerStore((s) => s.tripWaypoints);

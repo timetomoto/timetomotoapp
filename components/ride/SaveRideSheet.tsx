@@ -16,7 +16,7 @@ import { useTheme } from '../../lib/useTheme';
 import type { TrackPoint } from '../../lib/gpx';
 import { calcDistance, calcElevationGain } from '../../lib/gpx';
 import { reverseGeocode } from '../../lib/geocode';
-import { useGarageStore } from '../../lib/store';
+import { useActiveBike } from '../../lib/useActiveBike';
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -65,9 +65,7 @@ export default function SaveRideSheet({ visible, points, durationSeconds, onSave
   const avgSpeedMph     = durationSeconds > 0 ? (distanceMiles / durationSeconds) * 3600 : 0;
 
   // Bike info
-  const bikes = useGarageStore((s) => s.bikes);
-  const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
-  const activeBike = bikes.find((b) => b.id === selectedBikeId);
+  const activeBike = useActiveBike();
   const bikeNickname = activeBike?.nickname ?? activeBike?.model ?? 'bike';
 
   // Auto-generate ride name + summary via Gemini on mount
