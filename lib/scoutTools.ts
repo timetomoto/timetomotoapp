@@ -1,5 +1,4 @@
-import { useTripPlannerStore, useRoutesStore } from './store';
-import { useGarageStore } from './store';
+import { useTripPlannerStore, useRoutesStore, useGarageStore } from './store';
 import { geocodeLocation, reverseGeocode } from './geocode';
 import { addMaintenanceRecord, addModification, type MaintenanceRecord, type Modification } from './garage';
 

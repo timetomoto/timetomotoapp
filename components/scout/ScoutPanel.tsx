@@ -179,7 +179,12 @@ function ScoutPanelContent() {
   const bikes = useGarageStore((s) => s.bikes);
   const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
   const activeBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
-  const tripStore = useTripPlannerStore();
+  const tripOrigin = useTripPlannerStore((s) => s.tripOrigin);
+  const tripDestination = useTripPlannerStore((s) => s.tripDestination);
+  const tripWaypoints = useTripPlannerStore((s) => s.tripWaypoints);
+  const tripDeparture = useTripPlannerStore((s) => s.tripDeparture);
+  const tripRouteDistance = useTripPlannerStore((s) => s.tripRouteDistance);
+  const tripRouteDuration = useTripPlannerStore((s) => s.tripRouteDuration);
   const routes = useRoutesStore((s) => s.routes);
   const currentLocation = useSafetyStore((s) => s.lastKnownLocation);
   const userId = useAuthStore((s) => s.user?.id) ?? 'local';
@@ -249,9 +254,7 @@ function ScoutPanelContent() {
       ? { lat: currentLocation.lat, lng: currentLocation.lng }
       : null;
 
-    const tripOrigin = tripStore.tripOrigin;
-    const tripDest = tripStore.tripDestination;
-    const tripWps = tripStore.tripWaypoints as TripStop[];
+    const tripWps = tripWaypoints as TripStop[];
 
     return {
       currentScreen,
@@ -260,15 +263,15 @@ function ScoutPanelContent() {
       currentLocation: loc,
       currentTrip: {
         origin: tripOrigin ? { name: tripOrigin.name, lat: tripOrigin.lat, lng: tripOrigin.lng } : null,
-        destination: tripDest ? { name: tripDest.name, lat: tripDest.lat, lng: tripDest.lng } : null,
+        destination: tripDestination ? { name: tripDestination.name, lat: tripDestination.lat, lng: tripDestination.lng } : null,
         waypoints: tripWps.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
-        departureDate: tripStore.tripDeparture?.toISOString().split('T')[0] ?? null,
-        departureTime: tripStore.tripDeparture && (tripStore.tripDeparture.getHours() !== 0 || tripStore.tripDeparture.getMinutes() !== 0)
-          ? tripStore.tripDeparture.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+        departureDate: tripDeparture?.toISOString().split('T')[0] ?? null,
+        departureTime: tripDeparture && (tripDeparture.getHours() !== 0 || tripDeparture.getMinutes() !== 0)
+          ? tripDeparture.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
           : null,
         preference: null,
-        routeDistance: tripStore.tripRouteDistance || undefined,
-        routeDuration: tripStore.tripRouteDuration || undefined,
+        routeDistance: tripRouteDistance || undefined,
+        routeDuration: tripRouteDuration || undefined,
       },
       savedRoutes: routes.map((r) => ({
         id: r.id,
@@ -280,7 +283,7 @@ function ScoutPanelContent() {
       recentMaintenanceLogs: [],
       serviceIntervals: null,
     };
-  }, [bikes, activeBike, currentLocation, tripStore, favorites, routes, currentScreen]);
+  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, favorites, routes, currentScreen]);
 
   // ── Send message ───────────────────────────────────────────────────────
 

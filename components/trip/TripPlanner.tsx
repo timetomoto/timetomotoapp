@@ -137,11 +137,17 @@ export default function TripPlanner() {
   const panelY = useRef(new Animated.Value(SCREEN_H - SNAP_COLLAPSED)).current;
   const lastPanelY = useRef(SCREEN_H - SNAP_COLLAPSED);
 
+  // Keep lastPanelY in sync with animated value (avoids _value cast)
+  useEffect(() => {
+    const id = panelY.addListener(({ value }) => { lastPanelY.current = value; });
+    return () => panelY.removeListener(id);
+  }, []);
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 10,
       onPanResponderGrant: () => {
-        lastPanelY.current = (panelY as any)._value;
+        // lastPanelY is kept in sync via panelY.addListener
       },
       onPanResponderMove: (_, g) => {
         const newY = Math.max(SCREEN_H - SNAP_EXPANDED, Math.min(SCREEN_H - SNAP_COLLAPSED, lastPanelY.current + g.dy));

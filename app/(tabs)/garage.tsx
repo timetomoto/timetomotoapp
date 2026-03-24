@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,8 +10,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useSafetyStore } from '../../lib/store';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore, useGarageStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import AddBikeModal from '../../components/garage/AddBikeModal';
@@ -138,31 +139,36 @@ export default function GarageScreen() {
     );
   }
 
+  const lastKnownLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const mapToken = process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '';
+  const staticMapLat = lastKnownLocation?.lat ?? 30.2672;
+  const staticMapLng = lastKnownLocation?.lng ?? -97.7431;
+  const staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/${staticMapLng},${staticMapLat},10,0/400x200@2x?access_token=${mapToken}`;
+
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: theme.bg }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
+    <View style={[styles.root, { backgroundColor: theme.bg }]}>
+      {/* Static map background */}
+      <Image source={{ uri: staticMapUrl }} style={styles.staticMap} contentFit="cover" />
+      <View style={[styles.staticMapOverlay, { backgroundColor: theme.bg + 'CC' }]} />
+
+      {/* Floating controls */}
+      <View style={[styles.floatingHeader, { top: Platform.OS === 'ios' ? 52 : 10 }]}>
         <HamburgerButton onPress={() => setMenuOpen(true)} />
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={[styles.heading, { color: theme.textPrimary }]}>GARAGE</Text>
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable
-            style={[styles.addBtn, { backgroundColor: theme.red }, theme.btnBorderTop && { borderTopColor: theme.btnBorderTop, borderBottomColor: theme.btnBorderBottom, borderTopWidth: 1, borderBottomWidth: 1 }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setShowAddBike(true);
-            }}
-            accessibilityLabel="Add a bike"
-            accessibilityRole="button"
-          >
-            <Text style={styles.addBtnText}>+ ADD BIKE</Text>
-          </Pressable>
-        </View>
+        <Pressable
+          style={[styles.addBtn, { backgroundColor: theme.red }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setShowAddBike(true);
+          }}
+          accessibilityLabel="Add a bike"
+          accessibilityRole="button"
+        >
+          <Text style={styles.addBtnText}>+ ADD BIKE</Text>
+        </Pressable>
       </View>
 
+      {/* Garage panel — solid background, starts below floating header */}
+      <View style={[styles.garagePanel, { backgroundColor: theme.bg }]}>
       {loading ? (
         <ScrollView contentContainerStyle={styles.scrollContent} scrollIndicatorInsets={{ bottom: 40 }}>
           <BikeCardSkeleton />
@@ -311,6 +317,7 @@ export default function GarageScreen() {
           </>)}
         </ScrollView>
       )}
+      </View>
 
       {/* Add Bike Modal — always mounted, visibility controlled */}
       <AddBikeModal
@@ -334,7 +341,7 @@ export default function GarageScreen() {
 
       {/* Hamburger menu */}
       <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -343,22 +350,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Header
-  header: {
+  // Static map
+  staticMap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+  },
+  staticMapOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+  },
+  floatingHeader: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    zIndex: 10,
   },
-  heading: {
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addBtn: {
     borderRadius: 6,
     paddingHorizontal: 14,
@@ -402,10 +417,17 @@ const styles = StyleSheet.create({
   },
 
   // Scroll
+  garagePanel: {
+    flex: 1,
+    marginTop: Platform.OS === 'ios' ? 108 : 70,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
   scrollContent: {
-    paddingVertical: 16,
+    paddingTop: 16,
     paddingHorizontal: 12,
-    paddingBottom: 120,
+    paddingBottom: 300,
   },
 
   // Bike selector chips
