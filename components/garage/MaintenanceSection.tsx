@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
+import { useGarageStore } from '../../lib/store';
 import {
   loadMaintenance,
   addMaintenanceRecord,
@@ -210,9 +211,10 @@ export default function MaintenanceSection({ bikeId, userId, onCountChange }: { 
   const [showForm, setShowForm]   = useState(false);
   const [editing, setEditing]     = useState<MaintenanceRecord | null>(null);
 
+  const maintenanceRefresh = useGarageStore((s) => s.maintenanceRefresh);
   useEffect(() => {
     loadMaintenance(bikeId, userId).then(setRecords);
-  }, [bikeId]);
+  }, [bikeId, maintenanceRefresh]);
 
   useEffect(() => { onCountChange?.(records.length); }, [records.length]);
 

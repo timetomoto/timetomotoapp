@@ -175,8 +175,8 @@ export async function loadMaintenance(bikeId: string, userId?: string): Promise<
 }
 
 export async function addMaintenanceRecord(bikeId: string, record: MaintenanceRecord, userId?: string): Promise<void> {
-  if (userId) {
-    await supabase.from('maintenance_logs').insert({
+  if (userId && userId !== 'local') {
+    const { error } = await supabase.from('maintenance_logs').insert({
       id: record.id,
       bike_id: bikeId,
       user_id: userId,
@@ -187,8 +187,9 @@ export async function addMaintenanceRecord(bikeId: string, record: MaintenanceRe
       cost: record.cost ?? null,
       notes: record.notes ?? null,
     });
+    if (error) console.error('addMaintenanceRecord Supabase error:', error.message);
   }
-  // Update local cache
+  // Always update local cache
   const existing = await loadLocalMaintenance(bikeId);
   await AsyncStorage.setItem(maintenanceKey(bikeId), JSON.stringify([record, ...existing]));
 }
@@ -262,8 +263,8 @@ export async function loadModifications(bikeId: string, userId?: string): Promis
 }
 
 export async function addModification(bikeId: string, record: Modification, userId?: string): Promise<void> {
-  if (userId) {
-    await supabase.from('mod_logs').insert({
+  if (userId && userId !== 'local') {
+    const { error } = await supabase.from('mod_logs').insert({
       id: record.id,
       bike_id: bikeId,
       user_id: userId,
@@ -274,6 +275,7 @@ export async function addModification(bikeId: string, record: Modification, user
       cost: record.cost ?? null,
       notes: record.notes ?? null,
     });
+    if (error) console.error('addModification Supabase error:', error.message);
   }
   const existing = await loadLocalModifications(bikeId);
   await AsyncStorage.setItem(modificationsKey(bikeId), JSON.stringify([record, ...existing]));

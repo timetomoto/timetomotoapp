@@ -255,17 +255,20 @@ interface GarageState {
   bikes: Bike[];
   selectedBikeId: string | null;
   loading: boolean;
+  maintenanceRefresh: number;
   fetchBikes: (userId: string) => Promise<void>;
   addBike: (bike: Bike) => void;
   updateBike: (bike: Bike) => void;
   removeBike: (id: string, local?: boolean) => Promise<void>;
   selectBike: (id: string) => void;
+  bumpMaintenanceRefresh: () => void;
 }
 
 export const useGarageStore = create<GarageState>((set, get) => ({
   bikes: [],
   selectedBikeId: null,
   loading: false,
+  maintenanceRefresh: 0,
 
   fetchBikes: async (userId) => {
     set({ loading: true });
@@ -315,6 +318,7 @@ export const useGarageStore = create<GarageState>((set, get) => ({
   },
 
   selectBike: (id) => set({ selectedBikeId: id }),
+  bumpMaintenanceRefresh: () => set((s) => ({ maintenanceRefresh: s.maintenanceRefresh + 1 })),
 }));
 
 // ---------------------------------------------------------------------------
@@ -537,11 +541,9 @@ interface TabResetState {
   tripReset: number;
   pendingWeatherSubTab: 'current' | 'ride-window' | null;
   pendingTripSubTab: 'trip-planner' | null;
-  pendingTripFullScreen: boolean;
   resetTab: (tab: 'ride' | 'weather' | 'garage' | 'trip') => void;
   setPendingWeatherSubTab: (tab: 'current' | 'ride-window' | null) => void;
   setPendingTripSubTab: (tab: 'trip-planner' | null) => void;
-  setPendingTripFullScreen: (v: boolean) => void;
 }
 
 export const useTabResetStore = create<TabResetState>((set) => ({
@@ -551,9 +553,7 @@ export const useTabResetStore = create<TabResetState>((set) => ({
   tripReset: 0,
   pendingWeatherSubTab: null,
   pendingTripSubTab: null,
-  pendingTripFullScreen: false,
   resetTab: (tab) => set((s) => ({ [`${tab}Reset`]: s[`${tab}Reset` as keyof TabResetState] as number + 1 })),
   setPendingWeatherSubTab: (tab) => set({ pendingWeatherSubTab: tab }),
   setPendingTripSubTab: (tab) => set({ pendingTripSubTab: tab }),
-  setPendingTripFullScreen: (pendingTripFullScreen) => set({ pendingTripFullScreen }),
 }));

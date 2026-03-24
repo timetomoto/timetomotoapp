@@ -167,6 +167,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `Garage:\n` +
     `- ask_garage: Answer questions about any bike's specs, maintenance, or service intervals. Pass bike_name to query a specific bike, or omit for the active bike.\n` +
     `- set_active_bike: Switch the active bike by nickname or model name.\n` +
+    `- add_maintenance_log: Add a maintenance entry (oil change, tire change, chain lube, etc.) to any bike's log. Defaults to active bike and today's date.\n` +
+    `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
     `Saved routes:\n` +
     `- describe_saved_route: Look up a saved route by name and return its details. ALWAYS call this tool when the rider asks about a saved route — the context summary above only shows a preview, the tool searches ALL routes.\n` +
     `- load_saved_route: Load a saved route into Trip Planner so the rider can view, edit, or navigate it. Also call this before get_weather_briefing if the rider wants weather on a saved route.\n` +

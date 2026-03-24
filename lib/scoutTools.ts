@@ -1,6 +1,15 @@
 import { useTripPlannerStore, useRoutesStore } from './store';
 import { useGarageStore } from './store';
 import { geocodeLocation, reverseGeocode } from './geocode';
+import { addMaintenanceRecord, addModification, type MaintenanceRecord, type Modification } from './garage';
+
+/** Generate a v4 UUID for Supabase compatibility */
+function uuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 import { fetchDirections } from './directions';
 import {
   fetchRouteWeather,
@@ -248,6 +257,41 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
         query: { type: 'string', description: 'Nickname or model name of the bike to activate.' },
       },
       required: ['query'],
+    },
+  },
+
+  {
+    name: 'add_maintenance_log',
+    description: 'Add a maintenance log entry to a bike. Use when the rider says they did an oil change, tire change, chain lube, or any maintenance work.',
+    parameters: {
+      type: 'object',
+      properties: {
+        maintenance_type: { type: 'string', description: 'Type of maintenance: oil change, tire change, chain lube, brake pads, air filter, coolant flush, valve adjustment, general service, etc.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit to use the active bike.' },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format. Defaults to today if omitted.' },
+        mileage: { type: 'number', description: 'Odometer reading at time of service. Omit if unknown.' },
+        cost: { type: 'number', description: 'Cost in dollars. Omit if unknown.' },
+        notes: { type: 'string', description: 'Any additional notes about the service.' },
+      },
+      required: ['maintenance_type'],
+    },
+  },
+
+  {
+    name: 'add_modification',
+    description: 'Add a modification/accessory to a bike. Use when the rider says they installed exhaust, handguards, crash bars, luggage, GPS mount, suspension, lighting, or any aftermarket part.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Name of the modification or part installed.' },
+        category: { type: 'string', description: 'Category: exhaust, protection, luggage, suspension, lighting, electronics, ergonomics, performance, cosmetic, other.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit to use the active bike.' },
+        brand: { type: 'string', description: 'Brand name of the part (e.g. Akrapovic, SW-Motech). Omit if unknown.' },
+        date_installed: { type: 'string', description: 'Date in YYYY-MM-DD format. Defaults to today if omitted.' },
+        cost: { type: 'number', description: 'Cost in dollars. Omit if unknown.' },
+        notes: { type: 'string', description: 'Any additional notes.' },
+      },
+      required: ['title', 'category'],
     },
   },
 
@@ -728,6 +772,94 @@ export async function executeScoutTool(
         garageStore.selectBike(match.id);
         const label = [match.year, match.make, match.model].filter(Boolean).join(' ');
         return `Switched active bike to ${match.nickname ? `${label} ("${match.nickname}")` : label}.`;
+      }
+
+      case 'add_maintenance_log': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const now = new Date();
+        const dateStr = (parameters.date as string) ?? now.toISOString().split('T')[0];
+        const maintenanceType = parameters.maintenance_type as string;
+        const title = maintenanceType.charAt(0).toUpperCase() + maintenanceType.slice(1);
+
+        const record: MaintenanceRecord = {
+          id: uuid(),
+          bikeId: bike.id,
+          title,
+          maintenanceType: title,
+          date: dateStr,
+          mileage: parameters.mileage as number | undefined,
+          cost: parameters.cost as number | undefined,
+          notes: parameters.notes as string | undefined,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        };
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        try {
+          await addMaintenanceRecord(bike.id, record, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to save maintenance record: ${e?.message ?? 'unknown error'}. Try again.`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        let confirmation = `Added "${title}" to ${bikeLabel}'s maintenance log for ${dateStr}.`;
+        if (parameters.mileage) confirmation += ` Odometer: ${(parameters.mileage as number).toLocaleString()} mi.`;
+        if (parameters.cost) confirmation += ` Cost: $${parameters.cost}.`;
+        return confirmation;
+      }
+
+      case 'add_modification': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const now = new Date();
+        const mod: Modification = {
+          id: uuid(),
+          bikeId: bike.id,
+          title: parameters.title as string,
+          brand: parameters.brand as string | undefined,
+          category: parameters.category as string,
+          dateInstalled: (parameters.date_installed as string) ?? now.toISOString().split('T')[0],
+          cost: parameters.cost as number | undefined,
+          notes: parameters.notes as string | undefined,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+        };
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        try {
+          await addModification(bike.id, mod, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to save modification: ${e?.message ?? 'unknown error'}. Try again.`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        let confirmation = `Added "${mod.title}" to ${bikeLabel}'s modifications.`;
+        if (mod.brand) confirmation += ` Brand: ${mod.brand}.`;
+        if (mod.cost) confirmation += ` Cost: $${mod.cost}.`;
+        return confirmation;
       }
 
       // ── Saving ──────────────────────────────────────────────────────

@@ -6,7 +6,6 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { darkTheme } from '../../lib/theme';
 import { useScoutStore } from '../../lib/scoutStore';
-import { useTripPlannerStore } from '../../lib/store';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 
 const TABS = [
@@ -22,7 +21,6 @@ export default function FloatingTabBar() {
   const { theme } = useTheme();
   const isScoutOpen = useScoutStore((s) => s.isScoutOpen);
   const openScout = useScoutStore((s) => s.openScout);
-  const weatherHasConcern = useTripPlannerStore((s) => s.tripWeatherHasConcern);
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
@@ -43,7 +41,6 @@ export default function FloatingTabBar() {
               <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
               <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
             </View>
-            {weatherHasConcern && <View style={s.alertDot} />}
           </View>
           <View style={{ position: 'relative' }}>
             {/* Black stroke copies */}
@@ -145,16 +142,5 @@ const s = StyleSheet.create({
     textShadowColor: '#000',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
-  },
-  alertDot: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF9800',
-    borderWidth: 1.5,
-    borderColor: '#000',
   },
 });

@@ -310,7 +310,28 @@ function ScoutPanelContent() {
     setError(null);
 
     try {
-      const ctx = buildContext();
+      // Ensure favorites are loaded before building context (fixes Home location race)
+      let currentFavorites = favorites;
+      if (currentFavorites.length === 0) {
+        try {
+          const freshFavs = await loadFavorites(userId);
+          if (freshFavs.length > 0) {
+            currentFavorites = freshFavs.map((f) => ({
+              id: f.id ?? f.name,
+              nickname: f.nickname ?? f.name,
+              address: f.address ?? f.name,
+              isHome: f.is_home ?? false,
+            }));
+            setFavorites(currentFavorites);
+          }
+        } catch {}
+      }
+
+      // Build context with guaranteed-fresh favorites
+      const ctx: ScoutContext = {
+        ...buildContext(),
+        favoriteLocations: currentFavorites,
+      };
       const history = useScoutStore.getState().messages;
       const result = await sendScoutMessage(msg, history.slice(0, -1), ctx);
 

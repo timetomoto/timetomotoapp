@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
+import { useGarageStore } from '../../lib/store';
 import {
   loadModifications,
   addModification,
@@ -186,7 +187,8 @@ export default function ModificationsSection({ bikeId, userId, onCountChange }: 
   const [showForm, setShowForm]   = useState(false);
   const [editing, setEditing]     = useState<Modification | null>(null);
 
-  useEffect(() => { loadModifications(bikeId, userId).then(setRecords); }, [bikeId]);
+  const maintenanceRefresh = useGarageStore((s) => s.maintenanceRefresh);
+  useEffect(() => { loadModifications(bikeId, userId).then(setRecords); }, [bikeId, maintenanceRefresh]);
   useEffect(() => { onCountChange?.(records.length); }, [records.length]);
 
   const sorted = sortRecords(records, sortKey);

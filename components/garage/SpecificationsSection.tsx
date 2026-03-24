@@ -11,7 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import type { Bike, BikeSpecs } from '../../lib/store';
-import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -488,7 +487,6 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
   const [specs, setSpecs] = useState<BikeSpecs>(bike.specs ?? {});
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupDone, setLookupDone] = useState(specs.specsLookedUp === true);
-  const openScout = useScoutStore((s) => s.openScout);
   const [lookedUpAt, setLookedUpAt] = useState<string | null>(specs.specsLookedUpAt ?? null);
   const hasTriggered = useRef(false);
 
@@ -645,20 +643,6 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
-          {/* Ask Scout button */}
-          {lookupDone && (
-            <Pressable
-              style={[st.scoutBtn, { borderColor: theme.red }]}
-              onPress={() => openScout({ initialMessage: `Tell me about my ${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}` })}
-            >
-              <View style={{ width: 16, height: 16 }}>
-                <View style={{ position: 'absolute', width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: theme.red }} />
-                <View style={{ position: 'absolute', left: 7, top: 2, width: 2, height: 5.5, backgroundColor: theme.red, borderRadius: 1 }} />
-                <View style={{ position: 'absolute', left: 7, top: 8.5, width: 2, height: 5.5, backgroundColor: theme.red, opacity: 0.4, borderRadius: 1 }} />
-              </View>
-              <Text style={[st.scoutBtnText, { color: theme.red }]}>ASK SCOUT ABOUT YOUR BIKE</Text>
-            </Pressable>
-          )}
 
         </View>
 
@@ -770,15 +754,4 @@ const st = StyleSheet.create({
   },
   refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   dataSource: { fontSize: 10, lineHeight: 14, marginTop: 16, marginBottom: 8, fontStyle: 'italic' },
-  scoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    marginTop: 16,
-  },
-  scoutBtnText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
 });

@@ -630,8 +630,8 @@ export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner,
   const grouped = groupRoutes(filteredRoutes);
   const allCategories = [...grouped.keys()];
 
-  // Build ordered category list
-  const allGroupKeys = [...grouped.keys()];
+  // Build ordered category list — exclude empty categories
+  const allGroupKeys = [...grouped.keys()].filter((k) => (grouped.get(k)?.length ?? 0) > 0);
   const orderedKeys = [
     ...categoryOrder.filter((k) => allGroupKeys.includes(k)),
     ...allGroupKeys.filter((k) => !categoryOrder.includes(k)),
@@ -732,10 +732,19 @@ export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner,
   }
 
   function handleDeleteCategory(categoryName: string) {
-    const count = routes.filter((r) => r.category === categoryName).length;
+    // Use the same grouping logic to find the exact routes in this category
+    const categoryRoutes = grouped.get(categoryName) ?? [];
+    const toUpdate = categoryRoutes;
+    const count = toUpdate.length;
+
+    if (count === 0) {
+      setCategoryOrder((prev) => prev.filter((c) => c !== categoryName));
+      return;
+    }
+
     Alert.alert(
       'Delete Folder',
-      `Delete "${categoryName}"? The ${count} route${count !== 1 ? 's' : ''} inside will be moved to Uncategorized.`,
+      `Delete "${categoryName}"? The ${count} route${count !== 1 ? 's' : ''} inside will be permanently deleted.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -743,11 +752,11 @@ export default function RouteList({ showSavedRides, onNavigate, onViewInPlanner,
           style: 'destructive',
           onPress: async () => {
             const userId = user?.id ?? 'local';
-            const toUpdate = routes.filter((r) => r.category === categoryName);
             for (const r of toUpdate) {
-              updateRouteCategoryStore(r.id, null);
-              await updateRouteCategory(r.id, null, userId);
+              removeRoute(r.id);
+              await deleteRoute(r.id, userId);
             }
+            setCategoryOrder((prev) => prev.filter((c) => c !== categoryName));
           },
         },
       ],
