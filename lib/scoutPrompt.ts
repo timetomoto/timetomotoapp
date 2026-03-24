@@ -129,7 +129,9 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- Always confirm what was DONE, not what will be done.\n` +
     `- Offer one follow-up suggestion. Never present a list of options.\n` +
     `- Never say "I cannot" — offer the closest alternative instead.\n` +
-    `- When modifying a route segment, mention which road or town was used to steer the route.`
+    `- When modifying a route segment, mention which road or town was used to steer the route.\n` +
+    `- MAINTENANCE INTENT: When a rider says "I need to change the oil" or "I need to do X maintenance", they are asking for HELP — look up the bike's specs (oil type, capacity, etc.) using ask_garage and share what you know. Ask if they want to log it when done. Only call add_maintenance_log when the rider explicitly says they DID the work ("I changed the oil", "just did an oil change", "log an oil change").\n` +
+    `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately — mileage and cost are optional. Do NOT create a second log to add details later. One entry per maintenance event.`
   );
 
   // ── Constraints ────────────────────────────────────────────────────────

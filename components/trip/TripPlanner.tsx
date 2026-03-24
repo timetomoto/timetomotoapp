@@ -272,15 +272,18 @@ export default function TripPlanner() {
     const coords = geojson.coordinates;
     const lats = coords.map((c: number[]) => c[1]);
     const lngs = coords.map((c: number[]) => c[0]);
-    // Calculate bottom padding based on visible map area
-    // panelY is the Y position of the panel top — everything below is covered
-    const currentPanelY = (panelY as any)._value as number;
-    const panelCover = Math.max(0, SCREEN_H - currentPanelY);
-    const tabBarHeight = 80;
-    const bottomPad = (isFullScreenMode ?? fullScreen)
-      ? tabBarHeight
-      : panelCover + 40;
-    cameraRef.current?.fitBounds([Math.max(...lngs), Math.max(...lats)], [Math.min(...lngs), Math.min(...lats)], [60, 40, bottomPad, 40], 600);
+    // Two modes only:
+    // - Full screen: tab bar + safe area at bottom (~100px), header at top (~60px)
+    // - Panel visible: collapsed panel covers bottom half, only fit into top map portion
+    const isFS = isFullScreenMode ?? fullScreen;
+    const top = isFS ? 60 : 60;
+    const bottom = isFS ? 100 : SNAP_COLLAPSED;
+    cameraRef.current?.fitBounds(
+      [Math.max(...lngs), Math.max(...lats)],
+      [Math.min(...lngs), Math.min(...lats)],
+      [top, 40, bottom, 40],
+      600,
+    );
   }
 
   /** Poll for route geometry then fit — used after Scout closes */
@@ -481,6 +484,12 @@ export default function TripPlanner() {
           setTripRoute(r.geometry, r.distanceMiles, r.durationSeconds);
           setSaved(false);
           fetchWeatherAndConditions(r.geometry.coordinates, r.durationSeconds);
+          // Auto-fit camera to new route (skip if user is actively placing points)
+          if (!userIsPlacingPoints.current) {
+            // Update ref immediately so fitRoute has geometry
+            routeGeojsonRef.current = r.geometry;
+            fitRoute();
+          }
         }
       } catch {}
       setRouteLoading(false);
@@ -837,13 +846,22 @@ export default function TripPlanner() {
               </Pressable>
             </PointAnnotation>
           )}
-          {waypoints.map((wp, i) => (
-            <PointAnnotation key={`tp-wp-${i}`} id={`tp-wp-${i}`} coordinate={[wp.lng, wp.lat]} draggable onDragStart={() => handleMarkerDragStart(i)} onDrag={(e: any) => handleMarkerDrag(i, e)} onDragEnd={(e: any) => handleMarkerDragEnd(i, e)}>
-              <Pressable onLongPress={() => handleMarkerLongPress(i)}>
-                <View style={[st.marker, { backgroundColor: theme.orange }, draggingMarker === i && st.markerDragging]} />
-              </Pressable>
-            </PointAnnotation>
-          ))}
+          {waypoints.map((wp, i) => {
+            const isFuel = /gas|fuel|station|petrol|7-eleven|7eleven|shell|exxon|chevron|bp\b|circle k|qt\b|quiktrip|love'?s|pilot|flying j|casey|wawa|sheetz|racetrac|murphy|speedway|valero|sunoco|marathon|conoco|phillips|sinclair|citgo|hess|arco|mobil|texaco|costco gas|sam'?s gas|buc-ee/i.test(wp.name);
+            return (
+              <PointAnnotation key={`tp-wp-${i}`} id={`tp-wp-${i}`} coordinate={[wp.lng, wp.lat]} draggable onDragStart={() => handleMarkerDragStart(i)} onDrag={(e: any) => handleMarkerDrag(i, e)} onDragEnd={(e: any) => handleMarkerDragEnd(i, e)}>
+                <Pressable onLongPress={() => handleMarkerLongPress(i)}>
+                  {isFuel ? (
+                    <View style={[st.marker, { backgroundColor: '#FFD600', width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' }, draggingMarker === i && st.markerDragging]}>
+                      <Feather name="droplet" size={10} color="#000" />
+                    </View>
+                  ) : (
+                    <View style={[st.marker, { backgroundColor: theme.orange }, draggingMarker === i && st.markerDragging]} />
+                  )}
+                </Pressable>
+              </PointAnnotation>
+            );
+          })}
           {mapStyleReady && routeGeojson && <ShapeSource id="tp-route" shape={routeGeojson} onPress={handleRouteLinePress}><LineLayer id="tp-route-line" style={{ lineColor: theme.red, lineWidth: 4, lineOpacity: 0.8 }} /></ShapeSource>}
           {/* Construction layer */}
           {mapStyleReady && constructionOn && constructionGeoJSON.features.length > 0 && (
@@ -975,95 +993,86 @@ export default function TripPlanner() {
                 </Pressable>
               ) : null}
 
-              {/* Imported route notice */}
-              {tripRouteIsManual && (
-                <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
-                    This route was imported and can't be edited here. You can navigate it, save a copy, or clear it to plan a new route.
-                  </Text>
-                </View>
-              )}
-
-              {/* Origin — view-only for manual routes */}
-              <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={tripRouteIsManual ? undefined : () => setActiveField('origin')} disabled={tripRouteIsManual}>
-                <View style={[st.dot, { backgroundColor: theme.green }]} />
-                <Text style={[st.fieldText, { color: origin ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{origin?.name ?? 'Starting point'}</Text>
-                {origin && !tripRouteIsManual && <Pressable onPress={() => setOrigin(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
-              </Pressable>
-
-              {/* Waypoints */}
-              {waypoints.length > 0 && (
-                tripRouteIsManual ? (
-                  /* View-only waypoint list for imported routes */
-                  <View>
-                    {waypoints.map((wp, idx) => (
-                      <View key={`wp-${idx}`} style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border, marginBottom: 10 }]}>
-                        <View style={[st.dot, { backgroundColor: theme.orange }]} />
-                        <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
-                      </View>
-                    ))}
+              {tripRouteIsManual ? (
+                /* Imported route — no editable fields, just info + actions */
+                <>
+                  <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
+                    <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '600', marginBottom: 4 }}>
+                      {origin?.name ?? 'Imported Route'}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
+                      This route was imported and can't be edited here. You can navigate it, save a copy, or clear it to plan a new route.
+                    </Text>
                   </View>
-                ) : (
-                  /* Editable draggable waypoints */
-                  <GestureHandlerRootView>
-                    <DraggableFlatList
-                      data={waypoints}
-                      keyExtractor={(_item, index) => `wp-${index}`}
-                      scrollEnabled={false}
-                      onDragEnd={({ data }) => setWaypoints(data)}
-                      renderItem={({ item: wp, drag, isActive, getIndex }: RenderItemParams<Loc>) => {
-                        const idx = getIndex() ?? 0;
-                        return (
-                          <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, opacity: isActive ? 0.8 : 1, transform: [{ scale: isActive ? 1.03 : 1 }] }]}>
-                            <Pressable style={[st.field, { backgroundColor: isActive ? theme.bgPanel : theme.bgCard, borderColor: theme.border, flex: 1 }]} onPress={() => setActiveField(idx)}>
-                              <View style={[st.dot, { backgroundColor: theme.orange }]} />
-                              <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
-                            </Pressable>
-                            <Pressable onPress={() => setWaypoints(waypoints.filter((_, i) => i !== idx))} hitSlop={6}><Feather name="x-circle" size={16} color={theme.textMuted} /></Pressable>
-                            <Pressable onLongPress={drag} delayLongPress={150} hitSlop={6} style={{ paddingVertical: 8, paddingHorizontal: 4 }}>
-                              <Feather name="menu" size={16} color={theme.textMuted} />
-                            </Pressable>
-                          </View>
-                        );
-                      }}
-                    />
-                  </GestureHandlerRootView>
-                )
-              )}
-
-              {/* Destination — view-only for manual routes */}
-              <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={tripRouteIsManual ? undefined : () => setActiveField('destination')} disabled={tripRouteIsManual}>
-                <View style={[st.dot, { backgroundColor: theme.red }]} />
-                <Text style={[st.fieldText, { color: destination ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{destination?.name ?? 'Destination'}</Text>
-                {destination && !tripRouteIsManual && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
-              </Pressable>
-
-              {/* Add Stop | Reverse | Import — hidden for manual routes */}
-              {!tripRouteIsManual && (
-                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
-                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
-                    <Feather name="plus" size={13} color={theme.textSecondary} />
-                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
-                  </Pressable>
-                  {origin && destination && (
-                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleReverse}>
-                      <Feather name="refresh-cw" size={13} color={theme.textSecondary} />
-                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Reverse</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 4 }}>
+                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
+                      <Feather name="bookmark" size={13} color={theme.textSecondary} />
+                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import Different Route</Text>
                     </Pressable>
+                  </View>
+                </>
+              ) : (
+                /* Editable fields for planned routes */
+                <>
+                  {/* Origin */}
+                  <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('origin')}>
+                    <View style={[st.dot, { backgroundColor: theme.green }]} />
+                    <Text style={[st.fieldText, { color: origin ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{origin?.name ?? 'Starting point'}</Text>
+                    {origin && <Pressable onPress={() => setOrigin(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
+                  </Pressable>
+
+                  {/* Waypoints — draggable */}
+                  {waypoints.length > 0 && (
+                    <GestureHandlerRootView>
+                      <DraggableFlatList
+                        data={waypoints}
+                        keyExtractor={(_item, index) => `wp-${index}`}
+                        scrollEnabled={false}
+                        onDragEnd={({ data }) => setWaypoints(data)}
+                        renderItem={({ item: wp, drag, isActive, getIndex }: RenderItemParams<Loc>) => {
+                          const idx = getIndex() ?? 0;
+                          return (
+                            <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, opacity: isActive ? 0.8 : 1, transform: [{ scale: isActive ? 1.03 : 1 }] }]}>
+                              <Pressable style={[st.field, { backgroundColor: isActive ? theme.bgPanel : theme.bgCard, borderColor: theme.border, flex: 1 }]} onPress={() => setActiveField(idx)}>
+                                <View style={[st.dot, { backgroundColor: theme.orange }]} />
+                                <Text style={[st.fieldText, { color: theme.textPrimary }]} numberOfLines={1}>{wp.name}</Text>
+                              </Pressable>
+                              <Pressable onPress={() => setWaypoints(waypoints.filter((_, i) => i !== idx))} hitSlop={6}><Feather name="x-circle" size={16} color={theme.textMuted} /></Pressable>
+                              <Pressable onLongPress={drag} delayLongPress={150} hitSlop={6} style={{ paddingVertical: 8, paddingHorizontal: 4 }}>
+                                <Feather name="menu" size={16} color={theme.textMuted} />
+                              </Pressable>
+                            </View>
+                          );
+                        }}
+                      />
+                    </GestureHandlerRootView>
                   )}
-                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
-                    <Feather name="bookmark" size={13} color={theme.textSecondary} />
-                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import from My Routes</Text>
+
+                  {/* Destination */}
+                  <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('destination')}>
+                    <View style={[st.dot, { backgroundColor: theme.red }]} />
+                    <Text style={[st.fieldText, { color: destination ? theme.textPrimary : theme.textMuted }]} numberOfLines={1}>{destination?.name ?? 'Destination'}</Text>
+                    {destination && <Pressable onPress={() => setDestination(null)} hitSlop={8}><Feather name="x" size={14} color={theme.textMuted} /></Pressable>}
                   </Pressable>
-                </View>
-              )}
-              {tripRouteIsManual && (
-                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
-                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
-                    <Feather name="bookmark" size={13} color={theme.textSecondary} />
-                    <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import Different Route</Text>
-                  </Pressable>
-                </View>
+
+                  {/* Add Stop | Reverse | Import */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 12 }}>
+                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => { setActiveField(waypoints.length); }}>
+                      <Feather name="plus" size={13} color={theme.textSecondary} />
+                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Add Stop</Text>
+                    </Pressable>
+                    {origin && destination && (
+                      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={handleReverse}>
+                        <Feather name="refresh-cw" size={13} color={theme.textSecondary} />
+                        <Text style={{ fontSize: 12, color: theme.textSecondary }}>Reverse</Text>
+                      </Pressable>
+                    )}
+                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
+                      <Feather name="bookmark" size={13} color={theme.textSecondary} />
+                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import from My Routes</Text>
+                    </Pressable>
+                  </View>
+                </>
               )}
 
               {/* Route summary */}

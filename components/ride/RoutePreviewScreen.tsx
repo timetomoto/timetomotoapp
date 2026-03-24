@@ -101,13 +101,15 @@ export default function RoutePreviewScreen({
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const userId = user?.id ?? 'local';
-  const { bikes, selectedBikeId } = useGarageStore();
+  const { bikes, selectedBikeId, selectBike } = useGarageStore();
   const {
     isMonitoring, setMonitoring, shareActive,
     setCrashDetectionOverride, setLocationSharingOverride,
   } = useSafetyStore();
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
-  const [navBikeId, setNavBikeId] = useState<string | null>(selectedBikeId);
+  // Use global selectedBikeId directly — changes propagate everywhere
+  const navBikeId = selectedBikeId;
+  const setNavBikeId = (id: string | null) => { if (id) selectBike(id); };
   const rideSettingsRef = useRef<RideSettingsValues>({
     crashOn: false, crashOverride: false,
     shareEnabled: false, shareOverride: false,

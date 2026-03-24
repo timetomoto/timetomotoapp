@@ -117,15 +117,15 @@ const s = StyleSheet.create({
   // Scout FAB
   scoutFab: {
     position: 'absolute',
-    left: 12,
+    left: 13,
     bottom: 20,
     alignItems: 'center',
     gap: 3,
   },
   scoutCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 53,
+    height: 53,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
