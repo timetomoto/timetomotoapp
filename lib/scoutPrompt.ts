@@ -169,6 +169,7 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `Garage:\n` +
     `- ask_garage: Answer questions about any bike's specs, maintenance, or service intervals. Pass bike_name to query a specific bike, or omit for the active bike.\n` +
     `- set_active_bike: Switch the active bike by nickname or model name.\n` +
+    `- refresh_bike_data: Refresh a bike's specs, service intervals, and service bulletins from online sources.\n` +
     `- add_maintenance_log: Add a maintenance entry (oil change, tire change, chain lube, etc.) to any bike's log. Defaults to active bike and today's date.\n` +
     `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
     `Saved routes:\n` +

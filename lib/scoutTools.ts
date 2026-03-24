@@ -278,6 +278,18 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
+    name: 'refresh_bike_data',
+    description: 'Refresh a bike\'s specifications, service intervals, and service bulletins from online sources. Use when the rider asks to update or refresh their bike data.',
+    parameters: {
+      type: 'object',
+      properties: {
+        bike_name: { type: 'string', description: 'Nickname or model of the bike to refresh. Omit to use the active bike.' },
+      },
+      required: [],
+    },
+  },
+
+  {
     name: 'add_modification',
     description: 'Add a modification/accessory to a bike. Use when the rider says they installed exhaust, handguards, crash bars, luggage, GPS mount, suspension, lighting, or any aftermarket part.',
     parameters: {
@@ -772,6 +784,23 @@ export async function executeScoutTool(
         garageStore.selectBike(match.id);
         const label = [match.year, match.make, match.model].filter(Boolean).join(' ');
         return `Switched active bike to ${match.nickname ? `${label} ("${match.nickname}")` : label}.`;
+      }
+
+      case 'refresh_bike_data': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+        garageStore.bumpGarageDataRefresh();
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Refreshing specs, service intervals, and service bulletins for ${bikeLabel}. Head to Garage to see updated data.`;
       }
 
       case 'add_maintenance_log': {

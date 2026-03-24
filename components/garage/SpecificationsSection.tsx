@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
-import type { Bike, BikeSpecs } from '../../lib/store';
+import { useGarageStore, type Bike, type BikeSpecs } from '../../lib/store';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -491,13 +491,14 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
   const hasTriggered = useRef(false);
 
   // Sync when bike changes
+  const garageDataRefresh = useGarageStore((s) => s.garageDataRefresh);
   useEffect(() => {
     const s = bike.specs ?? {};
     setSpecs(s);
     setLookupDone(s.specsLookedUp === true);
     setLookedUpAt(s.specsLookedUpAt ?? null);
     hasTriggered.current = false;
-  }, [bike.id]);
+  }, [bike.id, garageDataRefresh]);
 
   // Auto-lookup on first expand if not already done (or if previous lookup returned empty)
   useEffect(() => {

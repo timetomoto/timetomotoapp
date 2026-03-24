@@ -256,12 +256,14 @@ interface GarageState {
   selectedBikeId: string | null;
   loading: boolean;
   maintenanceRefresh: number;
+  garageDataRefresh: number;
   fetchBikes: (userId: string) => Promise<void>;
   addBike: (bike: Bike) => void;
   updateBike: (bike: Bike) => void;
   removeBike: (id: string, local?: boolean) => Promise<void>;
   selectBike: (id: string) => void;
   bumpMaintenanceRefresh: () => void;
+  bumpGarageDataRefresh: () => void;
 }
 
 export const useGarageStore = create<GarageState>((set, get) => ({
@@ -269,6 +271,7 @@ export const useGarageStore = create<GarageState>((set, get) => ({
   selectedBikeId: null,
   loading: false,
   maintenanceRefresh: 0,
+  garageDataRefresh: 0,
 
   fetchBikes: async (userId) => {
     set({ loading: true });
@@ -319,6 +322,7 @@ export const useGarageStore = create<GarageState>((set, get) => ({
 
   selectBike: (id) => set({ selectedBikeId: id }),
   bumpMaintenanceRefresh: () => set((s) => ({ maintenanceRefresh: s.maintenanceRefresh + 1 })),
+  bumpGarageDataRefresh: () => set((s) => ({ garageDataRefresh: s.garageDataRefresh + 1 })),
 }));
 
 // ---------------------------------------------------------------------------
