@@ -132,7 +132,7 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- When modifying a route segment, mention which road or town was used to steer the route.\n` +
     `- MAINTENANCE INTENT: When a rider says "I need to change the oil" or "I need to do X maintenance", they are asking for HELP — look up the bike's specs (oil type, capacity, etc.) using ask_garage and share what you know. Ask if they want to log it when done. Only call add_maintenance_log when the rider explicitly says they DID the work ("I changed the oil", "just did an oil change", "log an oil change").\n` +
     `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately with all known details — mileage and cost are optional.\n` +
-    `- CRITICAL: NEVER call add_maintenance_log twice for the same maintenance event. If the rider provides mileage or cost AFTER you already logged the item, do NOT call the tool again. Simply confirm what was already logged and let them know they can edit the details in the Garage. One tool call per maintenance event, always.`
+    `- MAINTENANCE UPDATES: If the rider provides mileage or cost AFTER you already logged a maintenance item, call update_maintenance_log (not add_maintenance_log). Never create a duplicate — always update the existing entry. Same applies to modifications — use update_modification to change details on an existing mod.`
   );
 
   // ── Constraints ────────────────────────────────────────────────────────
@@ -171,7 +171,10 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- ask_garage: Answer questions about any bike's specs, maintenance, or service intervals. Pass bike_name to query a specific bike, or omit for the active bike.\n` +
     `- set_active_bike: Switch the active bike by nickname or model name.\n` +
     `- refresh_bike_data: Refresh a bike's specs, service intervals, and service bulletins from online sources.\n` +
-    `- add_maintenance_log: Add a maintenance entry (oil change, tire change, chain lube, etc.) to any bike's log. Defaults to active bike and today's date.\n` +
+    `- add_maintenance_log: Add a NEW maintenance entry. Defaults to active bike and today's date.\n` +
+    `- update_maintenance_log: Update an EXISTING maintenance entry — change mileage, cost, notes, or date. Use this when the rider adds details to something already logged.\n` +
+    `- update_modification: Update an EXISTING modification — change cost, brand, notes, or date.\n` +
+    `- update_bike: Update a bike's nickname, odometer, year, make, or model.\n` +
     `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
     `Saved routes:\n` +
     `- describe_saved_route: Look up a saved route by name and return its details. ALWAYS call this tool when the rider asks about a saved route — the context summary above only shows a preview, the tool searches ALL routes.\n` +

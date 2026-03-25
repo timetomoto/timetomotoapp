@@ -1,6 +1,7 @@
 import { useTripPlannerStore, useRoutesStore, useGarageStore } from './store';
 import { geocodeLocation, reverseGeocode } from './geocode';
-import { addMaintenanceRecord, addModification, type MaintenanceRecord, type Modification } from './garage';
+import { addMaintenanceRecord, addModification, updateMaintenanceRecord, updateModification, loadMaintenance, loadModifications, type MaintenanceRecord, type Modification } from './garage';
+import { supabase } from './supabase';
 
 /** Generate a v4 UUID for Supabase compatibility */
 function uuid(): string {
@@ -303,6 +304,55 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
         notes: { type: 'string', description: 'Any additional notes.' },
       },
       required: ['title', 'category'],
+    },
+  },
+
+  {
+    name: 'update_maintenance_log',
+    description: 'Update an existing maintenance log entry — change mileage, cost, notes, or date. Finds the most recent matching entry by type and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        maintenance_type: { type: 'string', description: 'Type of the maintenance entry to update (e.g. oil change, tire change).' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+        mileage: { type: 'number', description: 'Updated odometer reading.' },
+        cost: { type: 'number', description: 'Updated cost in dollars.' },
+        notes: { type: 'string', description: 'Updated notes.' },
+        date: { type: 'string', description: 'Updated date in YYYY-MM-DD format.' },
+      },
+      required: ['maintenance_type'],
+    },
+  },
+  {
+    name: 'update_modification',
+    description: 'Update an existing modification entry — change cost, brand, notes, or date. Finds the most recent matching entry by title and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the modification to update.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+        brand: { type: 'string', description: 'Updated brand name.' },
+        cost: { type: 'number', description: 'Updated cost in dollars.' },
+        notes: { type: 'string', description: 'Updated notes.' },
+        date_installed: { type: 'string', description: 'Updated date in YYYY-MM-DD format.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'update_bike',
+    description: 'Update a bike\'s details — nickname, odometer, year, make, or model.',
+    parameters: {
+      type: 'object',
+      properties: {
+        bike_name: { type: 'string', description: 'Current nickname or model of the bike to update.' },
+        nickname: { type: 'string', description: 'New nickname.' },
+        odometer: { type: 'number', description: 'Updated odometer reading in miles.' },
+        year: { type: 'number', description: 'Updated year.' },
+        make: { type: 'string', description: 'Updated make.' },
+        model: { type: 'string', description: 'Updated model.' },
+      },
+      required: ['bike_name'],
     },
   },
 
@@ -893,6 +943,119 @@ export async function executeScoutTool(
         if (mod.brand) confirmation += ` Brand: ${mod.brand}.`;
         if (mod.cost) confirmation += ` Cost: $${mod.cost}.`;
         return confirmation;
+      }
+
+      case 'update_maintenance_log': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const records = await loadMaintenance(bike.id, userId);
+        const type = (parameters.maintenance_type as string).toLowerCase();
+        const match = records.find((r) => r.maintenanceType.toLowerCase().includes(type));
+        if (!match) return `No "${parameters.maintenance_type}" entry found for ${bike.nickname ?? bike.model}. You can add one instead.`;
+
+        // Update fields
+        if (parameters.mileage != null) match.mileage = parameters.mileage as number;
+        if (parameters.cost != null) match.cost = parameters.cost as number;
+        if (parameters.notes) match.notes = parameters.notes as string;
+        if (parameters.date) match.date = parameters.date as string;
+        match.updatedAt = new Date().toISOString();
+
+        try {
+          await updateMaintenanceRecord(bike.id, match, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to update: ${e?.message ?? 'unknown error'}`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        let msg = `Updated "${match.maintenanceType}" on ${bikeLabel}.`;
+        if (parameters.mileage != null) msg += ` Odometer: ${(parameters.mileage as number).toLocaleString()} mi.`;
+        if (parameters.cost != null) msg += ` Cost: $${parameters.cost}.`;
+        return msg;
+      }
+
+      case 'update_modification': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const mods = await loadModifications(bike.id, userId);
+        const title = (parameters.title as string).toLowerCase();
+        const match = mods.find((m) => m.title.toLowerCase().includes(title));
+        if (!match) return `No modification matching "${parameters.title}" found for ${bike.nickname ?? bike.model}.`;
+
+        if (parameters.brand) match.brand = parameters.brand as string;
+        if (parameters.cost != null) match.cost = parameters.cost as number;
+        if (parameters.notes) match.notes = parameters.notes as string;
+        if (parameters.date_installed) match.dateInstalled = parameters.date_installed as string;
+        match.updatedAt = new Date().toISOString();
+
+        try {
+          await updateModification(bike.id, match, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to update: ${e?.message ?? 'unknown error'}`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Updated "${match.title}" on ${bikeLabel}.`;
+      }
+
+      case 'update_bike': {
+        const bikeName = (parameters.bike_name as string).toLowerCase();
+        const match = garageStore.bikes.find(
+          (b) => b.nickname?.toLowerCase().includes(bikeName) || b.model?.toLowerCase().includes(bikeName) || b.make?.toLowerCase().includes(bikeName),
+        );
+        if (!match) return `No bike matching "${parameters.bike_name}" found in your garage.`;
+
+        const updated = { ...match };
+        if (parameters.nickname) updated.nickname = parameters.nickname as string;
+        if (parameters.odometer != null) updated.odometer = parameters.odometer as number;
+        if (parameters.year != null) updated.year = parameters.year as number;
+        if (parameters.make) updated.make = parameters.make as string;
+        if (parameters.model) updated.model = parameters.model as string;
+
+        // Update store
+        garageStore.updateBike(updated);
+
+        // Persist to Supabase
+        try {
+          await supabase.from('bikes').update({
+            nickname: updated.nickname,
+            odometer: updated.odometer,
+            year: updated.year,
+            make: updated.make,
+            model: updated.model,
+          }).eq('id', updated.id);
+        } catch {}
+
+        const oldLabel = match.nickname ?? [match.year, match.make, match.model].filter(Boolean).join(' ');
+        const newLabel = updated.nickname ?? [updated.year, updated.make, updated.model].filter(Boolean).join(' ');
+        const changes: string[] = [];
+        if (parameters.nickname) changes.push(`nickname → "${updated.nickname}"`);
+        if (parameters.odometer != null) changes.push(`odometer → ${(updated.odometer ?? 0).toLocaleString()} mi`);
+        if (parameters.year != null || parameters.make || parameters.model) changes.push(`${newLabel}`);
+        return `Updated ${oldLabel}: ${changes.join(', ')}.`;
       }
 
       // ── Saving ──────────────────────────────────────────────────────
