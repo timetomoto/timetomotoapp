@@ -125,6 +125,7 @@ export default function TripPlanner() {
   const { routes: savedRoutes, addRoute, loading: routesStoreLoading, setRoutes, setLoading: setRoutesLoading } = useRoutesStore();
   const userId = user?.id ?? 'local';
   const cameraRef = useRef<Camera>(null);
+  const panelScrollRef = useRef<ScrollView>(null);
   const isDark = theme.bg === darkTheme.bg;
   const mapStyle = useMapStyleStore((s) => s.mapStyle);
 
@@ -258,6 +259,15 @@ export default function TripPlanner() {
 
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
+
+  // Scroll panel to bottom when a waypoint is added (keeps Add Stop visible)
+  const prevWaypointCount = useRef(waypoints.length);
+  useEffect(() => {
+    if (waypoints.length > prevWaypointCount.current) {
+      setTimeout(() => panelScrollRef.current?.scrollToEnd({ animated: true }), 200);
+    }
+    prevWaypointCount.current = waypoints.length;
+  }, [waypoints.length]);
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
   // Construction layer
@@ -1135,7 +1145,7 @@ export default function TripPlanner() {
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: panelExpanded ? 140 : 300 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={panelScrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: panelExpanded ? 140 : 300 }} keyboardShouldPersistTaps="handled">
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>
@@ -1268,7 +1278,10 @@ export default function TripPlanner() {
                     </Pressable>
                   )}
                   {waypoints.length >= MAX_WAYPOINTS && (
-                    <Text style={{ fontSize: 11, color: '#FF9800', textAlign: 'center', marginTop: -2, marginBottom: 2, fontWeight: '600' }}>Stop limit reached</Text>
+                    <Pressable onPress={showWaypointLimitAlert} style={{ alignItems: 'center', marginTop: -2, marginBottom: 2 }}>
+                      <Text style={{ fontSize: 11, color: '#FF9800', fontWeight: '600' }}>Stop limit reached</Text>
+                      <Text style={{ fontSize: 10, color: theme.textMuted, marginTop: 2 }}>Tap for options</Text>
+                    </Pressable>
                   )}
                   {waypoints.length >= 20 && waypoints.length < MAX_WAYPOINTS && (
                     <Text style={{ fontSize: 10, color: theme.textMuted, textAlign: 'center', marginBottom: 2 }}>{MAX_WAYPOINTS - waypoints.length} stop{MAX_WAYPOINTS - waypoints.length === 1 ? '' : 's'} remaining</Text>
