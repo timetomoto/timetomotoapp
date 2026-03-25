@@ -260,16 +260,16 @@ export default function TripPlanner() {
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
 
-  // Scroll to Add Stop area when a waypoint is added
+  // Scroll to Add Stop area when user manually adds a single stop (not bulk load)
   const prevWaypointCount = useRef(waypoints.length);
   const addStopRef = useRef<View>(null);
   useEffect(() => {
-    if (waypoints.length > prevWaypointCount.current) {
+    const diff = waypoints.length - prevWaypointCount.current;
+    // Only scroll when exactly 1 stop was added (manual add, not bulk import)
+    if (diff === 1) {
       if (waypoints.length >= MAX_WAYPOINTS) {
-        // At limit — scroll to top so user sees the banner
         setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: true }), 300);
       } else {
-        // Scroll to the Add Stop anchor
         setTimeout(() => {
           addStopRef.current?.measureLayout(
             panelScrollRef.current as any,
