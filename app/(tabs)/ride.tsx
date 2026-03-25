@@ -1512,6 +1512,7 @@ export default function RideScreen() {
                   onPress={() => {
                     if (isNavigatingActive) {
                       setNavRouteGeojson(null);
+                      setOverlayPoints(null);
                       resetNavigation();
                     }
                     if (isRecording) {
@@ -1645,8 +1646,9 @@ export default function RideScreen() {
               }
               handleStartNavigation(route);
             }}
-            onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; setNavRouteGeojson(null); resetNavigation(); }}
+            onCancel={() => { setIsSavedRoutePreview(false); savedRouteStartRef.current = null; setNavRouteGeojson(null); setOverlayPoints(null); resetNavigation(); }}
             onNavigateToRideWindow={() => {
+              setOverlayPoints(null);
               resetNavigation();
               setPendingWeatherSubTab('ride-window');
               router.navigate('/(tabs)/trip' as any);
@@ -1655,6 +1657,7 @@ export default function RideScreen() {
               setIsSavedRoutePreview(false);
               savedRouteStartRef.current = null;
               setNavRouteGeojson(null);
+              setOverlayPoints(null);
               resetNavigation();
               setSearchSheetOpen(true);
             }}
@@ -1732,10 +1735,11 @@ export default function RideScreen() {
                 });
               }
               setNavRouteGeojson(null);
+              setOverlayPoints(null);
               resetNavigation();
               handleLocateMe();
             }}
-            onDismiss={() => { setNavRouteGeojson(null); resetNavigation(); handleLocateMe(); }}
+            onDismiss={() => { setNavRouteGeojson(null); setOverlayPoints(null); resetNavigation(); handleLocateMe(); }}
           />
         )}
       </View>

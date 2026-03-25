@@ -137,7 +137,7 @@ export default function PlaceDetailPanel({ place, onClose, onNavigateInApp, onSa
 const styles = StyleSheet.create({
   panel: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 200,
     left: 16,
     right: 16,
     borderRadius: 12,
