@@ -413,6 +413,7 @@ export default function TripPlanner() {
   const [toastMsg, setToastMsg] = useState('');
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [tooManyStopsDismissed, setTooManyStopsDismissed] = useState(false);
 
   // Save modal state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -792,6 +793,7 @@ export default function TripPlanner() {
 
   function handleImportRoute(route: Route) {
     setImportModalOpen(false);
+    setTooManyStopsDismissed(false);
     if (route.points.length < 2) return;
     const pts = route.points;
     const first = pts[0];
@@ -1184,7 +1186,7 @@ export default function TripPlanner() {
               </View>
 
               {/* Too many points notice — routes with 26+ waypoints can't be edited */}
-              {tripRouteIsManual && waypoints.length > 23 && (
+              {tripRouteIsManual && waypoints.length > 23 && !tooManyStopsDismissed && (
                 <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
                   <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
                     This route has too many stops to edit in the app. You can navigate it, save a copy, or clear it to plan a new route.
@@ -1192,25 +1194,16 @@ export default function TripPlanner() {
                     <Text style={{ color: theme.red, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://kurviger.de')}>kurviger.de</Text>
                     {' '}— it's built for motorcycle trips. Export as GPX and import it into My Routes.
                   </Text>
+                  <Pressable
+                    style={{ alignSelf: 'flex-end', marginTop: 8, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: theme.red, borderRadius: 6 }}
+                    onPress={() => setTooManyStopsDismissed(true)}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>Got It</Text>
+                  </Pressable>
                 </View>
               )}
 
-              {tripRouteIsManual && waypoints.length > 23 ? (
-                /* View-only for large routes */
-                <>
-                  <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
-                    <Text style={{ color: theme.textPrimary, fontSize: 13, fontWeight: '600' }}>
-                      {origin?.name ?? 'Imported Route'} → {destination?.name ?? 'End'}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20, paddingHorizontal: 16, marginVertical: 4 }}>
-                    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} onPress={() => setImportModalOpen(true)}>
-                      <Feather name="bookmark" size={13} color={theme.textSecondary} />
-                      <Text style={{ fontSize: 12, color: theme.textSecondary }}>Import Different Route</Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : (
+              {(
                 /* Editable fields for planned routes */
                 <>
                   {/* Origin */}
