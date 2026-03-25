@@ -222,12 +222,7 @@ export default function AccountScreen() {
 
     setDeleting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data, error: fnError } = await supabase.functions.invoke('delete-account', {
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : undefined,
-      });
+      const { data, error: fnError } = await supabase.functions.invoke('delete-account');
 
       if (fnError || !data?.success) {
         throw new Error(fnError?.message ?? data?.error ?? 'Unknown error');

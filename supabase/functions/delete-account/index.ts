@@ -29,10 +29,11 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
     // Client scoped to the caller's JWT — used only to verify identity
-    const userClient = createClient(supabaseUrl, supabaseServiceKey, {
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false },
     });
@@ -43,6 +44,7 @@ serve(async (req) => {
     } = await userClient.auth.getUser();
 
     if (authError || !user) {
+      console.error('auth error:', authError?.message);
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
         { status: 401, headers: corsHeaders },
@@ -50,6 +52,7 @@ serve(async (req) => {
     }
 
     const userId = user.id;
+    console.log('Deleting account for user:', userId);
 
     // Admin client with service role — used for all delete operations
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -64,54 +67,29 @@ serve(async (req) => {
 
     const bikeIds = (bikes ?? []).map((b: { id: string }) => b.id);
 
-    // ── 2-4. Delete bike-related data ─────────────────────────────────────
+    // ── 2-4. Delete bike-related data (ignore errors for tables that may not exist) ──
     if (bikeIds.length > 0) {
-      const { error: e1 } = await admin
-        .from('documents')
-        .delete()
-        .in('bike_id', bikeIds);
-      if (e1) console.error('delete documents:', e1.message);
-
-      const { error: e2 } = await admin
-        .from('maintenance_logs')
-        .delete()
-        .in('bike_id', bikeIds);
-      if (e2) console.error('delete maintenance_logs:', e2.message);
-
-      const { error: e3 } = await admin
-        .from('mod_logs')
-        .delete()
-        .in('bike_id', bikeIds);
-      if (e3) console.error('delete mod_logs:', e3.message);
+      const bikeTables = ['documents', 'maintenance_logs', 'mod_logs'];
+      for (const table of bikeTables) {
+        try {
+          const { error } = await admin.from(table).delete().in('bike_id', bikeIds);
+          if (error) console.error(`delete ${table}:`, error.message);
+        } catch (e) {
+          console.error(`delete ${table} (table may not exist):`, e);
+        }
+      }
     }
 
-    // ── 5. Delete saved routes ────────────────────────────────────────────
-    const { error: e4 } = await admin
-      .from('saved_routes')
-      .delete()
-      .eq('user_id', userId);
-    if (e4) console.error('delete saved_routes:', e4.message);
-
-    // ── 6. Delete favorite locations ──────────────────────────────────────
-    const { error: e5 } = await admin
-      .from('favorite_locations')
-      .delete()
-      .eq('user_id', userId);
-    if (e5) console.error('delete favorite_locations:', e5.message);
-
-    // ── 7. Delete emergency contacts ──────────────────────────────────────
-    const { error: e6 } = await admin
-      .from('emergency_contacts')
-      .delete()
-      .eq('user_id', userId);
-    if (e6) console.error('delete emergency_contacts:', e6.message);
-
-    // ── 8. Delete ride shares ─────────────────────────────────────────────
-    const { error: e7 } = await admin
-      .from('ride_shares')
-      .delete()
-      .eq('user_id', userId);
-    if (e7) console.error('delete ride_shares:', e7.message);
+    // ── 5-8. Delete user-level data (ignore errors for tables that may not exist) ──
+    const userTables = ['saved_routes', 'favorite_locations', 'emergency_contacts', 'ride_shares'];
+    for (const table of userTables) {
+      try {
+        const { error } = await admin.from(table).delete().eq('user_id', userId);
+        if (error) console.error(`delete ${table}:`, error.message);
+      } catch (e) {
+        console.error(`delete ${table} (table may not exist):`, e);
+      }
+    }
 
     // ── 9. Delete bike photos from Storage ────────────────────────────────
     for (const bikeId of bikeIds) {
