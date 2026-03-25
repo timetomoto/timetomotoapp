@@ -595,7 +595,9 @@ export default function TripPlanner() {
       if (type === 'origin') setOrigin(loc);
       else if (type === 'destination') setDestination(loc);
       else {
-        if (waypoints.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
+        // Read live waypoint count (closure may be stale)
+        const currentWps = useTripPlannerStore.getState().tripWaypoints;
+        if (currentWps.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
         const insertIdx = findInsertionIndex(lat, lng);
         const newWps = [...waypoints];
         newWps.splice(insertIdx, 0, loc);
@@ -771,7 +773,8 @@ export default function TripPlanner() {
     const geom = e.geometry as any;
     if (!geom?.coordinates) return;
     const [lng, lat] = geom.coordinates;
-    if (waypoints.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
+    const currentWps = useTripPlannerStore.getState().tripWaypoints;
+    if (currentWps.length >= MAX_WAYPOINTS) { showWaypointLimitAlert(); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     markUserPlacing();
     const insertIdx = findInsertionIndex(lat, lng);
