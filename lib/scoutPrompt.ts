@@ -131,7 +131,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- Never say "I cannot" — offer the closest alternative instead.\n` +
     `- When modifying a route segment, mention which road or town was used to steer the route.\n` +
     `- MAINTENANCE INTENT: When a rider says "I need to change the oil" or "I need to do X maintenance", they are asking for HELP — look up the bike's specs (oil type, capacity, etc.) using ask_garage and share what you know. Ask if they want to log it when done. Only call add_maintenance_log when the rider explicitly says they DID the work ("I changed the oil", "just did an oil change", "log an oil change").\n` +
-    `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately — mileage and cost are optional. Do NOT create a second log to add details later. One entry per maintenance event.`
+    `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately with all known details — mileage and cost are optional.\n` +
+    `- CRITICAL: NEVER call add_maintenance_log twice for the same maintenance event. If the rider provides mileage or cost AFTER you already logged the item, do NOT call the tool again. Simply confirm what was already logged and let them know they can edit the details in the Garage. One tool call per maintenance event, always.`
   );
 
   // ── Constraints ────────────────────────────────────────────────────────

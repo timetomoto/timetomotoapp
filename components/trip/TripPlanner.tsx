@@ -1187,7 +1187,10 @@ export default function TripPlanner() {
               {tripRouteIsManual && waypoints.length > 23 && (
                 <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
                   <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
-                    This route has too many stops to edit ({waypoints.length + 2} points). You can navigate it, save a copy, or clear it to plan a new route.
+                    This route has too many stops to edit in the app. You can navigate it, save a copy, or clear it to plan a new route.
+                    {'\n\n'}Need to build a complex multi-stop route? Plan it free at{' '}
+                    <Text style={{ color: theme.red, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://kurviger.de')}>kurviger.de</Text>
+                    {' '}— it's built for motorcycle trips. Export as GPX and import it into My Routes.
                   </Text>
                 </View>
               )}

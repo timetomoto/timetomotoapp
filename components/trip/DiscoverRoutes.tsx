@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
@@ -124,7 +124,11 @@ export default function DiscoverRoutes({ onDismiss }: { onDismiss?: () => void }
       setTimeout(() => {
         Alert.alert(
           'Route Simplified',
-          `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWaypoints} waypoints. We placed ${maxWaypoints} evenly-spaced markers along the route so you can drag and adjust them.\n\nThe full route line is shown on the map.`,
+          `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWaypoints} waypoints. We placed ${maxWaypoints} evenly-spaced markers along the route.\n\nNeed to build a complex multi-stop route? Plan it free at kurviger.de — it's built for motorcycle trips. Export as GPX and import it here.`,
+          [
+            { text: 'Open Kurviger', onPress: () => Linking.openURL('https://kurviger.de') },
+            { text: 'Got It', style: 'cancel' },
+          ],
         );
       }, 1500);
     }

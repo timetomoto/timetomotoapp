@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated as RNAnimated,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -1705,7 +1706,11 @@ export default function RideScreen() {
                 setTimeout(() => {
                   Alert.alert(
                     'Route Simplified',
-                    `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWp} waypoints. We placed ${maxWp} evenly-spaced markers along the route so you can drag and adjust them.\n\nThe full route line is shown on the map.`,
+                    `This route has ${totalPoints.toLocaleString()} points but Trip Planner supports up to ${maxWp} waypoints. We placed ${maxWp} evenly-spaced markers along the route.\n\nNeed to build a complex multi-stop route? Plan it free at kurviger.de — it's built for motorcycle trips. Export as GPX and import it here.`,
+                    [
+                      { text: 'Open Kurviger', onPress: () => Linking.openURL('https://kurviger.de') },
+                      { text: 'Got It', style: 'cancel' },
+                    ],
                   );
                 }, 1500);
               }

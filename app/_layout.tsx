@@ -246,7 +246,6 @@ function SafetyService() {
 function RootLayoutInner() {
   const { mode, theme } = useTheme();
   const { loadSavedMode } = useThemeStore();
-
   useEffect(() => {
     loadSavedMode();
     useMapStyleStore.getState().loadSavedMapStyle();
