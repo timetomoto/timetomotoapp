@@ -28,6 +28,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useActiveBike } from '../../lib/useActiveBike';
+import { reverseGeocodeAddress } from '../../lib/geocode';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -366,14 +367,9 @@ export default function RideScreen() {
     pinScaleAnim.setValue(0);
     RNAnimated.spring(pinScaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
 
-    // Reverse geocode
-    Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
-      .then(([place]) => {
-        if (place) {
-          const parts = [place.name, place.street, place.city, place.region].filter(Boolean);
-          setDroppedPinAddress(parts.slice(0, 3).join(', '));
-        }
-      })
+    // Reverse geocode — street-level address
+    reverseGeocodeAddress(lat, lng)
+      .then((addr) => { if (addr) setDroppedPinAddress(addr); })
       .catch(() => {});
   }
 
@@ -1676,6 +1672,8 @@ export default function RideScreen() {
               const pts = activeRoute.geometry.coordinates;
               if (pts.length < 2) return;
               const tripStore = useTripPlannerStore.getState();
+              // Clear previous trip before loading new one
+              tripStore.clearTrip();
               const first = pts[0];
               const last = pts[pts.length - 1];
               tripStore.setTripOrigin({ name: destination?.name?.split('→')[0]?.trim() || 'Start', lat: first[1], lng: first[0] });
@@ -1699,6 +1697,8 @@ export default function RideScreen() {
               setNavMode('idle');
               setDestination(null);
               setActiveRoute(null);
+              setOverlayPoints(null);
+              setNavRouteGeojson(null);
               setIsSavedRoutePreview(false);
               router.navigate('/(tabs)/trip' as any);
               if (wasSampled) {
@@ -2168,7 +2168,7 @@ const styles = StyleSheet.create({
   // Pin callout
   pinCallout: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 200,
     left: 16,
     right: 16,
     borderRadius: 12,
