@@ -46,6 +46,12 @@ interface SafetyState {
   crashDetectionOverride: boolean;
   locationSharingOverride: boolean;
 
+  // Crash alert state (managed by CrashAlertModal, read by Scout tools)
+  isCrashAlertActive: boolean;
+  cancelCrashAlert: (() => void) | null;
+  triggerEmergencyNow: (() => void) | null;
+  onCrashAlertsSent: (() => void) | null;
+
   // Actions
   setMonitoring: (v: boolean) => void;
   setRecording: (v: boolean) => void;
@@ -62,6 +68,8 @@ interface SafetyState {
   setCrashDetectionOverride: (v: boolean) => void;
   setLocationSharingOverride: (v: boolean) => void;
   clearSessionOverrides: () => void;
+  setCrashAlertHandlers: (cancel: (() => void) | null, emergency: (() => void) | null) => void;
+  setOnCrashAlertsSent: (fn: (() => void) | null) => void;
   loadContacts: (userId: string) => Promise<void>;
   saveContacts: (userId: string, contacts: EmergencyContact[]) => Promise<string | null>;
 }
@@ -72,6 +80,10 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   emergencyContacts: [],
   lastKnownLocation: null,
   crashDetected: false,
+  isCrashAlertActive: false,
+  cancelCrashAlert: null,
+  triggerEmergencyNow: null,
+  onCrashAlertsSent: null,
   shareToken: null,
   shareActive: false,
   checkInDeadline: null,
@@ -84,7 +96,7 @@ export const useSafetyStore = create<SafetyState>((set) => ({
 
   setMonitoring:    (isMonitoring) => set({ isMonitoring }),
   setRecording:     (isRecording)  => set({ isRecording }),
-  setCrashDetected: (crashDetected) => set({ crashDetected }),
+  setCrashDetected: (crashDetected) => set({ crashDetected, isCrashAlertActive: crashDetected }),
   updateLocation:   (lat, lng) =>
     set({ lastKnownLocation: { lat, lng, timestamp: Date.now() } }),
   setContacts:    (emergencyContacts) => set({ emergencyContacts }),
@@ -99,6 +111,11 @@ export const useSafetyStore = create<SafetyState>((set) => ({
     crashDetectionOverride: false,
     locationSharingOverride: false,
   })),
+
+  setCrashAlertHandlers: (cancel, emergency) =>
+    set({ cancelCrashAlert: cancel, triggerEmergencyNow: emergency }),
+
+  setOnCrashAlertsSent: (fn) => set({ onCrashAlertsSent: fn }),
 
   setCheckIn: (deadline, notifId) =>
     set({ checkInDeadline: deadline, checkInActive: true, checkInNotifId: notifId }),

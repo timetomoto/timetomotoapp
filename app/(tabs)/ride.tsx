@@ -293,7 +293,7 @@ function RecordScreen({
               Check in: {formatCountdown(checkInSecsLeft)} remaining
             </Text>
             <Pressable style={[styles.checkInBtn, { backgroundColor: theme.green }]} onPress={handleCheckIn}>
-              <Text style={styles.checkInBtnText}>CHECK IN</Text>
+              <Text style={styles.checkInBtnText}>CHECK IN NOW</Text>
             </Pressable>
           </View>
         )}
@@ -613,6 +613,9 @@ export default function RideScreen() {
   const panResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingBikeIdRef = useRef<string | null>(null);
   const elapsedRef   = useRef(0);
+  // Voice announcement tracking — which threshold was last spoken for the current step
+  const lastAnnouncedThreshold = useRef<number>(0);
+  const lastAnnouncedStepIdx   = useRef<number>(-1);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Single source-of-truth elapsed timer — drives both RecordScreen overlay and StatsOverlay
@@ -681,10 +684,31 @@ export default function RideScreen() {
       const nextStep = findNextStepIndex(pos.lat, pos.lng, activeRoute.steps, currentStepIndex);
       if (nextStep !== currentStepIndex) {
         setCurrentStepIndex(nextStep);
-        // TODO: dev build — announce upcoming turn via TTS
-        const step = activeRoute.steps[nextStep];
-        if (step?.instruction) {
-          speakResponse(step.instruction);
+        // Reset voice threshold tracking for new step
+        lastAnnouncedStepIdx.current = nextStep;
+        lastAnnouncedThreshold.current = 0;
+      }
+
+      // Distance-based voice announcements at 800m, 150m, 30m thresholds
+      const currentStep = activeRoute.steps[currentStepIndex];
+      if (currentStep?.maneuverLocation && currentStep.instruction) {
+        const [mLng, mLat] = currentStep.maneuverLocation;
+        const distToManeuver = haversineMeters(pos.lat, pos.lng, mLat, mLng);
+        const prevThreshold = lastAnnouncedStepIdx.current === currentStepIndex
+          ? lastAnnouncedThreshold.current : 0;
+
+        if (distToManeuver <= 30 && prevThreshold < 30) {
+          speakResponse(currentStep.instruction);
+          lastAnnouncedThreshold.current = 30;
+          lastAnnouncedStepIdx.current = currentStepIndex;
+        } else if (distToManeuver <= 150 && prevThreshold < 150 && prevThreshold < 30) {
+          speakResponse(`In 500 feet, ${currentStep.instruction}`);
+          lastAnnouncedThreshold.current = 150;
+          lastAnnouncedStepIdx.current = currentStepIndex;
+        } else if (distToManeuver <= 800 && prevThreshold < 800 && prevThreshold < 150) {
+          speakResponse(`In half a mile, ${currentStep.instruction}`);
+          lastAnnouncedThreshold.current = 800;
+          lastAnnouncedStepIdx.current = currentStepIndex;
         }
       }
 

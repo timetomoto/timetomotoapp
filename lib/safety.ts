@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { Accelerometer } from 'expo-sensors';
+import { speakResponse, startRecordingCommand, stopRecordingCommand } from './scoutVoice';
 
 const IMPACT_G        = 4.0;   // G — minimum spike to arm detector
 const STILL_THRESHOLD = 0.30;  // deviation from 1G considered "stationary"
@@ -75,8 +76,26 @@ export class CrashDetector {
       } else if (now - this.stillFrom >= CONFIRM_MS) {
         // Confirmed: impact + sustained stillness
         this.reset();
+
+        // ── Voice hooks — fire before the modal opens ──
+        // These are stubs until expo-av + expo-speech are installed in dev build.
+        speakResponse(
+          "Are you okay? Tap I'm OK if you can hear me. Emergency contacts will be notified in 60 seconds."
+        );
+        startRecordingCommand();
+
         this.onCrash();
       }
     }
+  }
+
+  /**
+   * Call when crash SMS has been sent (countdown expired or emergency triggered).
+   * Stops voice listening and announces that contacts were notified.
+   * Stubs until dev build — hooks are in place for activation.
+   */
+  onAlertsSent() {
+    stopRecordingCommand();
+    speakResponse('Your emergency contacts have been notified with your location.');
   }
 }

@@ -32,6 +32,8 @@ import { useNavigationStore } from '../../lib/navigationStore';
 import { calcDistance } from '../../lib/gpx';
 import SlideUpWrapper from '../ui/SlideUpWrapper';
 import { loadFavorites } from '../../lib/favorites';
+import { loadMaintenance } from '../../lib/garage';
+import { reverseGeocode } from '../../lib/geocode';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
 
@@ -191,6 +193,7 @@ function ScoutPanelContent() {
   const tripDeparture = useTripPlannerStore((s) => s.tripDeparture);
   const tripRouteDistance = useTripPlannerStore((s) => s.tripRouteDistance);
   const tripRouteDuration = useTripPlannerStore((s) => s.tripRouteDuration);
+  const tripRoutePreference = useTripPlannerStore((s) => s.tripRoutePreference);
   const routes = useRoutesStore((s) => s.routes);
   const currentLocation = useSafetyStore((s) => s.lastKnownLocation);
   const isRecording = useSafetyStore((s) => s.isRecording);
@@ -203,6 +206,8 @@ function ScoutPanelContent() {
   const initialSent = useRef(false);
   const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [maintenanceLogs, setMaintenanceLogs] = useState<Awaited<ReturnType<typeof loadMaintenance>>>([]);
+  const [cachedCity, setCachedCity] = useState<{ lat: number; lng: number; city: string } | null>(null);
   const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const bypassed = isQuotaBypassed(userId);
@@ -228,6 +233,20 @@ function ScoutPanelContent() {
         );
         setFavoritesLoaded(true);
       });
+      // Load maintenance for active bike
+      const ab = useGarageStore.getState().bikes.find(
+        (b) => b.id === useGarageStore.getState().selectedBikeId
+      );
+      if (ab?.id) {
+        loadMaintenance(ab.id, userId).then((logs) => setMaintenanceLogs(logs.slice(0, 5)));
+      }
+      // Reverse geocode current location for city name (cached)
+      const loc = useSafetyStore.getState().lastKnownLocation;
+      if (loc && (!cachedCity || Math.abs(loc.lat - cachedCity.lat) > 0.01 || Math.abs(loc.lng - cachedCity.lng) > 0.01)) {
+        reverseGeocode(loc.lat, loc.lng).then((city) => {
+          setCachedCity({ lat: loc.lat, lng: loc.lng, city });
+        });
+      }
     }
   }, [isScoutOpen, userId]);
 
@@ -259,7 +278,13 @@ function ScoutPanelContent() {
 
   const buildContext = useCallback((): ScoutContext => {
     const loc = currentLocation
-      ? { lat: currentLocation.lat, lng: currentLocation.lng }
+      ? {
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+          // FIX 3: city from cached reverse geocode
+          city: cachedCity && Math.abs(currentLocation.lat - cachedCity.lat) < 0.01
+            ? cachedCity.city : undefined,
+        }
       : null;
 
     const tripWps = tripWaypoints as TripStop[];
@@ -276,7 +301,9 @@ function ScoutPanelContent() {
       isNavigating,
       speedMph: Math.round(navState.speedMph ?? 0),
       distanceMiles: isRecording ? Math.round(calcDistance(safetyState.recordedPoints) * 10) / 10 : 0,
-      elapsedSeconds: 0, // Can't read elapsedRef from here — tool reads from store
+      // TODO: elapsedSeconds lives in a useRef in ride.tsx (elapsedRef) — not in any store.
+      // To wire this, either move the timer to safetyStore or expose via a shared ref.
+      elapsedSeconds: 0,
       remainingDistanceMiles: Math.round((navState.remainingDistanceMiles ?? 0) * 10) / 10,
       eta: navState.eta ? navState.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : null,
       destinationName: navState.destination?.name ?? null,
@@ -284,6 +311,7 @@ function ScoutPanelContent() {
 
     return {
       currentScreen,
+      isCrashAlertActive: safetyState.isCrashAlertActive,
       rideState,
       bikes,
       activeBike,
@@ -296,7 +324,7 @@ function ScoutPanelContent() {
         departureTime: tripDeparture && (tripDeparture.getHours() !== 0 || tripDeparture.getMinutes() !== 0)
           ? tripDeparture.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
           : null,
-        preference: null,
+        preference: tripRoutePreference,
         routeDistance: tripRouteDistance || undefined,
         routeDuration: tripRouteDuration || undefined,
       },
@@ -307,10 +335,10 @@ function ScoutPanelContent() {
         distance: r.distance_miles ?? 0,
       })),
       favoriteLocations: favorites,
-      recentMaintenanceLogs: [],
+      recentMaintenanceLogs: maintenanceLogs,
       serviceIntervals: null,
     };
-  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, favorites, routes, currentScreen]);
+  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, tripRoutePreference, favorites, routes, currentScreen, maintenanceLogs, cachedCity]);
 
   // ── Send message ───────────────────────────────────────────────────────
 
@@ -461,6 +489,9 @@ function ScoutPanelContent() {
         </View>
         <Text style={[st.bubbleText, { color: theme.textPrimary, marginTop: 10 }]}>
           Where are we riding today?
+        </Text>
+        <Text style={[st.bubbleText, { color: theme.textMuted, fontSize: 10, marginTop: 8 }]}>
+          Scout is powered by AI. Responses may not always be accurate. Verify important details before riding.
         </Text>
       </View>
     </View>

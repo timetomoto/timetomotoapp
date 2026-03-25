@@ -23,6 +23,7 @@ import { stopBackgroundLocation } from '../lib/backgroundTasks';
 import CrashAlertModal from '../components/safety/CrashAlertModal';
 import ScoutPanel from '../components/scout/ScoutPanel';
 import { useTheme } from '../lib/useTheme';
+import { SAFETY_CRASH_DETECTION_KEY, SAFETY_LIVE_SHARE_KEY } from '../lib/storageKeys';
 
 // Configure how notifications are presented when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -112,7 +113,23 @@ function SafetyService() {
   // Lazy-init detector singleton
   if (!detectorRef.current) {
     detectorRef.current = new CrashDetector(() => setCrashDetected(true));
+    // Register voice hook so CrashAlertModal can call it when SMS fires
+    useSafetyStore.getState().setOnCrashAlertsSent(
+      () => detectorRef.current?.onAlertsSent()
+    );
   }
+
+  // ── Restore persisted safety defaults on mount ──
+  useEffect(() => {
+    (async () => {
+      const [crashVal, shareVal] = await Promise.all([
+        AsyncStorage.getItem(SAFETY_CRASH_DETECTION_KEY),
+        AsyncStorage.getItem(SAFETY_LIVE_SHARE_KEY),
+      ]);
+      if (crashVal === 'true') useSafetyStore.getState().setMonitoring(true);
+      if (shareVal === 'true') useSafetyStore.getState().setShareActive(true);
+    })();
+  }, []);
 
   // ── Crash detector lifecycle ──
   useEffect(() => {
@@ -165,17 +182,13 @@ function SafetyService() {
 
       for (const contact of emergencyContacts) {
         try {
-          await (await import('../lib/supabase')).supabase.functions.invoke('send-crash-alert', {
+          await supabase.functions.invoke('send-checkin-alert', {
             body: {
               contactPhone: contact.phone,
-              contactName:  contact.name,
               riderName,
-              lat:          loc.lat,
-              lng:          loc.lng,
               mapsUrl,
               timestamp,
-              // Edge function uses the message field; pass overriding body text
-              overrideBody: `TIME to MOTO: ${riderName} hasn't checked in.\nThey were last seen at: ${mapsUrl}\nCheck-in was set for: ${checkInTime}`,
+              checkInTime,
             },
           });
         } catch {}

@@ -17,12 +17,20 @@ export default {
       bundleIdentifier: 'com.timetomoto.app',
       infoPlist: {
         UIBackgroundModes: ['location', 'fetch'],
+        NSLocationWhenInUseUsageDescription:
+          'Time to Moto uses your location to show your position on the map, record rides, and provide navigation.',
         NSLocationAlwaysAndWhenInUseUsageDescription:
-          'timetomoto shares your live location with your emergency contacts during rides.',
+          'Time to Moto shares your live location with your emergency contacts during rides.',
         NSLocationAlwaysUsageDescription:
-          'timetomoto shares your live location with your emergency contacts during rides.',
+          'Time to Moto shares your live location with your emergency contacts during rides.',
+        NSMotionUsageDescription:
+          'Time to Moto uses motion sensors to detect potential crashes and alert your emergency contacts.',
         NSContactsUsageDescription:
           'Time to Moto uses your contacts to make it easy to add emergency contacts for your rides.',
+        NSSpeechRecognitionUsageDescription:
+          'Time to Moto uses speech recognition for hands-free voice commands while riding.',
+        NSMicrophoneUsageDescription:
+          'Time to Moto uses the microphone for voice commands with Scout, your riding assistant.',
       },
     },
     android: {

@@ -14,6 +14,21 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     garage: 'The rider is on the Garage screen — prioritize bike specs, maintenance, and service questions. You can still plan trips if asked.',
     other: 'The rider opened Scout from a secondary screen.',
   };
+  // ── CRASH ALERT MODE — overrides everything ─────────────────────────
+  if (ctx.isCrashAlertActive) {
+    sections.push(
+      `You are Scout. A CRASH HAS BEEN DETECTED. Your ONLY job right now is crash response.\n` +
+      `RULES:\n` +
+      `- All other tools are disabled. Only use: cancel_crash_alert, trigger_emergency, get_safety_status.\n` +
+      `- Responses MUST be under 10 words.\n` +
+      `- Lead with action, not confirmation.\n` +
+      `- "I'm ok" / "I'm fine" / "yes" / "okay" → call cancel_crash_alert\n` +
+      `- "help" / "call" / "emergency" / "hurt" → call trigger_emergency\n` +
+      `- "status" → call get_safety_status`
+    );
+    return sections.join('\n\n');
+  }
+
   sections.push(
     `You are Scout, the motorcycle trip planning assistant inside the Time to Moto app. ` +
     `You help riders plan routes, manage trips, and answer questions about their bikes.\n` +
@@ -135,10 +150,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     riderLines.push(`Recent maintenance (active bike): ${summary}.`);
   }
 
-  // Service intervals
-  if (ctx.serviceIntervals) {
-    riderLines.push('Service interval data is available for the active bike.');
-  }
+  // Service intervals — only include when data is actually loaded
+  // Currently not populated; omit to avoid misleading the model
 
   sections.push(
     'RIDER CONTEXT (live state — always trust this over conversation history, the rider may have made changes outside of this chat):\n' +
@@ -218,6 +231,11 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- find_nearby: Find a nearby place (gas, food, rest) near the rider's current location.\n` +
     `- stop_ride: Stop the ride recording. ALWAYS call with confirmed: false first — this asks the rider to confirm. Only call with confirmed: true after the rider explicitly says "yes" or "stop it".\n` +
     `- add_stop_to_navigation: Add a stop to the active navigation route or trip planner. Geocodes and inserts as next waypoint.\n` +
+    `Safety:\n` +
+    `- cancel_crash_alert: Cancel the active crash countdown. Only works during a crash alert.\n` +
+    `- trigger_emergency: Fire SMS to emergency contacts immediately. Only works during a crash alert.\n` +
+    `- checkin_now: Reset the check-in timer and cancel pending alert. Voice: "I'm ok" or "check in".\n` +
+    `- get_safety_status: Get current state of crash detection, live share, and check-in timer.\n` +
     `Saved routes:\n` +
     `- describe_saved_route: Look up a saved route by name and return its details. ALWAYS call this tool when the rider asks about a saved route — the context summary above only shows a preview, the tool searches ALL routes.\n` +
     `- load_saved_route: Load a saved route into Trip Planner so the rider can view, edit, or navigate it. Also call this before get_weather_briefing if the rider wants weather on a saved route.\n` +

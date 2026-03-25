@@ -451,6 +451,28 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  // ── Safety ──────────────────────────────────────────────────────────
+  {
+    name: 'cancel_crash_alert',
+    description: 'Cancel the active crash detection countdown and dismiss the crash modal. Use when the rider says they are OK.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'trigger_emergency',
+    description: 'Fire SMS to emergency contacts immediately without waiting for the crash countdown. Use when the rider says "help", "emergency", or "call".',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'checkin_now',
+    description: 'Reset the check-in timer and cancel any pending check-in alert. Use when the rider says "I\'m ok", "check in", or "I\'m fine".',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_safety_status',
+    description: 'Get the current state of crash detection, live share, and check-in timer.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+
   // ── Post-Ride ─────────────────────────────────────────────────────────
   {
     name: 'generate_ride_summary',
@@ -1321,6 +1343,57 @@ export async function executeScoutTool(
           `${distance.toFixed(1)} miles in ${durationStr} on the ${bike_nickname}. ` +
           `Averaged ${avg_speed.toFixed(0)} mph with ${elevation_gain.toLocaleString()} ft of climbing.`;
         return JSON.stringify({ suggestedName, summary });
+      }
+
+      // ── Safety tools ─────────────────────────────────────────────────
+      case 'cancel_crash_alert': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.isCrashAlertActive) return 'No crash alert is currently active.';
+        if (safetyStore.cancelCrashAlert) {
+          safetyStore.cancelCrashAlert();
+          return 'Crash alert cancelled. Rider confirmed they are OK.';
+        }
+        return 'Crash alert is active but cancel handler is not available.';
+      }
+
+      case 'trigger_emergency': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.isCrashAlertActive) return 'No crash alert is currently active.';
+        if (safetyStore.triggerEmergencyNow) {
+          safetyStore.triggerEmergencyNow();
+          return 'Emergency contacts are being notified immediately.';
+        }
+        return 'Crash alert is active but emergency handler is not available.';
+      }
+
+      case 'checkin_now': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.checkInActive) return 'No check-in timer is currently active.';
+        if (safetyStore.checkInNotifId) {
+          try {
+            const Notifs = require('expo-notifications');
+            Notifs.cancelScheduledNotificationAsync(safetyStore.checkInNotifId).catch(() => {});
+          } catch {}
+        }
+        safetyStore.clearCheckIn();
+        return 'Check-in timer reset. Your contacts will not be alerted.';
+      }
+
+      case 'get_safety_status': {
+        const ss = useSafetyStore.getState();
+        const parts: string[] = [];
+        parts.push(`Crash detection: ${ss.isMonitoring ? 'ON' : 'OFF'}`);
+        parts.push(`Crash alert active: ${ss.isCrashAlertActive ? 'YES' : 'no'}`);
+        parts.push(`Live share: ${ss.shareActive ? 'ON' : 'OFF'}${ss.shareToken ? ` (token: ${ss.shareToken.slice(0, 8)}…)` : ''}`);
+        if (ss.checkInActive && ss.checkInDeadline) {
+          const secsLeft = Math.max(0, Math.round((ss.checkInDeadline - Date.now()) / 1000));
+          const mins = Math.floor(secsLeft / 60);
+          parts.push(`Check-in timer: ${mins}m ${secsLeft % 60}s remaining`);
+        } else {
+          parts.push('Check-in timer: OFF');
+        }
+        parts.push(`Emergency contacts: ${ss.emergencyContacts.length}`);
+        return parts.join('\n');
       }
 
       default:

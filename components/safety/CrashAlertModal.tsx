@@ -11,8 +11,9 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useSafetyStore } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
+import { speakResponse, stopSpeaking, startRecordingCommand, stopRecordingCommand } from '../../lib/scoutVoice';
 
-const COUNTDOWN_SEC = 30;
+const COUNTDOWN_SEC = 60;
 
 async function sendCrashAlerts(
   userName: string,
@@ -53,19 +54,52 @@ async function sendCrashAlerts(
 export default function CrashAlertModal() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { crashDetected, emergencyContacts, lastKnownLocation, setCrashDetected } = useSafetyStore();
+  const { crashDetected, emergencyContacts, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
   const pulseAnim   = useRef(new Animated.Value(1)).current;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hapticRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const voiceListenRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const dismissedRef = useRef(false);
+
+  // Phrases that cancel the alert (rider is OK)
+  const CANCEL_PHRASES = ['i\'m ok', 'i\'m fine', 'im ok', 'im fine', 'yes', 'okay', 'cancel'];
+  // Phrases that escalate (rider needs help)
+  const EMERGENCY_PHRASES = ['help', 'emergency', 'call', 'hurt'];
 
   useEffect(() => {
     if (!crashDetected) return;
+    dismissedRef.current = false;
 
     setCountdown(COUNTDOWN_SEC);
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+
+    // NOTE: Initial voice announcement + startRecordingCommand() are fired
+    // by CrashDetector in lib/safety.ts BEFORE setCrashDetected(true).
+    // This avoids duplicate speech — safety.ts owns the instant voice hooks,
+    // this modal owns the ongoing listening, phrase matching, and cleanup.
+
+    // Poll for voice transcription results (stub returns '' until dev build).
+    // In the real implementation, startRecordingCommand (already running from
+    // safety.ts) continuously transcribes; this interval checks for matches.
+    voiceListenRef.current = setInterval(async () => {
+      if (dismissedRef.current) return;
+      try {
+        const transcript = await startRecordingCommand();
+        if (!transcript) return;
+        const lower = transcript.toLowerCase().trim();
+
+        if (CANCEL_PHRASES.some((p) => lower.includes(p))) {
+          stopRecordingCommand();
+          handleImOK();
+        } else if (EMERGENCY_PHRASES.some((p) => lower.includes(p))) {
+          stopRecordingCommand();
+          handleEmergencyNow();
+        }
+      } catch {}
+    }, 2000);
 
     const pulse = Animated.loop(
       Animated.sequence([
@@ -84,10 +118,14 @@ export default function CrashAlertModal() {
         if (n <= 1) {
           clearInterval(intervalRef.current!);
           clearInterval(hapticRef.current!);
+          clearInterval(voiceListenRef.current!);
           pulse.stop();
+          stopRecordingCommand();
           const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
           const name = user?.email ?? 'A rider';
           sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+            // Voice hook via CrashDetector.onAlertsSent() — stops recording + speaks
+            onCrashAlertsSent?.();
             setCrashDetected(false);
           });
           return 0;
@@ -99,16 +137,50 @@ export default function CrashAlertModal() {
     return () => {
       clearInterval(intervalRef.current!);
       clearInterval(hapticRef.current!);
+      clearInterval(voiceListenRef.current!);
+      stopRecordingCommand();
+      stopSpeaking();
       pulse.stop();
     };
   }, [crashDetected]);
 
   function handleImOK() {
+    dismissedRef.current = true;
     clearInterval(intervalRef.current!);
     clearInterval(hapticRef.current!);
+    clearInterval(voiceListenRef.current!);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    stopRecordingCommand();
+    stopSpeaking();
+    speakResponse("Glad you're okay. Countdown cancelled.");
     setCrashDetected(false);
   }
+
+  /** Skip countdown and fire SMS immediately (voice command or future UI trigger) */
+  function handleEmergencyNow() {
+    dismissedRef.current = true;
+    clearInterval(intervalRef.current!);
+    clearInterval(hapticRef.current!);
+    clearInterval(voiceListenRef.current!);
+    stopRecordingCommand();
+    speakResponse('Alerting your emergency contacts now.');
+    const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+    const name = user?.email ?? 'A rider';
+    sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+      // Voice hook via CrashDetector.onAlertsSent() — stops recording + speaks
+      onCrashAlertsSent?.();
+      setCrashDetected(false);
+    });
+  }
+
+  // Register handlers so Scout tools can cancel or escalate
+  useEffect(() => {
+    if (crashDetected) {
+      setCrashAlertHandlers(handleImOK, handleEmergencyNow);
+    } else {
+      setCrashAlertHandlers(null, null);
+    }
+  }, [crashDetected]);
 
   if (!crashDetected) return null;
 

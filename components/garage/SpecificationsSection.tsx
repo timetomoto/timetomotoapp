@@ -11,6 +11,7 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import { useGarageStore, type Bike, type BikeSpecs } from '../../lib/store';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -644,10 +645,21 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
+          {/* Ask Scout about this bike */}
+          <Pressable
+            style={[st.askScoutBtn, { borderColor: theme.red }]}
+            onPress={() => {
+              const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+              useScoutStore.getState().openScout({
+                initialMessage: `Tell me about my ${label} and what I should know about it.`,
+              });
+            }}
+          >
+            <Feather name="compass" size={14} color={theme.red} />
+            <Text style={[st.askScoutBtnText, { color: theme.red }]}>ASK SCOUT ABOUT YOUR BIKE</Text>
+          </Pressable>
 
         </View>
-
-        {/* Scout panel now global in _layout.tsx */}
     </View>
   );
 }
@@ -755,4 +767,15 @@ const st = StyleSheet.create({
   },
   refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   dataSource: { fontSize: 10, lineHeight: 14, marginTop: 16, marginBottom: 8, fontStyle: 'italic' },
+  askScoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  askScoutBtnText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
 });
