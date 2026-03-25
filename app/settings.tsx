@@ -431,6 +431,18 @@ export default function SettingsScreen() {
           </>
         )}
 
+        {/* ACCOUNT */}
+        <SectionHeader label="ACCOUNT" />
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
+          <Pressable
+            style={[styles.row, { borderBottomWidth: 0 }]}
+            onPress={() => router.push('/account')}
+          >
+            <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Account Settings</Text>
+            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
