@@ -260,11 +260,26 @@ export default function TripPlanner() {
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
 
-  // Scroll panel to bottom when a waypoint is added (keeps Add Stop visible)
+  // Scroll to Add Stop area when a waypoint is added
   const prevWaypointCount = useRef(waypoints.length);
+  const addStopRef = useRef<View>(null);
   useEffect(() => {
     if (waypoints.length > prevWaypointCount.current) {
-      setTimeout(() => panelScrollRef.current?.scrollToEnd({ animated: true }), 200);
+      if (waypoints.length >= MAX_WAYPOINTS) {
+        // At limit — scroll to top so user sees the banner
+        setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: true }), 300);
+      } else {
+        // Scroll to the Add Stop anchor
+        setTimeout(() => {
+          addStopRef.current?.measureLayout(
+            panelScrollRef.current as any,
+            (_x, y) => {
+              panelScrollRef.current?.scrollTo({ y: Math.max(0, y - 40), animated: true });
+            },
+            () => {},
+          );
+        }, 300);
+      }
     }
     prevWaypointCount.current = waypoints.length;
   }, [waypoints.length]);
@@ -1145,7 +1160,7 @@ export default function TripPlanner() {
           <View style={[st.dragHandle, { backgroundColor: theme.border }]} />
         </View>
 
-        <ScrollView ref={panelScrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: panelExpanded ? 140 : 300 }} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={panelScrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: panelExpanded ? 140 : 300 }} keyboardShouldPersistTaps="handled" scrollIndicatorInsets={{ top: 20 }}>
           {activeField !== null ? (
             /* Search mode */
             <View style={st.searchPad}>
@@ -1202,7 +1217,7 @@ export default function TripPlanner() {
               {tripRouteIsManual && waypoints.length > 23 && !tooManyStopsDismissed && (
                 <View style={{ backgroundColor: theme.bgCard, borderRadius: 8, padding: 10, marginBottom: 10, borderWidth: 1, borderColor: theme.border }}>
                   <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
-                    This route has too many stops to edit in the app. You can navigate it, save a copy, or clear it to plan a new route.
+                    This route has too many stops to edit in the app. You can navigate it as is, edit it or save a copy. Clear it to plan a new route.
                     {'\n\n'}Need to build a complex multi-stop route? Plan it free at{' '}
                     <Text style={{ color: theme.red, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://kurviger.de')}>kurviger.de</Text>
                     {' '}— it's built for motorcycle trips. Export as GPX and import it into My Routes.
@@ -1271,6 +1286,7 @@ export default function TripPlanner() {
                   )}
 
                   {/* Add Stop + limit warning */}
+                  <View ref={addStopRef} collapsable={false}>
                   {waypoints.length < MAX_WAYPOINTS && (
                     <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: -2, marginBottom: 2 }} onPress={() => { setActiveField(waypoints.length); }}>
                       <Feather name="plus" size={13} color={theme.textSecondary} />
@@ -1286,6 +1302,7 @@ export default function TripPlanner() {
                   {waypoints.length >= 20 && waypoints.length < MAX_WAYPOINTS && (
                     <Text style={{ fontSize: 10, color: theme.textMuted, textAlign: 'center', marginBottom: 2 }}>{MAX_WAYPOINTS - waypoints.length} stop{MAX_WAYPOINTS - waypoints.length === 1 ? '' : 's'} remaining</Text>
                   )}
+                  </View>
 
                   {/* Destination */}
                   <Pressable style={[st.field, { backgroundColor: theme.bgCard, borderColor: theme.border }]} onPress={() => setActiveField('destination')}>
@@ -1810,7 +1827,7 @@ const st = StyleSheet.create({
   toast: { position: 'absolute', bottom: 140, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, borderWidth: 1, padding: 14 },
   toastText: { fontSize: 13, fontWeight: '600' },
   flexOne: { flex: 1 },
-  fieldsWrap: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 10, gap: 10 },
+  fieldsWrap: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 16, gap: 10 },
   searchPad: { padding: 16 },
   actionsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 },
   secBtnRow: { flexDirection: 'row', gap: 8 },
