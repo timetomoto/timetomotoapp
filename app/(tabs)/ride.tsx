@@ -64,6 +64,9 @@ import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type
 import { fetchHEREConditions } from '../../lib/discoverStore';
 import StatsBar from '../../components/ride/StatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
+import ScoutVoiceIndicator from '../../components/ride/ScoutVoiceIndicator';
+import { speakResponse } from '../../lib/scoutVoice';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
 // Mapbox init — runs once
@@ -662,6 +665,8 @@ export default function RideScreen() {
       if (destination) {
         const distToDest = haversineMeters(pos.lat, pos.lng, destination.lat, destination.lng);
         if (distToDest < 30) {
+          // TODO: dev build — announce arrival via TTS
+          speakResponse('You have arrived at your destination.');
           setNavMode('completed');
           // Only clear overrides if not still recording — recording has its own cleanup
           if (!useSafetyStore.getState().isRecording) {
@@ -676,12 +681,19 @@ export default function RideScreen() {
       const nextStep = findNextStepIndex(pos.lat, pos.lng, activeRoute.steps, currentStepIndex);
       if (nextStep !== currentStepIndex) {
         setCurrentStepIndex(nextStep);
+        // TODO: dev build — announce upcoming turn via TTS
+        const step = activeRoute.steps[nextStep];
+        if (step?.instruction) {
+          speakResponse(step.instruction);
+        }
       }
 
       // Off-route check
       if (navMode === 'navigating') {
         const offDist = distanceToRouteMeters(pos.lat, pos.lng, activeRoute.geometry.coordinates);
         if (offDist > 50) {
+          // TODO: dev build — announce off-route via TTS
+          speakResponse('Off route. Recalculating.');
           setNavMode('off_route');
           setIsOffRoute(true);
           // Auto-recalculate after 3 seconds
@@ -1433,6 +1445,13 @@ export default function RideScreen() {
 
         {/* Weather legend — bottom-left when weather is on */}
         {weatherOn && <WeatherLegend />}
+
+        {/* Scout voice indicator — hidden until voice is enabled */}
+        <ScoutVoiceIndicator
+          isActive={false}
+          voiceState="idle"
+          onPress={() => useScoutStore.getState().openScout()}
+        />
 
         {/* ── Stats bar: navigation stats or recording stats (hidden in free ride) ── */}
         {isNavigatingActive ? (

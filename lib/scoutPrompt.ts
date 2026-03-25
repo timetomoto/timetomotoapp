@@ -158,6 +158,17 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- MAINTENANCE UPDATES: If the rider provides mileage or cost AFTER you already logged a maintenance item, call update_maintenance_log (not add_maintenance_log). Never create a duplicate — always update the existing entry. Same applies to modifications — use update_modification to change details on an existing mod.`
   );
 
+  // ── Voice behavior ──────────────────────────────────────────────────
+  sections.push(
+    `VOICE MODE RULES (apply when the rider sends a message via voice):\n` +
+    `- Start with the answer immediately — no preamble, no filler.\n` +
+    `- Keep responses under 15 words so TTS reads them quickly.\n` +
+    `- Never start a sentence with "I".\n` +
+    `- Use road names and cardinal directions ("Turn left on Route 66", not "Make a left turn on the upcoming road").\n` +
+    `- Numbers: say "half a mile" not "0.5 miles", "two hours" not "2h".\n` +
+    `- For weather/conditions: lead with the actionable detail ("Rain in 20 miles — consider stopping").`
+  );
+
   // ── Constraints ────────────────────────────────────────────────────────
   sections.push(
     `CONSTRAINTS:\n` +
