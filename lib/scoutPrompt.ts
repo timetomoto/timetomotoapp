@@ -20,6 +20,29 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     screenHints[ctx.currentScreen]
   );
 
+  // ── Ride state (when actively riding) ──────────────────────────────────
+  if (ctx.rideState) {
+    const r = ctx.rideState;
+    const parts: string[] = [];
+    if (r.isRecording) parts.push(r.isPaused ? 'RECORDING (paused)' : 'RECORDING');
+    if (r.isNavigating) parts.push('NAVIGATING');
+    if (r.speedMph > 0) parts.push(`${r.speedMph} mph`);
+    if (r.distanceMiles > 0) parts.push(`${r.distanceMiles} mi ridden`);
+    if (r.remainingDistanceMiles > 0) parts.push(`${r.remainingDistanceMiles} mi remaining`);
+    if (r.eta) parts.push(`ETA ${r.eta}`);
+    if (r.destinationName) parts.push(`heading to ${r.destinationName}`);
+    sections.push(`ACTIVE RIDE: ${parts.join(' · ')}`);
+
+    sections.push(
+      `RIDING MODE RULES:\n` +
+      `- The rider is actively on the road. Keep all responses to 2 sentences max.\n` +
+      `- No markdown, bullet points, or formatting — plain text only.\n` +
+      `- Be direct and concise. The rider may be glancing at their phone.\n` +
+      `- For navigation questions, read from the ride state above.\n` +
+      `- You can pause, resume, or report ride stats. NEVER stop a ride without explicit confirmation.`
+    );
+  }
+
   // ── Rider context ──────────────────────────────────────────────────────
   const riderLines: string[] = [];
 
@@ -176,6 +199,14 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- update_modification: Update an EXISTING modification — change cost, brand, notes, or date.\n` +
     `- update_bike: Update a bike's nickname, odometer, year, make, or model.\n` +
     `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
+    `Ride controls (only when actively recording or navigating):\n` +
+    `- pause_ride: Pause the current ride recording.\n` +
+    `- resume_ride: Resume a paused ride.\n` +
+    `- get_ride_stats: Get current speed, distance, duration, and status.\n` +
+    `- get_navigation_status: Get destination, distance remaining, ETA, next turn, off-route status.\n` +
+    `- find_nearby: Find a nearby place (gas, food, rest) near the rider's current location.\n` +
+    `- stop_ride: Stop the ride recording. ALWAYS call with confirmed: false first — this asks the rider to confirm. Only call with confirmed: true after the rider explicitly says "yes" or "stop it".\n` +
+    `- add_stop_to_navigation: Add a stop to the active navigation route or trip planner. Geocodes and inserts as next waypoint.\n` +
     `Saved routes:\n` +
     `- describe_saved_route: Look up a saved route by name and return its details. ALWAYS call this tool when the rider asks about a saved route — the context summary above only shows a preview, the tool searches ALL routes.\n` +
     `- load_saved_route: Load a saved route into Trip Planner so the rider can view, edit, or navigate it. Also call this before get_weather_briefing if the rider wants weather on a saved route.\n` +

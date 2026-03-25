@@ -1,4 +1,6 @@
-import { useTripPlannerStore, useRoutesStore, useGarageStore } from './store';
+import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } from './store';
+import { useNavigationStore } from './navigationStore';
+import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
 import { addMaintenanceRecord, addModification, updateMaintenanceRecord, updateModification, loadMaintenance, loadModifications, type MaintenanceRecord, type Modification } from './garage';
 import { supabase } from './supabase';
@@ -353,6 +355,61 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
         model: { type: 'string', description: 'Updated model.' },
       },
       required: ['bike_name'],
+    },
+  },
+
+  // ── Ride Controls ───────────────────────────────────────────────────
+  {
+    name: 'pause_ride',
+    description: 'Pause the current ride recording. Only works when actively recording.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'resume_ride',
+    description: 'Resume a paused ride recording.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_ride_stats',
+    description: 'Get current ride statistics — speed, distance, duration, and navigation status.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_navigation_status',
+    description: 'Get navigation status — distance remaining, ETA, destination, current step instruction.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'find_nearby',
+    description: 'Find a nearby place (gas station, restaurant, rest stop, etc.) along the current route or near the rider\'s location.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to find — e.g. "gas station", "coffee shop", "rest area".' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'stop_ride',
+    description: 'Stop the current ride recording. ALWAYS call with confirmed: false first to ask the rider to confirm. Only call with confirmed: true after the rider explicitly says yes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        confirmed: { type: 'boolean', description: 'false = ask user to confirm, true = execute stop after user confirmed.' },
+      },
+      required: ['confirmed'],
+    },
+  },
+  {
+    name: 'add_stop_to_navigation',
+    description: 'Add a stop to the active navigation route. Geocodes the place and inserts it as the next waypoint. Falls back to trip planner if not navigating.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Place name or address to add as a stop.' },
+      },
+      required: ['query'],
     },
   },
 
@@ -1056,6 +1113,116 @@ export async function executeScoutTool(
         if (parameters.odometer != null) changes.push(`odometer → ${(updated.odometer ?? 0).toLocaleString()} mi`);
         if (parameters.year != null || parameters.make || parameters.model) changes.push(`${newLabel}`);
         return `Updated ${oldLabel}: ${changes.join(', ')}.`;
+      }
+
+      // ── Ride Controls ────────────────────────────────────────────────
+      case 'pause_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to pause.';
+        if (safety.isRidePaused) return 'Ride is already paused.';
+        safety.setRidePaused(true);
+        return 'Ride paused.';
+      }
+
+      case 'resume_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to resume.';
+        if (!safety.isRidePaused) return 'Ride is not paused.';
+        safety.setRidePaused(false);
+        return 'Ride resumed.';
+      }
+
+      case 'get_ride_stats': {
+        const safety = useSafetyStore.getState();
+        const nav = useNavigationStore.getState();
+        if (!safety.isRecording && nav.mode === 'idle') return 'No active ride or navigation.';
+
+        const parts: string[] = [];
+        if (safety.isRecording) {
+          const dist = calcDistance(safety.recordedPoints);
+          parts.push(`Distance: ${dist.toFixed(1)} mi`);
+          parts.push(safety.isRidePaused ? 'Status: paused' : 'Status: recording');
+        }
+        if (nav.speedMph > 0) parts.push(`Speed: ${Math.round(nav.speedMph)} mph`);
+        if (nav.mode !== 'idle') {
+          parts.push(`Remaining: ${nav.remainingDistanceMiles.toFixed(1)} mi`);
+          if (nav.eta) parts.push(`ETA: ${nav.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`);
+          if (nav.destination) parts.push(`Heading to: ${nav.destination.name}`);
+        }
+        return parts.join(' · ');
+      }
+
+      case 'get_navigation_status': {
+        const nav = useNavigationStore.getState();
+        if (nav.mode === 'idle') return 'No active navigation.';
+
+        const parts: string[] = [];
+        parts.push(`Mode: ${nav.mode}`);
+        if (nav.destination) parts.push(`Destination: ${nav.destination.name}`);
+        parts.push(`Remaining: ${nav.remainingDistanceMiles.toFixed(1)} mi`);
+        if (nav.eta) parts.push(`ETA: ${nav.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`);
+        if (nav.speedMph > 0) parts.push(`Speed: ${Math.round(nav.speedMph)} mph`);
+        if (nav.isOffRoute) parts.push('⚠️ OFF ROUTE');
+        if (nav.activeRoute?.steps?.[nav.currentStepIndex]) {
+          const step = nav.activeRoute.steps[nav.currentStepIndex];
+          parts.push(`Next: ${step.instruction}`);
+        }
+        return parts.join(' · ');
+      }
+
+      case 'find_nearby': {
+        const query = parameters.query as string;
+        const results = await geocodeLocation(query, context.currentLocation);
+        if (results.length === 0) return `No "${query}" found nearby.`;
+        const place = results[0];
+        return `Found: ${place.name}. Want me to add it as a stop?`;
+      }
+
+      case 'stop_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to stop.';
+
+        const confirmed = parameters.confirmed as boolean;
+        if (!confirmed) {
+          const dist = calcDistance(safety.recordedPoints);
+          return `You've ridden ${dist.toFixed(1)} miles. Are you sure you want to stop and save your ride?`;
+        }
+
+        // Confirmed — trigger stop. We can't directly call handleStopRequested (it's in ride.tsx).
+        // Instead, set a flag the ride screen watches.
+        safety.setRecording(false);
+        return 'Ride stopped. Save your ride from the Ride screen.';
+      }
+
+      case 'add_stop_to_navigation': {
+        const query = parameters.query as string;
+        const nav = useNavigationStore.getState();
+        const isNavigating = nav.mode === 'navigating' || nav.mode === 'off_route' || nav.mode === 'recalculating';
+
+        const results = await geocodeLocation(query, context.currentLocation);
+        if (results.length === 0) return `No "${query}" found nearby.`;
+        const place = results[0];
+
+        if (isNavigating && nav.activeRoute) {
+          // Insert as next waypoint in active navigation
+          // Calculate distance from current location
+          let distToStop = 0;
+          if (context.currentLocation) {
+            const { haversineMiles } = await import('./distance');
+            distToStop = haversineMiles(context.currentLocation.lat, context.currentLocation.lng, place.lat, place.lng);
+          }
+          // Add to trip planner store as a waypoint (navigation will pick it up)
+          const wps = [...(tripStore.tripWaypoints as TripStop[])];
+          wps.push({ name: place.name, lat: place.lat, lng: place.lng });
+          tripStore.setTripWaypoints(wps);
+          return `Added ${place.name} as your next stop — ${distToStop.toFixed(1)} mi away.`;
+        }
+
+        // Not navigating — add to trip planner
+        const wps = [...(tripStore.tripWaypoints as TripStop[])];
+        wps.push({ name: place.name, lat: place.lat, lng: place.lng });
+        tripStore.setTripWaypoints(wps);
+        return `Added ${place.name} to your trip. Head to Trip Planner to see it on the map.`;
       }
 
       // ── Saving ──────────────────────────────────────────────────────

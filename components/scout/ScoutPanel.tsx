@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Animated,
   Easing,
   FlatList,
@@ -27,6 +28,8 @@ import {
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
 import { useActiveBike } from '../../lib/useActiveBike';
+import { useNavigationStore } from '../../lib/navigationStore';
+import { calcDistance } from '../../lib/gpx';
 import SlideUpWrapper from '../ui/SlideUpWrapper';
 import { loadFavorites } from '../../lib/favorites';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
@@ -37,6 +40,7 @@ import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes'
 // ---------------------------------------------------------------------------
 
 const MAX_MESSAGES_PER_SESSION = 50;
+const SCREEN_H = Dimensions.get('window').height;
 
 const ROUTE_MODIFYING_TOOLS = new Set([
   'set_origin', 'set_destination', 'add_waypoint', 'steer_segment',
@@ -144,12 +148,16 @@ export default function ScoutPanel() {
   const closeScout = useScoutStore((s) => s.closeScout);
   const insets = useSafeAreaInsets();
 
+  const isRiding = useSafetyStore((s) => s.isRecording);
+  const navMode = useNavigationStore.getState().mode;
+  const rideActive = isRiding || (navMode !== 'idle' && navMode !== 'preview');
+
   if (!isScoutOpen) return null;
 
   return (
     <SlideUpWrapper visible={isScoutOpen} onClose={closeScout} bottomOffset={0}>
-      {/* Top spacer so panel starts below status bar */}
-      <View style={{ height: insets.top + 60 }} />
+      {/* Top spacer — smaller when riding so map stays visible */}
+      <View style={{ height: rideActive ? SCREEN_H * 0.55 : insets.top + 60 }} />
       <ScoutPanelContent />
     </SlideUpWrapper>
   );
@@ -185,6 +193,8 @@ function ScoutPanelContent() {
   const tripRouteDuration = useTripPlannerStore((s) => s.tripRouteDuration);
   const routes = useRoutesStore((s) => s.routes);
   const currentLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const isRecording = useSafetyStore((s) => s.isRecording);
+  const isRidePaused = useSafetyStore((s) => s.isRidePaused);
   const userId = useAuthStore((s) => s.user?.id) ?? 'local';
 
   // Local state
@@ -254,8 +264,27 @@ function ScoutPanelContent() {
 
     const tripWps = tripWaypoints as TripStop[];
 
+    // Build ride state from stores
+    const navState = useNavigationStore.getState();
+    const safetyState = useSafetyStore.getState();
+    const isNavigating = navState.mode === 'navigating' || navState.mode === 'off_route' || navState.mode === 'recalculating';
+    const rideActive = isRecording || isNavigating;
+
+    const rideState = rideActive ? {
+      isRecording,
+      isPaused: isRidePaused,
+      isNavigating,
+      speedMph: Math.round(navState.speedMph ?? 0),
+      distanceMiles: isRecording ? Math.round(calcDistance(safetyState.recordedPoints) * 10) / 10 : 0,
+      elapsedSeconds: 0, // Can't read elapsedRef from here — tool reads from store
+      remainingDistanceMiles: Math.round((navState.remainingDistanceMiles ?? 0) * 10) / 10,
+      eta: navState.eta ? navState.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : null,
+      destinationName: navState.destination?.name ?? null,
+    } : null;
+
     return {
       currentScreen,
+      rideState,
       bikes,
       activeBike,
       currentLocation: loc,
@@ -394,7 +423,15 @@ function ScoutPanelContent() {
 
   const bikeLabel = activeBike?.nickname ?? (activeBike ? [activeBike.year, activeBike.make, activeBike.model].filter(Boolean).join(' ') : null) ?? 'my bike';
 
-  const welcomeExamples = [
+  const contentIsRiding = isRecording || useNavigationStore.getState().mode === 'navigating';
+
+  const welcomeExamples = contentIsRiding ? [
+    'Find gas near me',
+    'How far to my destination?',
+    'Pause my ride',
+    "What's my ETA?",
+    'Add a coffee stop',
+  ] : [
     'Plan a 2-hour loop from here on back roads',
     'Check weather for my route this Saturday',
     `What oil does ${bikeLabel} take?`,
