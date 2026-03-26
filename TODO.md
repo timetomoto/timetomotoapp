@@ -39,7 +39,6 @@
 - [ ] Scout — steer_segment needs entry+exit waypoints for full loop roads
 - [ ] Scout — load_saved_route should extract intermediate waypoints as markers
 - [ ] Scout — detect truncated responses and append friendly message
-- [x] Scout — service intervals wired into context + ask_garage (reads cached data from ServiceIntervalsSection)
 - [ ] Scout — screen awareness ("What screen am I on?" — data exists, prompt doesn't report it)
 - [ ] Scout — "I can't" phrasing (Gemini says "I can't" instead of offering alternatives per personality rules)
 - [ ] Scout quota bypass — configure with Supabase user ID before launch
@@ -52,33 +51,6 @@
 - [ ] Code consolidation — lib/limits.ts, lib/dateFormatting.ts, lib/apiConstants.ts
 - [ ] Code consolidation — colors into theme.ts (warningOrange, fuelYellow, rainBlue)
 - [ ] Code consolidation — lib/animationConstants.ts, lib/layoutConstants.ts
-
-## TESTING — Simulator (Retested & Passed March 26)
-
-- [x] Multi-waypoint — "Add stops in Marble Falls and Burnet" → both appear
-- [x] Stop ride confirmation — two-step gate prevents skipping
-- [x] Scroll on reopen — Scout auto-scrolls to latest message
-- [x] "Plan a ride" without details — no longer clears existing trip
-- [x] Departure time in My Routes — shows time for planned routes
-- [x] Departure timezone — describe_saved_route shows local time not UTC
-- [x] Fuzzy route search — "Load my weekend warrior route" returns no match
-- [x] Nav hints — stripped on all responses, only appended after route-modifying tools
-- [x] initialMessage — ASK SCOUT button works with existing conversation
-- [x] Duplicate maintenance — Scout asks before logging same type twice
-- [x] ask_garage specs — returns actual specs from live store
-- [x] ask_garage bike matching — "2019 YAMAHA WR250R" finds DuelFort
-- [x] ask_garage modifications — returns all mods not just current session
-- [x] Emergency contacts — loaded on app startup, shown in crash modal
-- [x] Today's date — relative dates ("this Saturday") calculate correctly
-- [x] Bike pre-selection — PreRideChecklist defaults to first bike
-- [x] Weather badge — Scout weather briefing auto-sends from checklist
-- [x] Specs clearing on model name change — clears and re-fetches
-- [x] Selected bike persists across app restart
-- [x] Selected bike first in chip lists (Garage, PreRideChecklist, RoutePreview)
-- [x] Crash alerts sent to selected contacts only (not all)
-- [x] Service intervals wired into Scout context
-- [x] Ambiguous requests — all 6 edge cases handled gracefully
-- [x] Safe Mapbox import — Expo Go shows fallback, dev build works normally
 
 ## TESTING — Device Required
 
@@ -251,3 +223,19 @@ Mapbox Optimization API `roundtrip=true` only reorders supplied waypoints. No di
 - [x] Easter egg joke — "Tell me a joke"
 - [x] URLs updated timetomoto.app → timetomoto.com
 - [x] Simulate crash dev command
+- [x] 70+ Scout simulator tests passed (March 25-26)
+- [x] 27 Scout bugs found and fixed during testing
+- [x] Bidirectional bike matching on all Scout tools
+- [x] Road conditions 14-day filter + severity cap
+- [x] find_nearby uses route proximity + city hint
+- [x] Safe Mapbox import — Expo Go fallback, dev build works
+- [x] Specs/intervals/bulletins clear on model name change
+- [x] Selected bike persists across app restart
+- [x] Selected bike first in all chip lists
+- [x] Crash alerts sent to selected contacts only
+- [x] Service intervals wired into Scout context + ask_garage
+- [x] delete_maintenance_log + delete_modification tools
+- [x] Contextual Scout welcome messages by screen
+- [x] Scout FAB pill redesign
+- [x] Off-route preserves GPX geometry (no road-snapping)
+- [x] Better error messaging for bike model lookup failures
