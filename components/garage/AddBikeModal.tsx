@@ -430,7 +430,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const fields = {
+    const fields: any = {
       year: parseInt(year, 10),
       make: make.trim(),
       model: model.trim(),
@@ -443,10 +443,17 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
     };
 
     if (isEdit && editBike) {
-      // If make/model changed and no user-uploaded photo, clear stale wiki photo cache
-      const makeModelChanged = fields.make !== editBike.make || fields.model !== editBike.model;
-      if (makeModelChanged && !photoUrl) {
-        clearWikiPhotoCache(editBike.id);
+      // If make/model/year changed, clear stale cached data
+      const makeModelChanged = fields.make !== editBike.make || fields.model !== editBike.model || fields.year !== editBike.year;
+      if (makeModelChanged) {
+        if (!photoUrl) clearWikiPhotoCache(editBike.id);
+        // Reset specs so stale data from old model doesn't persist
+        if (editBike.specs?.specsLookedUp) {
+          fields.specs = { ...editBike.specs, specsLookedUp: false, specsSource: null };
+        }
+        // Clear cached service intervals and bulletins for old model
+        AsyncStorage.removeItem(`ttm_service_intervals_${editBike.id}`).catch(() => {});
+        AsyncStorage.removeItem(`ttm_service_bulletins_${editBike.id}`).catch(() => {});
       }
 
       // Edit existing bike
@@ -460,9 +467,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
           updateBike({ ...editBike, ...fields });
         } catch (e) { console.error('local bike edit failed:', e); setSaving(false); }
       } else {
-        const { error: dbError } = await supabase
-          .from('bikes')
-          .update({
+        const updatePayload: Record<string, any> = {
             year: fields.year,
             make: fields.make,
             model: fields.model,
@@ -472,7 +477,11 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
             "fuelCapacity": fields.fuelCapacity,
             "fuelCapacityUnit": fields.fuelCapacityUnit,
             photo_url: fields.photo_url,
-          })
+        };
+        if (fields.specs) updatePayload.specs = fields.specs;
+        const { error: dbError } = await supabase
+          .from('bikes')
+          .update(updatePayload)
           .eq('id', editBike.id);
         setSaving(false);
         if (dbError) { setError(dbError.message); return; }
