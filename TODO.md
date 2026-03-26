@@ -17,6 +17,7 @@
 - [ ] Voice implementation — replace stubs in lib/scoutVoice.ts with expo-av + expo-speech (dev build required)
 - [ ] Wake word — "Hey Scout" continuous listening during active ride (dev build required)
 - [ ] Hands-free Scout + live map — "Hey Scout" triggers voice input, user watches Trip Planner map while Scout makes changes in real-time via store mutations. Scout speaks responses via TTS. User responds by voice without reopening panel. Full flow: voice command → map updates → Scout speaks follow-up → user replies by voice → repeat. Requires: minimized Scout bar on Plan tab (floating input + last response), voice input active while bar is visible, TTS for all responses in this mode. Build during voice implementation session.
+- [ ] Bearing arrow for imported/GPX routes — find nearest point on route geometry, look ahead ~500m, show directional arrow on TurnCard. Makes imported routes navigable without Mapbox steps. No road names or maneuver types, just bearing direction. Build during voice/dev build session.
 
 ## DEV — P2 (Medium — Quality)
 
