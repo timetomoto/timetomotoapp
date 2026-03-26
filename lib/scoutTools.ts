@@ -912,12 +912,21 @@ export async function executeScoutTool(
         }
 
         if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
-        const specs = bike.specs ?? {};
+        // Read specs from live store — context bike may have stale/empty specs
+        const liveBike = garageStore.bikes.find((b) => b.id === bike!.id);
+        const specs = liveBike?.specs ?? bike.specs ?? {};
         const parts: string[] = [];
         const label = `${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}${bike.nickname ? ` "${bike.nickname}"` : ''}`;
         parts.push(`Bike: ${label}${isActive ? ' (active)' : ' (not active)'}`);
         if (bike.odometer) parts.push(`Odometer: ${bike.odometer.toLocaleString()} mi`);
-        if (Object.keys(specs).length > 0) parts.push(`Specs: ${JSON.stringify(specs)}`);
+        if (Object.keys(specs).length > 0) {
+          // Format specs as readable key-value pairs instead of raw JSON
+          const specLines = Object.entries(specs)
+            .filter(([, v]) => v != null && v !== '' && v !== false)
+            .map(([k, v]) => `  ${k}: ${v}`)
+            .join('\n');
+          parts.push(`Specs:\n${specLines}`);
+        }
         // Include maintenance and modifications for the queried bike
         const userId = garageStore.bikes[0]?.user_id ?? 'local';
         const maintenance = isActive
