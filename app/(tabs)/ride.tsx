@@ -716,29 +716,39 @@ export default function RideScreen() {
       if (navMode === 'navigating') {
         const offDist = distanceToRouteMeters(pos.lat, pos.lng, activeRoute.geometry.coordinates);
         if (offDist > 50) {
-          // TODO: dev build — announce off-route via TTS
-          speakResponse('Off route. Recalculating.');
-          setNavMode('off_route');
-          setIsOffRoute(true);
-          // Auto-recalculate after 3 seconds
-          setTimeout(async () => {
-            if (!destination) return;
-            setNavMode('recalculating');
-            try {
-              const newRoutes = await fetchDirections(
-                pos.lng, pos.lat, destination.lng, destination.lat, routePreference,
-              );
-              if (newRoutes.length > 0) {
-                setActiveRoute(newRoutes[0]);
-                setNavRouteGeojson(newRoutes[0].geometry);
-                setCurrentStepIndex(0);
-                setIsOffRoute(false);
+          const isManualRoute = activeRoute.steps.length === 0;
+          if (isManualRoute) {
+            // Imported/GPX route — don't recalculate via Mapbox (would snap to roads)
+            // Just show off-route indicator, keep original geometry
+            setIsOffRoute(true);
+            speakResponse('Off route.');
+          } else {
+            // Mapbox-calculated route — recalculate to get back on track
+            speakResponse('Off route. Recalculating.');
+            setNavMode('off_route');
+            setIsOffRoute(true);
+            setTimeout(async () => {
+              if (!destination) return;
+              setNavMode('recalculating');
+              try {
+                const newRoutes = await fetchDirections(
+                  pos.lng, pos.lat, destination.lng, destination.lat, routePreference,
+                );
+                if (newRoutes.length > 0) {
+                  setActiveRoute(newRoutes[0]);
+                  setNavRouteGeojson(newRoutes[0].geometry);
+                  setCurrentStepIndex(0);
+                  setIsOffRoute(false);
+                  setNavMode('navigating');
+                }
+              } catch {
                 setNavMode('navigating');
               }
-            } catch {
-              setNavMode('navigating'); // Resume even if recalc fails
-            }
-          }, 3000);
+            }, 3000);
+          }
+        } else if (useNavigationStore.getState().isOffRoute) {
+          // Back on route — clear off-route indicator
+          setIsOffRoute(false);
         }
       }
 
