@@ -452,14 +452,14 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
           <Pressable
             style={[styles.row, { borderBottomColor: theme.border }]}
-            onPress={() => Linking.openURL('https://timetomoto.app/privacy')}
+            onPress={() => Linking.openURL('https://timetomoto.com/privacy')}
           >
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Privacy Policy</Text>
             <Feather name="external-link" size={14} color={theme.textSecondary} />
           </Pressable>
           <Pressable
             style={[styles.row, { borderBottomWidth: 0 }]}
-            onPress={() => Linking.openURL('https://timetomoto.app/terms')}
+            onPress={() => Linking.openURL('https://timetomoto.com/terms')}
           >
             <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Terms of Service</Text>
             <Feather name="external-link" size={14} color={theme.textSecondary} />
