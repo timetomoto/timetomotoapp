@@ -1372,7 +1372,20 @@ export async function executeScoutTool(
 
       case 'find_nearby': {
         const query = parameters.query as string;
-        const results = await geocodeLocation(query, context.currentLocation);
+        // Use current location, or fall back to route origin/midpoint
+        const proximity = context.currentLocation ?? (() => {
+          const ts = useTripPlannerStore.getState();
+          const o = ts.tripOrigin;
+          const d = ts.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return null;
+        })();
+        // Append city hint to avoid matching road names in other states
+        const cityHint = context.currentLocation?.city
+          ?? (proximity ? await reverseGeocode(proximity.lat, proximity.lng) : '');
+        const searchQuery = cityHint ? `${query} near ${cityHint}` : query;
+        const results = await geocodeLocation(searchQuery, proximity);
         if (results.length === 0) return `No "${query}" found nearby.`;
         const place = results[0];
         return `Found: ${place.name}. Want me to add it as a stop?`;
