@@ -877,10 +877,17 @@ export async function executeScoutTool(
           }
         }
         if (allConditions.length === 0) return 'No active road conditions reported along the route. Ride clear.';
-        const construction = allConditions.filter((c) => c.type === 'construction');
-        const hazards = allConditions.filter((c) => c.type === 'hazard');
-        const closures = allConditions.filter((c) => c.type === 'closure');
+        // Prioritize severe/moderate, cap total to keep response manageable
+        const sorted = allConditions.sort((a, b) => {
+          const sev = { critical: 0, major: 1, severe: 1, moderate: 2, minor: 3, low: 4 } as Record<string, number>;
+          return (sev[a.severity] ?? 3) - (sev[b.severity] ?? 3);
+        });
+        const capped = sorted.slice(0, 15);
+        const construction = capped.filter((c) => c.type === 'construction');
+        const hazards = capped.filter((c) => c.type === 'hazard');
+        const closures = capped.filter((c) => c.type === 'closure');
         const parts: string[] = [];
+        parts.push(`${allConditions.length} total conditions found (showing top ${capped.length} by severity).`);
         if (construction.length > 0) {
           parts.push(`CONSTRUCTION (${construction.length}):\n${construction.map((c) => `• [${c.severity.toUpperCase()}] ${c.title}: ${c.description}`).join('\n')}`);
         }
