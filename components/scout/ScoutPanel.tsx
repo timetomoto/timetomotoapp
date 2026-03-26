@@ -364,12 +364,19 @@ function ScoutPanelContent() {
     if (!text) setInput('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    // Easter egg
-    if (/how many (bikes|motorcycles) should (you|i|someone) have/i.test(msg)) {
+    // Easter egg — joke response
+    if (/tell me a joke|know any jokes|got a joke/i.test(msg)) {
       const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
       addMessage(userMsg);
-      const eggMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'One more.', timestamp: new Date() };
-      addMessage(eggMsg);
+      const jokeMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'How many bikes should you have?', timestamp: new Date() };
+      addMessage(jokeMsg);
+      return;
+    }
+    if (/how many/i.test(msg) && messages.length > 0 && messages[messages.length - 1]?.content === 'How many bikes should you have?') {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const punchline: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'One more.', timestamp: new Date() };
+      addMessage(punchline);
       return;
     }
 
