@@ -130,6 +130,19 @@ export default function TripPlanner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
+
+  // Fallback when Mapbox native module is not available (Expo Go)
+  if (!_mapboxAvailable) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Feather name="map" size={48} color={theme.textMuted} />
+        <Text style={{ color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>Map Unavailable</Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+          Trip Planner requires a dev build for map features. Scout and Garage work in Expo Go.
+        </Text>
+      </View>
+    );
+  }
   const { routes: savedRoutes, addRoute, loading: routesStoreLoading, setRoutes, setLoading: setRoutesLoading } = useRoutesStore();
   const userId = user?.id ?? 'local';
   const cameraRef = useRef<any>(null);
