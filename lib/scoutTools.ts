@@ -996,12 +996,15 @@ export async function executeScoutTool(
       case 'set_active_bike': {
         const query = (parameters.query as string).toLowerCase();
         const bikes = garageStore.bikes;
-        const match = bikes.find(
-          (b) =>
-            b.nickname?.toLowerCase().includes(query) ||
-            b.model?.toLowerCase().includes(query) ||
-            b.make?.toLowerCase().includes(query),
-        );
+        const match = bikes.find((b) => {
+          const nick = b.nickname?.toLowerCase() ?? '';
+          const model = b.model?.toLowerCase() ?? '';
+          const make = b.make?.toLowerCase() ?? '';
+          const fullLabel = `${b.year ?? ''} ${make} ${model} ${nick}`.toLowerCase();
+          return nick.includes(query) || model.includes(query) || make.includes(query) ||
+            query.includes(nick) || query.includes(model) || query.includes(make) ||
+            fullLabel.includes(query) || query.includes(fullLabel.trim());
+        });
         if (!match) return `No bike matching "${parameters.query}" found in your garage.`;
         garageStore.selectBike(match.id);
         const label = [match.year, match.make, match.model].filter(Boolean).join(' ');
@@ -1014,7 +1017,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -1031,7 +1037,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -1077,7 +1086,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -1119,7 +1131,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -1159,7 +1174,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
