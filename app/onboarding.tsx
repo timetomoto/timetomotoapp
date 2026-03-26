@@ -57,8 +57,7 @@ function Screen1() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
-      <View style={[s.scoutIconLarge, { backgroundColor: theme.red }]}>
+      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 100 }]}>
         {/* Scout crosshair icon */}
         <View style={{ width: 176, height: 176 }}>
           <View style={{ position: 'absolute', width: 176, height: 176, borderRadius: 88, borderWidth: 10, borderColor: '#fff' }} />
@@ -68,6 +67,7 @@ function Screen1() {
           <View style={{ position: 'absolute', top: 84, left: 24, width: 56, height: 10, backgroundColor: '#fff', opacity: 0.4, borderRadius: 5 }} />
         </View>
       </View>
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
       <Text style={[s.screenSubBold, { color: theme.textPrimary }]}>Your Riding Assistant</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
         Plan routes, check weather, manage bikes.
@@ -428,7 +428,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   screenTitle: {
-    fontSize: 44,
+    fontSize: 22,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 10,
