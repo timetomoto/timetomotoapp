@@ -46,6 +46,9 @@ function Screen1() {
         <TimetomotoLogo width={LOGO_W} height={LOGO_H} disableLink />
       </View>
 
+      <View style={[s.scoutIconLarge, { backgroundColor: theme.red }]}>
+        <Feather name="compass" size={36} color="#fff" />
+      </View>
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
         Your riding assistant. Plan routes, check weather, manage your bikes — just ask.
@@ -397,6 +400,14 @@ const s = StyleSheet.create({
 
   // Screen 1
   logoBlock: { alignItems: 'center', marginBottom: 40 },
+  scoutIconLarge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   screenTitle: {
     fontSize: 22,
     fontWeight: '700',
