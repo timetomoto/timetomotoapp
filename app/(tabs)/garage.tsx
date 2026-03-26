@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -46,6 +46,19 @@ export default function GarageScreen() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ maintenance: true });
 
   const selectedBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
+  const chipScrollRef = useRef<ScrollView>(null);
+
+  // Auto-scroll chip row to selected bike on mount / selection change
+  useEffect(() => {
+    if (!selectedBikeId || bikes.length <= 1) return;
+    const idx = bikes.findIndex((b) => b.id === selectedBikeId);
+    if (idx > 0) {
+      // Estimate chip width (~120px per chip) and scroll to center it
+      const chipWidth = 120;
+      const offset = Math.max(0, idx * chipWidth - 100);
+      setTimeout(() => chipScrollRef.current?.scrollTo({ x: offset, animated: true }), 100);
+    }
+  }, [selectedBikeId, bikes.length]);
 
   // Load/save expanded state
   useEffect(() => {
@@ -201,6 +214,7 @@ export default function GarageScreen() {
           {/* Bike selector chips */}
           {bikes.length > 1 && (
             <ScrollView
+              ref={chipScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.chipRow}
@@ -618,6 +632,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 14,
     marginTop: 12,
+    marginBottom: 12,
     marginHorizontal: 16,
   },
   askScoutBtnText: {
