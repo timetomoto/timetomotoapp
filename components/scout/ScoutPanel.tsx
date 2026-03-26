@@ -364,6 +364,15 @@ function ScoutPanelContent() {
     if (!text) setInput('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    // Easter egg
+    if (/how many (bikes|motorcycles) should (you|i|someone) have/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const eggMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'One more.', timestamp: new Date() };
+      addMessage(eggMsg);
+      return;
+    }
+
     const userMsg: ScoutMessage = {
       id: `u_${Date.now()}`,
       role: 'user',
