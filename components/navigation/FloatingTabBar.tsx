@@ -24,7 +24,7 @@ export default function FloatingTabBar() {
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
-      {/* Scout FAB — pill bleeds off left edge */}
+      {/* Scout FAB — pill bleeds off left edge, icon stacked above text */}
       {!isScoutOpen && (
         <Pressable
           style={[s.scoutPill, { backgroundColor: theme.red }]}
@@ -107,17 +107,17 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Scout FAB — pill that bleeds off left edge
+  // Scout FAB — pill that bleeds off left edge, icon stacked above text
   scoutPill: {
     position: 'absolute',
     left: -18,
-    bottom: 10,
-    flexDirection: 'row',
+    bottom: 30,
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
     paddingLeft: 28,
     paddingRight: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
     borderRadius: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -126,7 +126,7 @@ const s = StyleSheet.create({
     elevation: 10,
   },
   scoutPillLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
     color: '#fff',
