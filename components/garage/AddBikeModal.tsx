@@ -447,10 +447,8 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
       const makeModelChanged = fields.make !== editBike.make || fields.model !== editBike.model || fields.year !== editBike.year;
       if (makeModelChanged) {
         if (!photoUrl) clearWikiPhotoCache(editBike.id);
-        // Reset specs so stale data from old model doesn't persist
-        if (editBike.specs?.specsLookedUp) {
-          fields.specs = { ...editBike.specs, specsLookedUp: false, specsSource: null };
-        }
+        // Clear all specs — stale data from old model shouldn't persist
+        fields.specs = {};
         // Clear cached service intervals and bulletins for old model
         AsyncStorage.removeItem(`ttm_service_intervals_${editBike.id}`).catch(() => {});
         AsyncStorage.removeItem(`ttm_service_bulletins_${editBike.id}`).catch(() => {});
