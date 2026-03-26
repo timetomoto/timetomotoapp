@@ -53,10 +53,10 @@ export default function GarageScreen() {
     if (!selectedBikeId || bikes.length <= 1) return;
     const idx = bikes.findIndex((b) => b.id === selectedBikeId);
     if (idx > 0) {
-      // Estimate chip width (~120px per chip) and scroll to center it
       const chipWidth = 120;
       const offset = Math.max(0, idx * chipWidth - 100);
-      setTimeout(() => chipScrollRef.current?.scrollTo({ x: offset, animated: true }), 100);
+      // Longer delay on mount to ensure ScrollView is laid out
+      setTimeout(() => chipScrollRef.current?.scrollTo({ x: offset, animated: false }), 300);
     }
   }, [selectedBikeId, bikes.length]);
 
