@@ -48,6 +48,7 @@ interface SafetyState {
 
   // Crash alert state (managed by CrashAlertModal, read by Scout tools)
   isCrashAlertActive: boolean;
+  crashSimulated: boolean; // dev-only: skip SMS on simulated crashes
   cancelCrashAlert: (() => void) | null;
   triggerEmergencyNow: (() => void) | null;
   onCrashAlertsSent: (() => void) | null;
@@ -81,6 +82,7 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   lastKnownLocation: null,
   crashDetected: false,
   isCrashAlertActive: false,
+  crashSimulated: false,
   cancelCrashAlert: null,
   triggerEmergencyNow: null,
   onCrashAlertsSent: null,

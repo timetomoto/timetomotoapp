@@ -54,7 +54,7 @@ async function sendCrashAlerts(
 export default function CrashAlertModal() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { crashDetected, emergencyContacts, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
+  const { crashDetected, crashSimulated, emergencyContacts, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
   const pulseAnim   = useRef(new Animated.Value(1)).current;
@@ -121,13 +121,19 @@ export default function CrashAlertModal() {
           clearInterval(voiceListenRef.current!);
           pulse.stop();
           stopRecordingCommand();
-          const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
-          const name = user?.email ?? 'A rider';
-          sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
-            // Voice hook via CrashDetector.onAlertsSent() — stops recording + speaks
+          if (crashSimulated) {
+            console.log('[CrashAlert] Simulated — skipping SMS');
             onCrashAlertsSent?.();
+            useSafetyStore.setState({ crashSimulated: false });
             setCrashDetected(false);
-          });
+          } else {
+            const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+            const name = user?.email ?? 'A rider';
+            sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+              onCrashAlertsSent?.();
+              setCrashDetected(false);
+            });
+          }
           return 0;
         }
         return n - 1;
@@ -163,14 +169,21 @@ export default function CrashAlertModal() {
     clearInterval(hapticRef.current!);
     clearInterval(voiceListenRef.current!);
     stopRecordingCommand();
-    speakResponse('Alerting your emergency contacts now.');
-    const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
-    const name = user?.email ?? 'A rider';
-    sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
-      // Voice hook via CrashDetector.onAlertsSent() — stops recording + speaks
+    if (crashSimulated) {
+      console.log('[CrashAlert] Simulated — skipping SMS (emergency)');
+      speakResponse('Simulation: emergency contacts would be notified.');
       onCrashAlertsSent?.();
+      useSafetyStore.setState({ crashSimulated: false });
       setCrashDetected(false);
-    });
+    } else {
+      speakResponse('Alerting your emergency contacts now.');
+      const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
+      const name = user?.email ?? 'A rider';
+      sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+        onCrashAlertsSent?.();
+        setCrashDetected(false);
+      });
+    }
   }
 
   // Register handlers so Scout tools can cancel or escalate

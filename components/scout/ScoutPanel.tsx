@@ -384,9 +384,12 @@ function ScoutPanelContent() {
     if (__DEV__ && /simulate crash/i.test(msg)) {
       const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
       addMessage(userMsg);
-      const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Crash simulation triggered. Modal should appear now.', timestamp: new Date() };
+      const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Crash simulation triggered. SMS is disabled — safe to test. Tap I\'M OK to dismiss.', timestamp: new Date() };
       addMessage(ackMsg);
-      useSafetyStore.getState().setCrashDetected(true);
+      const ss = useSafetyStore.getState();
+      ss.setCrashDetected(true);
+      // Mark as simulated so CrashAlertModal skips real SMS
+      useSafetyStore.setState({ crashSimulated: true });
       return;
     }
 
