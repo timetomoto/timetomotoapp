@@ -49,7 +49,6 @@ export const SAFETY_LIVE_SHARE_KEY = 'ttm_safety_live_share';
 
 // Scout
 export const SCOUT_QUOTA_PREFIX = 'ttm_scout_quota';
-export const SCOUT_WELCOME_INDEX_KEY = 'ttm_scout_welcome_index';
 export const scoutQuotaKey = (userId: string) => `${SCOUT_QUOTA_PREFIX}_${userId}`;
 
 // Search / navigation

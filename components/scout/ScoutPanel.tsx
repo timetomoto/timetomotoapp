@@ -32,7 +32,6 @@ import { useNavigationStore } from '../../lib/navigationStore';
 import { calcDistance } from '../../lib/gpx';
 import SlideUpWrapper from '../ui/SlideUpWrapper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SCOUT_WELCOME_INDEX_KEY } from '../../lib/storageKeys';
 import { loadFavorites } from '../../lib/favorites';
 import { loadMaintenance } from '../../lib/garage';
 import { reverseGeocode } from '../../lib/geocode';
@@ -495,11 +494,19 @@ function ScoutPanelContent() {
 
   const bikeLabel = activeBike?.nickname ?? (activeBike ? [activeBike.year, activeBike.make, activeBike.model].filter(Boolean).join(' ') : null) ?? 'my bike';
 
-  const contentIsRiding = isRecording || useNavigationStore.getState().mode === 'navigating';
-
-  // Cycling welcome messages — index persisted in AsyncStorage
-  const WELCOME_MESSAGES = [
-    {
+  // Contextual welcome message based on current screen
+  const WELCOME_BY_SCREEN: Record<string, { headline: string; subtext: string; prompts: string[] }> = {
+    ride: {
+      headline: "I'm Scout. Ready to ride.",
+      subtext: 'Controls, navigation, and safety — while you\'re on the move.',
+      prompts: [
+        'How far to my destination?',
+        'Find gas near me',
+        'Pause my ride',
+        "What's my safety status?",
+      ],
+    },
+    trip: {
       headline: "I'm Scout — your AI riding assistant.",
       subtext: 'Routes, weather, and road conditions — just ask.',
       prompts: [
@@ -509,7 +516,7 @@ function ScoutPanelContent() {
         'Add a fuel stop halfway through my trip',
       ],
     },
-    {
+    garage: {
       headline: "I'm Scout. Your bike, managed.",
       subtext: 'Specs, maintenance, and mods — all in one place.',
       prompts: [
@@ -519,45 +526,21 @@ function ScoutPanelContent() {
         'When was my last tire change?',
       ],
     },
-    {
-      headline: "I'm Scout. Ride smarter, ride safer.",
-      subtext: "I've got your back before and during every ride.",
+    other: {
+      headline: "I'm Scout — your AI riding assistant.",
+      subtext: 'Ask me anything about your ride.',
       prompts: [
+        'Plan a scenic route for this weekend',
+        'Check weather for my route Saturday',
+        'Log an oil change today',
         "What's my safety status?",
-        'Check in now',
-        'Pause my ride',
-        'How far to my destination?',
       ],
     },
-  ];
-
-  const RIDING_PROMPTS = [
-    'Find gas near me',
-    'How far to my destination?',
-    'Pause my ride',
-    "What's my ETA?",
-    'Add a coffee stop',
-  ];
-
-  const [welcomeIndex, setWelcomeIndex] = useState(0);
-  useEffect(() => {
-    if (!isScoutOpen || messages.length > 0) return;
-    // Load persisted index and advance it
-    (async () => {
-      const stored = await AsyncStorage.getItem(SCOUT_WELCOME_INDEX_KEY).catch(() => null);
-      const idx = stored ? parseInt(stored, 10) : 0;
-      const safeIdx = isNaN(idx) ? 0 : idx % WELCOME_MESSAGES.length;
-      setWelcomeIndex(safeIdx);
-      // Advance for next time
-      const next = (safeIdx + 1) % WELCOME_MESSAGES.length;
-      AsyncStorage.setItem(SCOUT_WELCOME_INDEX_KEY, String(next)).catch(() => {});
-    })();
-  }, [isScoutOpen]);
+  };
 
   const WelcomeMessage = () => {
     if (messages.length > 0) return null;
-    const msg = contentIsRiding ? null : WELCOME_MESSAGES[welcomeIndex];
-    const prompts = contentIsRiding ? RIDING_PROMPTS : msg?.prompts ?? [];
+    const msg = WELCOME_BY_SCREEN[currentScreen] ?? WELCOME_BY_SCREEN.other;
     return (
       <View style={[st.bubbleRow, st.bubbleRowLeft, { maxWidth: '92%' }]}>
         <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
@@ -565,13 +548,13 @@ function ScoutPanelContent() {
         </View>
         <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
           <Text style={[st.bubbleText, { color: theme.textPrimary, fontWeight: '700', fontSize: 15 }]}>
-            {contentIsRiding ? "I'm Scout. What do you need?" : msg?.headline}
+            {msg.headline}
           </Text>
           <Text style={[st.bubbleText, { color: theme.textSecondary, marginTop: 4 }]}>
-            {contentIsRiding ? 'Quick commands while you ride.' : msg?.subtext}
+            {msg.subtext}
           </Text>
           <View style={{ marginTop: 10, gap: 6 }}>
-            {prompts.map((ex, i) => (
+            {msg.prompts.map((ex, i) => (
               <Pressable
                 key={i}
                 style={[st.promptChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
