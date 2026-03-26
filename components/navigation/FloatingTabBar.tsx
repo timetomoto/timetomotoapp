@@ -128,9 +128,9 @@ const s = StyleSheet.create({
     elevation: 10,
   },
   scoutPillLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0,
+    letterSpacing: -0.2,
     color: '#fff',
   },
 });
