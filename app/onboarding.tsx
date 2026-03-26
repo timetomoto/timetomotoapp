@@ -57,7 +57,7 @@ function Screen1() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 100 }]}>
+      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 50 }]}>
         {/* Scout crosshair icon */}
         <View style={{ width: 176, height: 176 }}>
           <View style={{ position: 'absolute', width: 176, height: 176, borderRadius: 88, borderWidth: 10, borderColor: '#fff' }} />
