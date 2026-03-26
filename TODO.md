@@ -39,6 +39,7 @@
 - [ ] Scout — steer_segment needs entry+exit waypoints for full loop roads
 - [ ] Scout — load_saved_route should extract intermediate waypoints as markers
 - [ ] Scout — detect truncated responses and append friendly message
+- [x] Scout — service intervals wired into context + ask_garage (reads cached data from ServiceIntervalsSection)
 - [ ] Scout — screen awareness ("What screen am I on?" — data exists, prompt doesn't report it)
 - [ ] Scout — "I can't" phrasing (Gemini says "I can't" instead of offering alternatives per personality rules)
 - [ ] Scout quota bypass — configure with Supabase user ID before launch
