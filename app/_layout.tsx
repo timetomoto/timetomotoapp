@@ -119,7 +119,7 @@ function SafetyService() {
     );
   }
 
-  // ── Restore persisted safety defaults on mount ──
+  // ── Restore persisted safety defaults + load contacts on mount ──
   useEffect(() => {
     (async () => {
       const [crashVal, shareVal] = await Promise.all([
@@ -129,6 +129,9 @@ function SafetyService() {
       if (crashVal === 'true') useSafetyStore.getState().setMonitoring(true);
       if (shareVal === 'true') useSafetyStore.getState().setShareActive(true);
     })();
+    // Always load emergency contacts so crash detection has them ready
+    const userId = useAuthStore.getState().user?.id ?? 'local';
+    useSafetyStore.getState().loadContacts(userId);
   }, []);
 
   // ── Crash detector lifecycle ──
