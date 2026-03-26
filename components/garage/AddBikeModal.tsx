@@ -445,9 +445,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
     if (isEdit && editBike) {
       // If make/model/year changed, clear stale cached data
       const makeModelChanged = fields.make !== editBike.make || fields.model !== editBike.model || fields.year !== editBike.year;
-      console.log('[EditBike] makeModelChanged:', makeModelChanged, 'old:', editBike.make, editBike.model, 'new:', fields.make, fields.model);
       if (makeModelChanged) {
-        console.log('[EditBike] Clearing specs, intervals, bulletins');
         if (!photoUrl) clearWikiPhotoCache(editBike.id);
         // Clear all specs — stale data from old model shouldn't persist
         fields.specs = {};
