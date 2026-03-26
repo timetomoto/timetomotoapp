@@ -30,6 +30,21 @@ export function onboardingKey(userId?: string | null) {
 // Legacy key for migration
 export const ONBOARDING_KEY = '@ttm/onboarding_v1';
 
+function CompassIcon({ size = 18, color = '#fff' }: { size?: number; color?: string }) {
+  const half = size / 2;
+  const arm = size * 0.35;
+  const thick = 2;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={{ position: 'absolute', width: size, height: size, borderRadius: half, borderWidth: 1.5, borderColor: color }} />
+      <View style={{ position: 'absolute', left: half - thick / 2, top: half - arm, width: thick, height: arm, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ position: 'absolute', left: half - thick / 2, top: half, width: thick, height: arm, backgroundColor: color, opacity: 0.4, borderRadius: 1 }} />
+      <View style={{ position: 'absolute', top: half - thick / 2, left: half, width: arm, height: thick, backgroundColor: color, opacity: 0.4, borderRadius: 1 }} />
+      <View style={{ position: 'absolute', top: half - thick / 2, left: half - arm, width: arm, height: thick, backgroundColor: color, opacity: 0.4, borderRadius: 1 }} />
+    </View>
+  );
+}
+
 const { width: SCREEN_W } = Dimensions.get('window');
 const LOGO_W = Math.round(SCREEN_W * 0.65);
 const LOGO_H = Math.round(LOGO_W * (31 / 162));
@@ -68,7 +83,7 @@ function Screen1() {
         </View>
         <View style={[s.mockBubbleBot, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <View style={[s.mockAvatar, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
-            <Feather name="compass" size={10} color={theme.red} />
+            <CompassIcon size={12} color={theme.red} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[s.mockBubbleBotText, { color: theme.textPrimary }]}>
