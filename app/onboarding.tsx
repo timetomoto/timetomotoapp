@@ -57,7 +57,7 @@ function Screen1() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 40 }]}>
+      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 10 }]}>
         {/* Scout crosshair icon */}
         <View style={{ width: 176, height: 176 }}>
           <View style={{ position: 'absolute', width: 176, height: 176, borderRadius: 88, borderWidth: 10, borderColor: '#fff' }} />
@@ -73,19 +73,33 @@ function Screen1() {
         Plan routes, check weather, manage bikes.
       </Text>
 
-      {/* Mock Scout conversation */}
-      <View style={s.mockChat}>
-        <View style={[s.mockBubbleUser, { backgroundColor: theme.red }]}>
-          <Text style={s.mockBubbleUserText}>Plan a ride from Austin to Fredericksburg</Text>
+      {/* Fake Scout panel with mock conversation */}
+      <View style={[s.fakePanel, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+        {/* Drag handle */}
+        <View style={s.fakeDragHandleWrap}>
+          <View style={[s.fakeDragHandle, { backgroundColor: theme.border }]} />
         </View>
-        <View style={[s.mockBubbleBot, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <View style={[s.mockAvatar, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
-            <CompassIcon size={12} color={theme.red} />
+        {/* Header */}
+        <View style={[s.fakePanelHeader, { borderBottomColor: theme.border }]}>
+          <View style={s.fakePanelHeaderCenter}>
+            <CompassIcon size={16} color={theme.red} />
+            <Text style={[s.fakePanelHeaderTitle, { color: theme.textPrimary }]}>SCOUT</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[s.mockBubbleBotText, { color: theme.textPrimary }]}>
-              Route set. 97 miles, about 2 hours.{'\n'}Want to check weather for Saturday?
-            </Text>
+        </View>
+        {/* Chat bubbles */}
+        <View style={s.mockChat}>
+          <View style={[s.mockBubbleUser, { backgroundColor: theme.red }]}>
+            <Text style={s.mockBubbleUserText}>Plan a ride from Austin to Fredericksburg</Text>
+          </View>
+          <View style={[s.mockBubbleBot, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+            <View style={[s.mockAvatar, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+              <CompassIcon size={12} color={theme.red} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.mockBubbleBotText, { color: theme.textPrimary }]}>
+                Route set. 97 miles, about 2 hours.{'\n'}Want to check weather for Saturday?
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -465,8 +479,28 @@ const s = StyleSheet.create({
     marginBottom: 32,
   },
 
+  // Fake Scout panel
+  fakePanel: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  fakeDragHandleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
+  fakeDragHandle: { width: 36, height: 4, borderRadius: 2 },
+  fakePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  fakePanelHeaderCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  fakePanelHeaderTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
+
   // Mock chat
-  mockChat: { width: '100%', gap: 12, marginTop: 8 },
+  mockChat: { width: '100%', gap: 12, padding: 14 },
   mockBubbleUser: {
     alignSelf: 'flex-end',
     borderRadius: 16,
