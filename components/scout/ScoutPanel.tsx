@@ -151,7 +151,7 @@ export default function ScoutPanel() {
   const insets = useSafeAreaInsets();
 
   const isRiding = useSafetyStore((s) => s.isRecording);
-  const navMode = useNavigationStore.getState().mode;
+  const navMode = useNavigationStore((s) => s.mode);
   const rideActive = isRiding || (navMode !== 'idle' && navMode !== 'preview');
 
   if (!isScoutOpen) return null;
