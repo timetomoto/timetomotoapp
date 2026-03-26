@@ -455,7 +455,7 @@ export async function executeScoutTool(
         }
         // Load or fetch service intervals (fetches from Gemini if not cached)
         try {
-          const intervals = await getOrFetchIntervals(bike.id, bike.year, bike.make, bike.model);
+          const intervals = await getOrFetchIntervals(bike.id, bike.year ?? undefined, bike.make ?? undefined, bike.model ?? undefined);
           if (intervals && intervals.items.length > 0) {
             const intervalList = intervals.items
               .map((it) => `${it.item}: ${it.interval}${it.notes ? ` (${it.notes})` : ''}`)
