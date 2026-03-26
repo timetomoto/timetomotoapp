@@ -57,10 +57,6 @@ function Screen1() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <View style={s.logoBlock}>
-        <TimetomotoLogo width={LOGO_W} height={LOGO_H} disableLink />
-      </View>
-
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
       <View style={[s.scoutIconLarge, { backgroundColor: theme.red }]}>
         {/* Scout crosshair icon */}
