@@ -21,7 +21,6 @@ import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSec
 import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
 import { useScoutStore } from '../../lib/scoutStore';
-import { loadMaintenance, loadModifications } from '../../lib/garage';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
@@ -294,27 +293,13 @@ export default function GarageScreen() {
             {/* ASK SCOUT about this bike */}
             <Pressable
               style={[styles.askScoutBtn, { borderColor: theme.red }]}
-              onPress={async () => {
+              onPress={() => {
                 const bike = selectedBike;
                 const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
-                const bikeSpecs = bike.specs ?? {};
-                const specSummary = Object.entries(bikeSpecs)
-                  .filter(([, v]) => v != null && v !== '' && v !== false)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(', ');
-                const uid = user?.id ?? 'local';
-                const [maint, mods] = await Promise.all([
-                  loadMaintenance(bike.id, uid).catch(() => []),
-                  loadModifications(bike.id, uid).catch(() => []),
-                ]);
-                const maintStr = maint.length > 0
-                  ? `\nMaintenance: ${maint.slice(0, 5).map((m: any) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`).join('; ')}`
-                  : '';
-                const modsStr = mods.length > 0
-                  ? `\nModifications: ${mods.map((m: any) => `${m.title}${m.brand ? ` (${m.brand})` : ''}`).join('; ')}`
-                  : '';
+                // Select this bike so Scout context picks it up
+                useGarageStore.getState().selectBike(bike.id);
                 useScoutStore.getState().openScout({
-                  initialMessage: `Here are the details for my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''}. Odometer: ${bike.odometer ?? 'unknown'} mi. ${specSummary ? `Specs: ${specSummary}` : 'No specs loaded.'}${maintStr}${modsStr}\n\nSummarize what I should know about this bike.`,
+                  initialMessage: `Tell me about my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''} — specs, maintenance, modifications, and service intervals.`,
                 });
               }}
             >
