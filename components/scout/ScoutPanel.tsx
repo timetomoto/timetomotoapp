@@ -503,7 +503,7 @@ function ScoutPanelContent() {
     "What's my ETA?",
     'Add a coffee stop',
   ] : [
-    'Plan a 2-hour loop from here on back roads',
+    'Plan a scenic route for this weekend',
     'Check weather for my route this Saturday',
     `What oil does ${bikeLabel} take?`,
     'Add a fuel stop halfway through my trip',
