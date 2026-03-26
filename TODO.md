@@ -117,6 +117,61 @@
 - [ ] Remove EXPO_PUBLIC_TOMORROW_API_KEY from .env.local
 - [ ] Sweep console.error statements — keep only essential ones
 
+## POST-LAUNCH — Round Trip / Loop Route Generator
+
+### Overview
+Integrate GraphHopper or Kurviger API for motorcycle-optimized round trip generation. Mapbox cannot generate loops from a single point + distance target — it only reorders supplied waypoints. GraphHopper has native `round_trip` with curvy road weighting (same tech stack as Calimoto). Do NOT build with Mapbox DIY — loops will follow main roads and be boring.
+
+### Phase 1: GraphHopper Integration
+- [ ] Evaluate GraphHopper vs Kurviger API pricing and access (GraphHopper: $49-299/mo, Kurviger: contact for API access)
+- [ ] Sign up for API key, test `algorithm=round_trip` endpoint
+- [ ] Create `lib/loopRoute.ts` — wrapper for GraphHopper round trip API
+  - Input: `{ lat, lng, distanceMeters, heading?, seed? }`
+  - Parameters: `round_trip.distance`, `round_trip.seed`, `heading`, `heading_penalty`
+  - Kurviger adds: `weighting=curvature` (favors twisty roads), `avoid_edges` (reduces road reuse)
+  - Output: GeoJSON LineString geometry + distance + duration
+  - Generate 3 variations using different seeds
+- [ ] Convert GraphHopper geometry to Mapbox-compatible format for map display
+- [ ] Store generated loops as `tripRouteIsManual: true` (same as GPX imports — no Mapbox recalc)
+
+### Phase 2: Scout Tool — `plan_loop`
+- [ ] Add `plan_loop` tool to `lib/scoutTools.ts`
+  - Parameters: `distance_miles` (or `duration_hours`), `direction` (north/south/east/west/any), `preference` (scenic/backroads/fastest)
+  - Convert duration to distance estimate: `duration_hours * avg_speed_mph`
+  - Call GraphHopper 3x with different seeds
+  - Return: "I generated 3 loop options: 45mi/1.5hr, 52mi/1.8hr, 48mi/1.6hr. Which one looks good?"
+  - On user selection, load into Trip Planner
+- [ ] Add voice support: "Hey Scout, plan a 2-hour loop heading west"
+- [ ] System prompt update: remove "I can't plan routes by duration" limitation
+
+### Phase 3: Trip Planner UI
+- [ ] "GENERATE LOOP" button in Trip Planner (next to route preference selector)
+- [ ] Loop settings sheet:
+  - Distance slider: 20-300 miles (or duration: 1-8 hours)
+  - Compass direction picker (8 directions + "any")
+  - Road preference: twisty/scenic/fastest
+  - "GENERATE" button
+- [ ] Show 3 route options overlaid on map (different colors)
+- [ ] Tap to select → loads into trip planner as active route
+- [ ] "REGENERATE" button for new variations (increments seed)
+
+### Phase 4: Quality & Polish
+- [ ] Elevation profile for generated loops (GraphHopper returns elevation data)
+- [ ] "Curviness score" — rate how twisty the generated route is
+- [ ] Favorite loop settings — save preferred distance/direction combos
+- [ ] Loop history — recent generated loops for quick re-ride
+- [ ] A/B test: show loop quality rating prompt after ride completion
+
+### Technical Notes
+- GraphHopper max round trip: 300km (186 miles) — sufficient for day rides
+- Kurviger `curvature` weighting is the key differentiator vs generic routing
+- Generated loops have no Mapbox turn-by-turn — use bearing arrow (also post-launch)
+- Can hybrid: GraphHopper for loop shape, Mapbox Directions for turn-by-turn on the generated waypoints (if waypoint count ≤ 25)
+- API cost scales with usage — monitor and add caching for repeated similar requests
+
+### Why Not Mapbox
+Mapbox Optimization API `roundtrip=true` only reorders supplied waypoints. No distance target, no curvy road preference, no motorcycle profile. DIY waypoint generation produces "boring rectangle" loops on main roads. Would hurt brand reputation vs Calimoto.
+
 ## COMPLETED
 
 - [x] Gemini 2.0-flash → 2.5-flash upgrade
