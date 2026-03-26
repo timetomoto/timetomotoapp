@@ -156,8 +156,15 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     riderLines.push(`Recent maintenance (active bike): ${summary}.`);
   }
 
-  // Service intervals — only include when data is actually loaded
-  // Currently not populated; omit to avoid misleading the model
+  // Service intervals — include when data has been looked up for the active bike
+  const intervals = ctx.serviceIntervals as any;
+  if (intervals?.items?.length > 0) {
+    const intervalSummary = intervals.items
+      .slice(0, 5)
+      .map((it: any) => `${it.item}: ${it.interval}`)
+      .join('; ');
+    riderLines.push(`Service intervals (active bike): ${intervalSummary}.`);
+  }
 
   sections.push(
     'RIDER CONTEXT (live state — always trust this over conversation history, the rider may have made changes outside of this chat):\n' +

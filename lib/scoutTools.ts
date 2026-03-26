@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } from './store';
 import { useNavigationStore } from './navigationStore';
 import { calcDistance } from './gpx';
@@ -950,10 +951,20 @@ export async function executeScoutTool(
             .join('; ');
           parts.push(`Modifications: ${modList}`);
         }
-        if (isActive) {
-          const intervals = context.serviceIntervals;
-          if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
-        }
+        // Load cached service intervals
+        const intervalCacheKey = `ttm_service_intervals_${bike.id}`;
+        try {
+          const intervalRaw = await AsyncStorage.getItem(intervalCacheKey);
+          if (intervalRaw) {
+            const cached = JSON.parse(intervalRaw);
+            if (cached.items?.length > 0) {
+              const intervalList = cached.items
+                .map((it: any) => `${it.item}: ${it.interval}${it.notes ? ` (${it.notes})` : ''}`)
+                .join('\n  ');
+              parts.push(`Service intervals:\n  ${intervalList}`);
+            }
+          }
+        } catch {}
         parts.push(`Question: ${parameters.question}`);
         return parts.join('\n');
       }

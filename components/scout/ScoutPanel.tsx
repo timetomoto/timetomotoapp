@@ -31,6 +31,7 @@ import { useActiveBike } from '../../lib/useActiveBike';
 import { useNavigationStore } from '../../lib/navigationStore';
 import { calcDistance } from '../../lib/gpx';
 import SlideUpWrapper from '../ui/SlideUpWrapper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadFavorites } from '../../lib/favorites';
 import { loadMaintenance } from '../../lib/garage';
 import { reverseGeocode } from '../../lib/geocode';
@@ -207,6 +208,7 @@ function ScoutPanelContent() {
   const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
   const [maintenanceLogs, setMaintenanceLogs] = useState<Awaited<ReturnType<typeof loadMaintenance>>>([]);
+  const [serviceIntervals, setServiceIntervals] = useState<any>(null);
   const [cachedCity, setCachedCity] = useState<{ lat: number; lng: number; city: string } | null>(null);
   const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
   const [quotaExhausted, setQuotaExhausted] = useState(false);
@@ -239,6 +241,12 @@ function ScoutPanelContent() {
       );
       if (ab?.id) {
         loadMaintenance(ab.id, userId).then((logs) => setMaintenanceLogs(logs.slice(0, 5)));
+        // Load cached service intervals for active bike
+        AsyncStorage.getItem(`ttm_service_intervals_${ab.id}`).then((raw) => {
+          if (raw) {
+            try { setServiceIntervals(JSON.parse(raw)); } catch {}
+          }
+        });
       }
       // Reverse geocode current location for city name (cached)
       const loc = useSafetyStore.getState().lastKnownLocation;
@@ -345,9 +353,9 @@ function ScoutPanelContent() {
       })),
       favoriteLocations: favorites,
       recentMaintenanceLogs: maintenanceLogs,
-      serviceIntervals: null,
+      serviceIntervals: serviceIntervals?.items?.length > 0 ? serviceIntervals : null,
     };
-  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, tripRoutePreference, favorites, routes, currentScreen, maintenanceLogs, cachedCity]);
+  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, tripRoutePreference, favorites, routes, currentScreen, maintenanceLogs, serviceIntervals, cachedCity]);
 
   // ── Send message ───────────────────────────────────────────────────────
 
