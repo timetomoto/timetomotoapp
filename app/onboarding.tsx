@@ -72,8 +72,9 @@ function Screen1() {
         </View>
       </View>
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
+      <Text style={[s.screenSubBold, { color: theme.textPrimary }]}>Your Riding Assistant</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
-        Your riding assistant. Plan routes, check weather, manage your bikes — just ask.
+        Plan routes, check weather, manage your bikes — just ask.
       </Text>
 
       {/* Mock Scout conversation */}
@@ -436,6 +437,12 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 10,
     textAlign: 'center',
+  },
+  screenSubBold: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
   },
   screenBody: {
     fontSize: 14,
