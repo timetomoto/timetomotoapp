@@ -624,7 +624,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <View style={[st.hintBanner, { backgroundColor: '#FF980018', borderColor: '#FF9800' }]}>
               <Feather name="info" size={13} color="#FF9800" />
               <Text style={[st.hintText, { color: '#FF9800' }]}>
-                Specs not found automatically. Tap any value to enter manually or make sure your bike title matches the manufacturer's exact model name (e.g. "R 1250 GS" not "GS 1250").
+                Specs not found automatically. You can tap any field above to enter values manually. If the lookup failed, try editing your bike's year, make, or model in the edit screen to match the manufacturer's exact name (e.g. "R 1250 GS" not "GS 1250").
               </Text>
             </View>
           ) : null}

@@ -236,7 +236,12 @@ export default function ServiceIntervalsSection({ bike, onCountChange }: { bike:
             Look up recommended service intervals for your {bikeLabel} using AI.
           </Text>
           {error && (
-            <Text style={[s.errorText, { color: theme.red }]}>{error}</Text>
+            <>
+              <Text style={[s.errorText, { color: theme.red }]}>{error}</Text>
+              <Text style={[s.emptySubtitle, { color: theme.textSecondary, marginTop: 4 }]}>
+                If the lookup can't find your bike, try editing the year, make, or model to match the manufacturer's exact name.
+              </Text>
+            </>
           )}
           <Pressable
             style={({ pressed }) => [s.lookupBtn, { backgroundColor: theme.red }, pressed && { opacity: 0.8 }]}
