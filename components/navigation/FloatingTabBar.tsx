@@ -32,13 +32,14 @@ export default function FloatingTabBar() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             openScout();
           }}
+          hitSlop={{ top: 8, bottom: 8, right: 12 }}
         >
-          <View style={{ width: 20, height: 20 }}>
-            <View style={{ position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: '#fff' }} />
-            <View style={{ position: 'absolute', left: 9, top: 2, width: 2, height: 7, backgroundColor: '#fff', borderRadius: 1 }} />
-            <View style={{ position: 'absolute', left: 9, top: 11, width: 2, height: 7, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-            <View style={{ position: 'absolute', top: 9, left: 11, width: 7, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-            <View style={{ position: 'absolute', top: 9, left: 2, width: 7, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+          <View style={{ width: 28, height: 28 }}>
+            <View style={{ position: 'absolute', width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff' }} />
+            <View style={{ position: 'absolute', left: 13, top: 4, width: 2, height: 9, backgroundColor: '#fff', borderRadius: 1 }} />
+            <View style={{ position: 'absolute', left: 13, top: 15, width: 2, height: 9, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+            <View style={{ position: 'absolute', top: 13, left: 15, width: 9, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+            <View style={{ position: 'absolute', top: 13, left: 4, width: 9, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
           </View>
           <Text style={s.scoutPillLabel}>SCOUT</Text>
         </Pressable>
@@ -109,25 +110,25 @@ const s = StyleSheet.create({
   // Scout FAB — pill that bleeds off left edge
   scoutPill: {
     position: 'absolute',
-    left: -12,
-    bottom: 24,
+    left: -18,
+    bottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingLeft: 22,
-    paddingRight: 14,
-    paddingVertical: 10,
-    borderRadius: 24,
+    gap: 8,
+    paddingLeft: 28,
+    paddingRight: 16,
+    paddingVertical: 12,
+    borderRadius: 28,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 10,
   },
   scoutPillLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     color: '#fff',
   },
 });
