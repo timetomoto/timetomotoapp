@@ -351,7 +351,7 @@ function ScoutPanelContent() {
         category: r.category ?? '',
         distance: r.distance_miles ?? 0,
       })),
-      favoriteLocations: favorites,
+      favoriteLocations: favorites.map((f) => ({ id: f.id, nickname: f.nickname, address: f.isHome ? f.address : '', isHome: f.isHome })),
       recentMaintenanceLogs: maintenanceLogs,
       serviceIntervals: serviceIntervals?.items?.length > 0 ? serviceIntervals : null,
     };

@@ -1,5 +1,5 @@
 import { buildScoutSystemPrompt } from './scoutPrompt';
-import { SCOUT_TOOL_DEFINITIONS, executeScoutTool } from './scoutTools';
+import { SCOUT_TOOL_DEFINITIONS, CRASH_MODE_TOOLS, executeScoutTool } from './scoutTools';
 import type { ScoutMessage, ScoutContext } from './scoutTypes';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +81,11 @@ export async function sendScoutMessage(
     // 1. Build system prompt
     const systemPrompt = buildScoutSystemPrompt(context);
 
+    // Filter tools in crash mode — only 3 safety tools, saves ~4,920 tokens
+    const toolDefs = context.isCrashAlertActive
+      ? SCOUT_TOOL_DEFINITIONS.filter((t) => CRASH_MODE_TOOLS.has(t.name))
+      : SCOUT_TOOL_DEFINITIONS;
+
     // 2. Format conversation history as Gemini messages (windowed)
     const windowed = conversationHistory.slice(-HISTORY_WINDOW);
     const contents: GeminiContent[] = windowed.map((msg) => ({
@@ -92,7 +97,7 @@ export async function sendScoutMessage(
     contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
     // 3. First Gemini call
-    let response = await callGemini(systemPrompt, contents, controller.signal);
+    let response = await callGemini(systemPrompt, contents, controller.signal, toolDefs);
 
     // 4. Function-calling loop
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -126,7 +131,7 @@ export async function sendScoutMessage(
       contents.push({ role: 'user', parts: responseParts });
 
       // Next Gemini call with tool results
-      response = await callGemini(systemPrompt, contents, controller.signal);
+      response = await callGemini(systemPrompt, contents, controller.signal, toolDefs);
     }
 
     // 5. Extract final text
@@ -159,11 +164,12 @@ async function callGemini(
   systemPrompt: string,
   contents: GeminiContent[],
   signal: AbortSignal,
+  toolDefs: typeof SCOUT_TOOL_DEFINITIONS = SCOUT_TOOL_DEFINITIONS,
 ): Promise<GeminiResponse> {
   const body: GeminiRequest = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
-    tools: { functionDeclarations: SCOUT_TOOL_DEFINITIONS },
+    tools: { functionDeclarations: toolDefs },
     generationConfig: { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 1024 } },
   };
 

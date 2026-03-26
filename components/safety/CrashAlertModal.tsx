@@ -53,8 +53,14 @@ async function sendCrashAlerts(
 
 export default function CrashAlertModal() {
   const { theme } = useTheme();
-  const { user } = useAuthStore();
-  const { crashDetected, emergencyContacts, notifyContactPhones, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
+  const user = useAuthStore((s) => s.user);
+  const crashDetected = useSafetyStore((s) => s.crashDetected);
+  const emergencyContacts = useSafetyStore((s) => s.emergencyContacts);
+  const notifyContactPhones = useSafetyStore((s) => s.notifyContactPhones);
+  const lastKnownLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const setCrashDetected = useSafetyStore((s) => s.setCrashDetected);
+  const setCrashAlertHandlers = useSafetyStore((s) => s.setCrashAlertHandlers);
+  const onCrashAlertsSent = useSafetyStore((s) => s.onCrashAlertsSent);
 
   // Determine which contacts to alert:
   // 1. If ride is active with selected contacts, use those
