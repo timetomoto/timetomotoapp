@@ -650,7 +650,16 @@ export async function executeScoutTool(
 
       // ── Segment Steering ────────────────────────────────────────────
       case 'steer_segment': {
-        const viaResults = await geocodeLocation(parameters.via, context.currentLocation);
+        // Use route midpoint for proximity so geocoding stays near the route
+        const steerTs = useTripPlannerStore.getState();
+        const steerProx = (() => {
+          const o = steerTs.tripOrigin;
+          const d = steerTs.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return context.currentLocation;
+        })();
+        const viaResults = await geocodeLocation(parameters.via, steerProx);
         if (viaResults.length === 0) return `Could not find "${parameters.via}" to route through.`;
         const via = viaResults[0];
 
@@ -659,7 +668,8 @@ export async function executeScoutTool(
         // Insert after the start point
         const insertAt = Math.max(0, startIdx + 1);
         const wp: TripStop = { name: via.name, lat: via.lat, lng: via.lng };
-        const waypoints = [...context.currentTrip.waypoints];
+        const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWps];
         waypoints.splice(insertAt, 0, wp);
         tripStore.setTripWaypoints(waypoints);
         return `Inserted via-waypoint at ${via.name} between ${parameters.segment_start} and ${parameters.segment_end} to steer the route.`;
@@ -667,19 +677,33 @@ export async function executeScoutTool(
 
       case 'avoid_road': {
         // Route around the named road by inserting a bypass via-point
-        const bypassQuery = `${parameters.road_name} bypass near ${parameters.segment_start}`;
-        const viaResults = await geocodeLocation(bypassQuery, context.currentLocation);
+        // Use route midpoint for proximity so geocoding stays near the route
+        const ts = useTripPlannerStore.getState();
+        const routeProx = (() => {
+          const o = ts.tripOrigin;
+          const d = ts.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return context.currentLocation;
+        })();
+        // Build a query that stays near the route region
+        const originName = context.currentTrip.origin?.name ?? '';
+        const destName = context.currentTrip.destination?.name ?? '';
+        const regionHint = originName && destName ? ` between ${originName} and ${destName}` : '';
+        const bypassQuery = `town not on ${parameters.road_name}${regionHint}`;
+        const viaResults = await geocodeLocation(bypassQuery, routeProx);
         if (viaResults.length === 0) {
           // Fallback: try just a town near the segment
           const fallback = await geocodeLocation(
-            `town near ${parameters.segment_start}`,
-            context.currentLocation,
+            `town near ${parameters.segment_start ?? originName}`,
+            routeProx,
           );
           if (fallback.length === 0) return `Could not find a bypass route to avoid ${parameters.road_name}.`;
           const via = fallback[0];
           const startIdx = resolveSegmentIndex(parameters.segment_start, context);
           const insertAt = Math.max(0, startIdx + 1);
-          const waypoints = [...context.currentTrip.waypoints];
+          const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+          const waypoints = [...liveWps];
           waypoints.splice(insertAt, 0, { name: via.name, lat: via.lat, lng: via.lng });
           tripStore.setTripWaypoints(waypoints);
           return `Added bypass waypoint at ${via.name} to avoid ${parameters.road_name}. Check the map to confirm the new routing.`;
@@ -687,7 +711,8 @@ export async function executeScoutTool(
         const via = viaResults[0];
         const startIdx = resolveSegmentIndex(parameters.segment_start, context);
         const insertAt = Math.max(0, startIdx + 1);
-        const waypoints = [...context.currentTrip.waypoints];
+        const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWps];
         waypoints.splice(insertAt, 0, { name: via.name, lat: via.lat, lng: via.lng });
         tripStore.setTripWaypoints(waypoints);
         return `Added bypass waypoint at ${via.name} to avoid ${parameters.road_name}.`;

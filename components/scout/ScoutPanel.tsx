@@ -429,6 +429,7 @@ function ScoutPanelContent() {
         .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
         .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
         .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
+        .replace(/[,.]? *(but )?(you can )?(adjust|edit|modify|view|see|check) (it |the route |this )?(in |on |at )?(the )?Trip Planner[^\n]*/gi, '')
         .trimEnd();
 
       // Only append our nav hint after route-modifying tool calls
