@@ -47,13 +47,13 @@ function Screen1() {
       </View>
 
       <View style={[s.scoutIconLarge, { backgroundColor: theme.red }]}>
-        {/* Scout crosshair icon — matches FAB */}
-        <View style={{ width: 44, height: 44 }}>
-          <View style={{ position: 'absolute', width: 44, height: 44, borderRadius: 22, borderWidth: 2.5, borderColor: '#fff' }} />
-          <View style={{ position: 'absolute', left: 21, top: 6, width: 2.5, height: 14, backgroundColor: '#fff', borderRadius: 1.5 }} />
-          <View style={{ position: 'absolute', left: 21, top: 24, width: 2.5, height: 14, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1.5 }} />
-          <View style={{ position: 'absolute', top: 21, left: 24, width: 14, height: 2.5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1.5 }} />
-          <View style={{ position: 'absolute', top: 21, left: 6, width: 14, height: 2.5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1.5 }} />
+        {/* Scout crosshair icon */}
+        <View style={{ width: 88, height: 88 }}>
+          <View style={{ position: 'absolute', width: 88, height: 88, borderRadius: 44, borderWidth: 5, borderColor: '#fff' }} />
+          <View style={{ position: 'absolute', left: 42, top: 12, width: 5, height: 28, backgroundColor: '#fff', borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', left: 42, top: 48, width: 5, height: 28, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', top: 42, left: 48, width: 28, height: 5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', top: 42, left: 12, width: 28, height: 5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
         </View>
       </View>
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
@@ -408,9 +408,9 @@ const s = StyleSheet.create({
   // Screen 1
   logoBlock: { alignItems: 'center', marginBottom: 40 },
   scoutIconLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
