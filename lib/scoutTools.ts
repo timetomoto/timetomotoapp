@@ -3,7 +3,7 @@ import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } f
 import { useNavigationStore } from './navigationStore';
 import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
-import { addMaintenanceRecord, addModification, updateMaintenanceRecord, updateModification, loadMaintenance, loadModifications, type MaintenanceRecord, type Modification } from './garage';
+import { addMaintenanceRecord, addModification, updateMaintenanceRecord, updateModification, deleteMaintenanceRecord, deleteModification, loadMaintenance, loadModifications, type MaintenanceRecord, type Modification } from './garage';
 import { supabase } from './supabase';
 
 /** Generate a v4 UUID for Supabase compatibility */
@@ -338,6 +338,30 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
         cost: { type: 'number', description: 'Updated cost in dollars.' },
         notes: { type: 'string', description: 'Updated notes.' },
         date_installed: { type: 'string', description: 'Updated date in YYYY-MM-DD format.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'delete_maintenance_log',
+    description: 'Delete a maintenance log entry by matching type and bike. Use when the rider says to remove or delete a logged maintenance item, or when moving entries to a different bike (delete from old bike, then add to new bike).',
+    parameters: {
+      type: 'object',
+      properties: {
+        maintenance_type: { type: 'string', description: 'Type of maintenance to delete: oil change, air filter, chain adjustment, etc.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+      },
+      required: ['maintenance_type'],
+    },
+  },
+  {
+    name: 'delete_modification',
+    description: 'Delete a modification entry by matching title and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the modification to delete.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
       },
       required: ['title'],
     },
@@ -1163,6 +1187,70 @@ export async function executeScoutTool(
 
         const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
         return `Updated "${match.title}" on ${bikeLabel}.`;
+      }
+
+      case 'delete_maintenance_log': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const allBikes = garageStore.bikes;
+          const found = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            return nick.includes(q) || model.includes(q) || make.includes(q) ||
+              q.includes(nick) || q.includes(model) || q.includes(make);
+          });
+          if (!found) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = found;
+        }
+        if (!bike) return 'No active bike selected.';
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const logs = await loadMaintenance(bike.id, userId);
+        const mType = (parameters.maintenance_type as string).toLowerCase();
+        const entry = logs.find((m) => m.maintenanceType.toLowerCase().includes(mType));
+        if (!entry) return `No "${parameters.maintenance_type}" entry found for ${bike.nickname ?? bike.model}.`;
+        try {
+          await deleteMaintenanceRecord(bike.id, entry.id, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to delete: ${e?.message ?? 'unknown error'}`;
+        }
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Deleted "${entry.maintenanceType}" from ${bikeLabel}'s maintenance log.`;
+      }
+
+      case 'delete_modification': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const allBikes = garageStore.bikes;
+          const found = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            return nick.includes(q) || model.includes(q) || make.includes(q) ||
+              q.includes(nick) || q.includes(model) || q.includes(make);
+          });
+          if (!found) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = found;
+        }
+        if (!bike) return 'No active bike selected.';
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const mods = await loadModifications(bike.id, userId);
+        const title = (parameters.title as string).toLowerCase();
+        const mod = mods.find((m) => m.title.toLowerCase().includes(title));
+        if (!mod) return `No modification matching "${parameters.title}" found for ${bike.nickname ?? bike.model}.`;
+        try {
+          await deleteModification(bike.id, mod.id, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to delete: ${e?.message ?? 'unknown error'}`;
+        }
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Deleted "${mod.title}" from ${bikeLabel}'s modifications.`;
       }
 
       case 'update_bike': {

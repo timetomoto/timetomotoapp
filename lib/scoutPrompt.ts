@@ -182,7 +182,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- MAINTENANCE INTENT: When a rider says "I need to change the oil" or "I need to do X maintenance", they are asking for HELP — look up the bike's specs (oil type, capacity, etc.) using ask_garage and share what you know. Ask if they want to log it when done. Only call add_maintenance_log when the rider explicitly says they DID the work ("I changed the oil", "just did an oil change", "log an oil change").\n` +
     `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately with all known details — mileage and cost are optional.\n` +
     `- MAINTENANCE UPDATES: If the rider provides mileage or cost AFTER you already logged a maintenance item, call update_maintenance_log (not add_maintenance_log). Never create a duplicate — always update the existing entry. Same applies to modifications — use update_modification to change details on an existing mod.\n` +
-    `- DUPLICATE CHECK: If the rider asks to log maintenance of the same type that was already logged earlier in this conversation, confirm first: "You already logged an oil change earlier — want to update that one or log a new entry?" Do not auto-create a second entry of the same type without asking.`
+    `- DUPLICATE CHECK: If the rider asks to log maintenance of the same type that was already logged earlier in this conversation, confirm first: "You already logged an oil change earlier — want to update that one or log a new entry?" Do not auto-create a second entry of the same type without asking.\n` +
+    `- MOVE ENTRIES: If the rider says they logged maintenance or mods on the wrong bike, use delete_maintenance_log on the old bike and add_maintenance_log on the correct bike. Do both steps — don't just add without deleting.`
   );
 
   // ── Voice behavior (only when voice input is active) ────────────────
@@ -239,6 +240,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- add_maintenance_log: Add a NEW maintenance entry. Defaults to active bike and today's date.\n` +
     `- update_maintenance_log: Update an EXISTING maintenance entry — change mileage, cost, notes, or date. Use this when the rider adds details to something already logged.\n` +
     `- update_modification: Update an EXISTING modification — change cost, brand, notes, or date.\n` +
+    `- delete_maintenance_log: Delete a maintenance entry by type. Use when moving entries to another bike (delete + re-add).\n` +
+    `- delete_modification: Delete a modification by title.\n` +
     `- update_bike: Update a bike's nickname, odometer, year, make, or model.\n` +
     `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
     `Ride controls (only when actively recording or navigating):\n` +
