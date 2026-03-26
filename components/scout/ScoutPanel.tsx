@@ -399,7 +399,7 @@ function ScoutPanelContent() {
         addMessage(ackMsg);
       } else {
         // Show message with tappable link — link handler closes Scout + opens checklist
-        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Tap to open your Pre-Ride Checklist.', timestamp: new Date() };
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Review your settings and tap START & RECORD RIDE on the Pre-Ride Checklist.', timestamp: new Date() };
         addMessage(ackMsg);
       }
       return;
