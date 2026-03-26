@@ -398,11 +398,9 @@ function ScoutPanelContent() {
         const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'You already have a ride in progress.', timestamp: new Date() };
         addMessage(ackMsg);
       } else {
-        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Opening your pre-ride checklist.', timestamp: new Date() };
+        // Show message with tappable link — link handler closes Scout + opens checklist
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Tap to open your Pre-Ride Checklist.', timestamp: new Date() };
         addMessage(ackMsg);
-        // Close Scout first, then open checklist
-        closeScout();
-        setTimeout(() => safety.setPendingStartRide(true), 400);
       }
       return;
     }
@@ -595,25 +593,29 @@ function ScoutPanelContent() {
   const atLimit = messages.length >= MAX_MESSAGES_PER_SESSION;
 
   // Screen link map for tappable navigation in messages
-  const screenLinks: Array<{ pattern: RegExp; route: string }> = [
+  const screenLinks: Array<{ pattern: RegExp; route: string; action?: () => void }> = [
     { pattern: /Trip Planner/g, route: '/(tabs)/trip' },
     { pattern: /Garage/g, route: '/(tabs)/garage' },
     { pattern: /Ride screen/g, route: '/(tabs)/ride' },
+    { pattern: /Pre-Ride Checklist/g, route: '/(tabs)/ride', action: () => {
+      closeScout();
+      setTimeout(() => useSafetyStore.getState().setPendingStartRide(true), 400);
+    }},
   ];
 
   /** Parse message text and replace screen names with tappable links */
   const renderLinkedText = (text: string, textColor: string) => {
     // Build a combined regex
-    const combined = /(Trip Planner|Garage|Ride screen)/g;
-    const parts: Array<{ text: string; link?: string }> = [];
+    const combined = /(Trip Planner|Garage|Ride screen|Pre-Ride Checklist)/g;
+    const parts: Array<{ text: string; link?: string; action?: () => void }> = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = combined.exec(text)) !== null) {
       if (match.index > lastIndex) {
         parts.push({ text: text.slice(lastIndex, match.index) });
       }
-      const route = screenLinks.find((l) => l.pattern.test(match![0]))?.route;
-      parts.push({ text: match[0], link: route });
+      const linkDef = screenLinks.find((l) => l.pattern.test(match![0]));
+      parts.push({ text: match[0], link: linkDef?.route, action: linkDef?.action });
       // Reset the per-link pattern lastIndex
       screenLinks.forEach((l) => { l.pattern.lastIndex = 0; });
       lastIndex = match.index + match[0].length;
@@ -634,8 +636,12 @@ function ScoutPanelContent() {
               key={i}
               style={{ textDecorationLine: 'underline', color: theme.red }}
               onPress={() => {
-                closeScout();
-                router.navigate(p.link as any);
+                if (p.action) {
+                  p.action();
+                } else {
+                  closeScout();
+                  router.navigate(p.link as any);
+                }
               }}
             >
               {p.text}
