@@ -1,6 +1,10 @@
-import { useTripPlannerStore, useRoutesStore, useGarageStore } from './store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } from './store';
+import { useNavigationStore } from './navigationStore';
+import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
-import { addMaintenanceRecord, addModification, type MaintenanceRecord, type Modification } from './garage';
+import { addMaintenanceRecord, addModification, updateMaintenanceRecord, updateModification, deleteMaintenanceRecord, deleteModification, loadMaintenance, loadModifications, type MaintenanceRecord, type Modification } from './garage';
+import { supabase } from './supabase';
 
 /** Generate a v4 UUID for Supabase compatibility */
 function uuid(): string {
@@ -306,6 +310,134 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  {
+    name: 'update_maintenance_log',
+    description: 'Update an existing maintenance log entry — change mileage, cost, notes, or date. Finds the most recent matching entry by type and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        maintenance_type: { type: 'string', description: 'Type of the maintenance entry to update (e.g. oil change, tire change).' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+        mileage: { type: 'number', description: 'Updated odometer reading.' },
+        cost: { type: 'number', description: 'Updated cost in dollars.' },
+        notes: { type: 'string', description: 'Updated notes.' },
+        date: { type: 'string', description: 'Updated date in YYYY-MM-DD format.' },
+      },
+      required: ['maintenance_type'],
+    },
+  },
+  {
+    name: 'update_modification',
+    description: 'Update an existing modification entry — change cost, brand, notes, or date. Finds the most recent matching entry by title and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the modification to update.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+        brand: { type: 'string', description: 'Updated brand name.' },
+        cost: { type: 'number', description: 'Updated cost in dollars.' },
+        notes: { type: 'string', description: 'Updated notes.' },
+        date_installed: { type: 'string', description: 'Updated date in YYYY-MM-DD format.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'delete_maintenance_log',
+    description: 'Delete a maintenance log entry by matching type and bike. Use when the rider says to remove or delete a logged maintenance item, or when moving entries to a different bike (delete from old bike, then add to new bike).',
+    parameters: {
+      type: 'object',
+      properties: {
+        maintenance_type: { type: 'string', description: 'Type of maintenance to delete: oil change, air filter, chain adjustment, etc.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+      },
+      required: ['maintenance_type'],
+    },
+  },
+  {
+    name: 'delete_modification',
+    description: 'Delete a modification entry by matching title and bike.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the modification to delete.' },
+        bike_name: { type: 'string', description: 'Nickname or model of the bike. Omit for active bike.' },
+      },
+      required: ['title'],
+    },
+  },
+  {
+    name: 'update_bike',
+    description: 'Update a bike\'s details — nickname, odometer, year, make, or model.',
+    parameters: {
+      type: 'object',
+      properties: {
+        bike_name: { type: 'string', description: 'Current nickname or model of the bike to update.' },
+        nickname: { type: 'string', description: 'New nickname.' },
+        odometer: { type: 'number', description: 'Updated odometer reading in miles.' },
+        year: { type: 'number', description: 'Updated year.' },
+        make: { type: 'string', description: 'Updated make.' },
+        model: { type: 'string', description: 'Updated model.' },
+      },
+      required: ['bike_name'],
+    },
+  },
+
+  // ── Ride Controls ───────────────────────────────────────────────────
+  {
+    name: 'pause_ride',
+    description: 'Pause the current ride recording. Only works when actively recording.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'resume_ride',
+    description: 'Resume a paused ride recording.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_ride_stats',
+    description: 'Get current ride statistics — speed, distance, duration, and navigation status.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_navigation_status',
+    description: 'Get navigation status — distance remaining, ETA, destination, current step instruction.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'find_nearby',
+    description: 'Find a nearby place (gas station, restaurant, rest stop, etc.) along the current route or near the rider\'s location.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to find — e.g. "gas station", "coffee shop", "rest area".' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'stop_ride',
+    description: 'Stop the current ride recording. ALWAYS call with confirmed: false first to ask the rider to confirm. Only call with confirmed: true after the rider explicitly says yes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        confirmed: { type: 'boolean', description: 'false = ask user to confirm, true = execute stop after user confirmed.' },
+      },
+      required: ['confirmed'],
+    },
+  },
+  {
+    name: 'add_stop_to_navigation',
+    description: 'Add a stop to the active navigation route. Geocodes the place and inserts it as the next waypoint. Falls back to trip planner if not navigating.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Place name or address to add as a stop.' },
+      },
+      required: ['query'],
+    },
+  },
+
   // ── Saved Routes ─────────────────────────────────────────────────────
   {
     name: 'describe_saved_route',
@@ -344,6 +476,28 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  // ── Safety ──────────────────────────────────────────────────────────
+  {
+    name: 'cancel_crash_alert',
+    description: 'Cancel the active crash detection countdown and dismiss the crash modal. Use when the rider says they are OK.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'trigger_emergency',
+    description: 'Fire SMS to emergency contacts immediately without waiting for the crash countdown. Use when the rider says "help", "emergency", or "call".',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'checkin_now',
+    description: 'Reset the check-in timer and cancel any pending check-in alert. Use when the rider says "I\'m ok", "check in", or "I\'m fine".',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_safety_status',
+    description: 'Get the current state of crash detection, live share, and check-in timer.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+
   // ── Post-Ride ─────────────────────────────────────────────────────────
   {
     name: 'generate_ride_summary',
@@ -366,6 +520,9 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
 // ---------------------------------------------------------------------------
 // PART B — Tool executor
 // ---------------------------------------------------------------------------
+
+// Gate for stop_ride two-step confirmation — prevents model from skipping confirmation
+let stopRideConfirmationPending = false;
 
 // Preference alias mapping
 const PREFERENCE_MAP: Record<string, string> = {
@@ -478,7 +635,9 @@ export async function executeScoutTool(
         if (results.length === 0) return `Could not find "${parameters.query}". Try a more specific place name.`;
         const place = results[0];
         const wp: TripStop = { name: parameters.label || place.name, lat: place.lat, lng: place.lng };
-        const waypoints = [...context.currentTrip.waypoints];
+        // Read LIVE waypoints from store (not stale context) so sequential calls see prior additions
+        const liveWaypoints = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWaypoints];
         const pos = parameters.position != null ? parameters.position : waypoints.length;
         waypoints.splice(pos, 0, wp);
         tripStore.setTripWaypoints(waypoints);
@@ -516,7 +675,16 @@ export async function executeScoutTool(
 
       // ── Segment Steering ────────────────────────────────────────────
       case 'steer_segment': {
-        const viaResults = await geocodeLocation(parameters.via, context.currentLocation);
+        // Use route midpoint for proximity so geocoding stays near the route
+        const steerTs = useTripPlannerStore.getState();
+        const steerProx = (() => {
+          const o = steerTs.tripOrigin;
+          const d = steerTs.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return context.currentLocation;
+        })();
+        const viaResults = await geocodeLocation(parameters.via, steerProx);
         if (viaResults.length === 0) return `Could not find "${parameters.via}" to route through.`;
         const via = viaResults[0];
 
@@ -525,7 +693,8 @@ export async function executeScoutTool(
         // Insert after the start point
         const insertAt = Math.max(0, startIdx + 1);
         const wp: TripStop = { name: via.name, lat: via.lat, lng: via.lng };
-        const waypoints = [...context.currentTrip.waypoints];
+        const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWps];
         waypoints.splice(insertAt, 0, wp);
         tripStore.setTripWaypoints(waypoints);
         return `Inserted via-waypoint at ${via.name} between ${parameters.segment_start} and ${parameters.segment_end} to steer the route.`;
@@ -533,19 +702,33 @@ export async function executeScoutTool(
 
       case 'avoid_road': {
         // Route around the named road by inserting a bypass via-point
-        const bypassQuery = `${parameters.road_name} bypass near ${parameters.segment_start}`;
-        const viaResults = await geocodeLocation(bypassQuery, context.currentLocation);
+        // Use route midpoint for proximity so geocoding stays near the route
+        const ts = useTripPlannerStore.getState();
+        const routeProx = (() => {
+          const o = ts.tripOrigin;
+          const d = ts.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return context.currentLocation;
+        })();
+        // Build a query that stays near the route region
+        const originName = context.currentTrip.origin?.name ?? '';
+        const destName = context.currentTrip.destination?.name ?? '';
+        const regionHint = originName && destName ? ` between ${originName} and ${destName}` : '';
+        const bypassQuery = `town not on ${parameters.road_name}${regionHint}`;
+        const viaResults = await geocodeLocation(bypassQuery, routeProx);
         if (viaResults.length === 0) {
           // Fallback: try just a town near the segment
           const fallback = await geocodeLocation(
-            `town near ${parameters.segment_start}`,
-            context.currentLocation,
+            `town near ${parameters.segment_start ?? originName}`,
+            routeProx,
           );
           if (fallback.length === 0) return `Could not find a bypass route to avoid ${parameters.road_name}.`;
           const via = fallback[0];
           const startIdx = resolveSegmentIndex(parameters.segment_start, context);
           const insertAt = Math.max(0, startIdx + 1);
-          const waypoints = [...context.currentTrip.waypoints];
+          const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+          const waypoints = [...liveWps];
           waypoints.splice(insertAt, 0, { name: via.name, lat: via.lat, lng: via.lng });
           tripStore.setTripWaypoints(waypoints);
           return `Added bypass waypoint at ${via.name} to avoid ${parameters.road_name}. Check the map to confirm the new routing.`;
@@ -553,7 +736,8 @@ export async function executeScoutTool(
         const via = viaResults[0];
         const startIdx = resolveSegmentIndex(parameters.segment_start, context);
         const insertAt = Math.max(0, startIdx + 1);
-        const waypoints = [...context.currentTrip.waypoints];
+        const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWps];
         waypoints.splice(insertAt, 0, { name: via.name, lat: via.lat, lng: via.lng });
         tripStore.setTripWaypoints(waypoints);
         return `Added bypass waypoint at ${via.name} to avoid ${parameters.road_name}.`;
@@ -693,10 +877,17 @@ export async function executeScoutTool(
           }
         }
         if (allConditions.length === 0) return 'No active road conditions reported along the route. Ride clear.';
-        const construction = allConditions.filter((c) => c.type === 'construction');
-        const hazards = allConditions.filter((c) => c.type === 'hazard');
-        const closures = allConditions.filter((c) => c.type === 'closure');
+        // Prioritize severe/moderate, cap total to keep response manageable
+        const sorted = allConditions.sort((a, b) => {
+          const sev = { critical: 0, major: 1, severe: 1, moderate: 2, minor: 3, low: 4 } as Record<string, number>;
+          return (sev[a.severity] ?? 3) - (sev[b.severity] ?? 3);
+        });
+        const capped = sorted.slice(0, 15);
+        const construction = capped.filter((c) => c.type === 'construction');
+        const hazards = capped.filter((c) => c.type === 'hazard');
+        const closures = capped.filter((c) => c.type === 'closure');
         const parts: string[] = [];
+        parts.push(`${allConditions.length} total conditions found (showing top ${capped.length} by severity).`);
         if (construction.length > 0) {
           parts.push(`CONSTRUCTION (${construction.length}):\n${construction.map((c) => `• [${c.severity.toUpperCase()}] ${c.title}: ${c.description}`).join('\n')}`);
         }
@@ -738,12 +929,17 @@ export async function executeScoutTool(
         if (bikeName) {
           const query = bikeName.toLowerCase();
           const allBikes = garageStore.bikes;
-          const match = allBikes.find(
-            (b) =>
-              b.nickname?.toLowerCase().includes(query) ||
-              b.model?.toLowerCase().includes(query) ||
-              b.make?.toLowerCase().includes(query),
-          );
+          const match = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            const year = b.year ? String(b.year) : '';
+            const fullLabel = `${year} ${make} ${model} ${nick}`.toLowerCase();
+            // Match in either direction: query contains bike fields OR bike fields contain query
+            return nick.includes(query) || model.includes(query) || make.includes(query) ||
+              query.includes(nick) || query.includes(model) || query.includes(make) ||
+              fullLabel.includes(query) || query.includes(fullLabel.trim());
+          });
           if (match) {
             bike = match;
             isActive = match.id === (context.activeBike?.id ?? null);
@@ -753,24 +949,53 @@ export async function executeScoutTool(
         }
 
         if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
-        const specs = bike.specs ?? {};
+        // Read specs from live store — context bike may have stale/empty specs
+        const liveBike = garageStore.bikes.find((b) => b.id === bike!.id);
+        const specs = liveBike?.specs ?? bike.specs ?? {};
         const parts: string[] = [];
         const label = `${[bike.year, bike.make, bike.model].filter(Boolean).join(' ')}${bike.nickname ? ` "${bike.nickname}"` : ''}`;
         parts.push(`Bike: ${label}${isActive ? ' (active)' : ' (not active)'}`);
         if (bike.odometer) parts.push(`Odometer: ${bike.odometer.toLocaleString()} mi`);
-        if (Object.keys(specs).length > 0) parts.push(`Specs: ${JSON.stringify(specs)}`);
-        // Only include maintenance/intervals for the active bike (they're loaded per-bike)
-        if (isActive) {
-          const maintenance = context.recentMaintenanceLogs.slice(0, 10);
-          if (maintenance.length > 0) {
-            const mList = maintenance
-              .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`)
-              .join('; ');
-            parts.push(`Recent maintenance: ${mList}`);
-          }
-          const intervals = context.serviceIntervals;
-          if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
+        if (Object.keys(specs).length > 0) {
+          // Format specs as readable key-value pairs instead of raw JSON
+          const specLines = Object.entries(specs)
+            .filter(([, v]) => v != null && v !== '' && v !== false)
+            .map(([k, v]) => `  ${k}: ${v}`)
+            .join('\n');
+          parts.push(`Specs:\n${specLines}`);
         }
+        // Include maintenance and modifications for the queried bike
+        const userId = garageStore.bikes[0]?.user_id ?? 'local';
+        const maintenance = isActive
+          ? context.recentMaintenanceLogs.slice(0, 10)
+          : await loadMaintenance(bike.id, userId);
+        if (maintenance.length > 0) {
+          const mList = maintenance.slice(0, 10)
+            .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}${m.cost ? ` ($${m.cost})` : ''}`)
+            .join('; ');
+          parts.push(`Recent maintenance: ${mList}`);
+        }
+        const mods = await loadModifications(bike.id, userId);
+        if (mods.length > 0) {
+          const modList = mods
+            .map((m) => `${m.title}${m.brand ? ` (${m.brand})` : ''}${m.cost ? ` $${m.cost}` : ''}`)
+            .join('; ');
+          parts.push(`Modifications: ${modList}`);
+        }
+        // Load cached service intervals
+        const intervalCacheKey = `ttm_service_intervals_${bike.id}`;
+        try {
+          const intervalRaw = await AsyncStorage.getItem(intervalCacheKey);
+          if (intervalRaw) {
+            const cached = JSON.parse(intervalRaw);
+            if (cached.items?.length > 0) {
+              const intervalList = cached.items
+                .map((it: any) => `${it.item}: ${it.interval}${it.notes ? ` (${it.notes})` : ''}`)
+                .join('\n  ');
+              parts.push(`Service intervals:\n  ${intervalList}`);
+            }
+          }
+        } catch {}
         parts.push(`Question: ${parameters.question}`);
         return parts.join('\n');
       }
@@ -778,12 +1003,15 @@ export async function executeScoutTool(
       case 'set_active_bike': {
         const query = (parameters.query as string).toLowerCase();
         const bikes = garageStore.bikes;
-        const match = bikes.find(
-          (b) =>
-            b.nickname?.toLowerCase().includes(query) ||
-            b.model?.toLowerCase().includes(query) ||
-            b.make?.toLowerCase().includes(query),
-        );
+        const match = bikes.find((b) => {
+          const nick = b.nickname?.toLowerCase() ?? '';
+          const model = b.model?.toLowerCase() ?? '';
+          const make = b.make?.toLowerCase() ?? '';
+          const fullLabel = `${b.year ?? ''} ${make} ${model} ${nick}`.toLowerCase();
+          return nick.includes(query) || model.includes(query) || make.includes(query) ||
+            query.includes(nick) || query.includes(model) || query.includes(make) ||
+            fullLabel.includes(query) || query.includes(fullLabel.trim());
+        });
         if (!match) return `No bike matching "${parameters.query}" found in your garage.`;
         garageStore.selectBike(match.id);
         const label = [match.year, match.make, match.model].filter(Boolean).join(' ');
@@ -796,7 +1024,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -813,7 +1044,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -859,7 +1093,10 @@ export async function executeScoutTool(
         if (bikeName) {
           const q = bikeName.toLowerCase();
           const match = garageStore.bikes.find(
-            (b) => b.nickname?.toLowerCase().includes(q) || b.model?.toLowerCase().includes(q) || b.make?.toLowerCase().includes(q),
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
           );
           if (!match) return `No bike matching "${bikeName}" found in your garage.`;
           bike = match;
@@ -895,6 +1132,319 @@ export async function executeScoutTool(
         return confirmation;
       }
 
+      case 'update_maintenance_log': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const records = await loadMaintenance(bike.id, userId);
+        const type = (parameters.maintenance_type as string).toLowerCase();
+        const match = records.find((r) => r.maintenanceType.toLowerCase().includes(type));
+        if (!match) return `No "${parameters.maintenance_type}" entry found for ${bike.nickname ?? bike.model}. You can add one instead.`;
+
+        // Update fields
+        if (parameters.mileage != null) match.mileage = parameters.mileage as number;
+        if (parameters.cost != null) match.cost = parameters.cost as number;
+        if (parameters.notes) match.notes = parameters.notes as string;
+        if (parameters.date) match.date = parameters.date as string;
+        match.updatedAt = new Date().toISOString();
+
+        try {
+          await updateMaintenanceRecord(bike.id, match, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to update: ${e?.message ?? 'unknown error'}`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        let msg = `Updated "${match.maintenanceType}" on ${bikeLabel}.`;
+        if (parameters.mileage != null) msg += ` Odometer: ${(parameters.mileage as number).toLocaleString()} mi.`;
+        if (parameters.cost != null) msg += ` Cost: $${parameters.cost}.`;
+        return msg;
+      }
+
+      case 'update_modification': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const match = garageStore.bikes.find(
+            (b) => {
+              const nick = b.nickname?.toLowerCase() ?? ''; const mdl = b.model?.toLowerCase() ?? ''; const mk = b.make?.toLowerCase() ?? '';
+              return nick.includes(q) || mdl.includes(q) || mk.includes(q) || q.includes(nick) || q.includes(mdl) || q.includes(mk);
+            },
+          );
+          if (!match) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = match;
+        }
+        if (!bike) return 'No active bike selected. Add a bike in the Garage first.';
+
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const mods = await loadModifications(bike.id, userId);
+        const title = (parameters.title as string).toLowerCase();
+        const match = mods.find((m) => m.title.toLowerCase().includes(title));
+        if (!match) return `No modification matching "${parameters.title}" found for ${bike.nickname ?? bike.model}.`;
+
+        if (parameters.brand) match.brand = parameters.brand as string;
+        if (parameters.cost != null) match.cost = parameters.cost as number;
+        if (parameters.notes) match.notes = parameters.notes as string;
+        if (parameters.date_installed) match.dateInstalled = parameters.date_installed as string;
+        match.updatedAt = new Date().toISOString();
+
+        try {
+          await updateModification(bike.id, match, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to update: ${e?.message ?? 'unknown error'}`;
+        }
+
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Updated "${match.title}" on ${bikeLabel}.`;
+      }
+
+      case 'delete_maintenance_log': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const allBikes = garageStore.bikes;
+          const found = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            return nick.includes(q) || model.includes(q) || make.includes(q) ||
+              q.includes(nick) || q.includes(model) || q.includes(make);
+          });
+          if (!found) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = found;
+        }
+        if (!bike) return 'No active bike selected.';
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const logs = await loadMaintenance(bike.id, userId);
+        const mType = (parameters.maintenance_type as string).toLowerCase();
+        const entry = logs.find((m) => m.maintenanceType.toLowerCase().includes(mType));
+        if (!entry) return `No "${parameters.maintenance_type}" entry found for ${bike.nickname ?? bike.model}.`;
+        try {
+          await deleteMaintenanceRecord(bike.id, entry.id, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to delete: ${e?.message ?? 'unknown error'}`;
+        }
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Deleted "${entry.maintenanceType}" from ${bikeLabel}'s maintenance log.`;
+      }
+
+      case 'delete_modification': {
+        const bikeName = parameters.bike_name as string | undefined;
+        let bike = context.activeBike;
+        if (bikeName) {
+          const q = bikeName.toLowerCase();
+          const allBikes = garageStore.bikes;
+          const found = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            return nick.includes(q) || model.includes(q) || make.includes(q) ||
+              q.includes(nick) || q.includes(model) || q.includes(make);
+          });
+          if (!found) return `No bike matching "${bikeName}" found in your garage.`;
+          bike = found;
+        }
+        if (!bike) return 'No active bike selected.';
+        const userId = bike.user_id ?? garageStore.bikes[0]?.user_id ?? 'local';
+        const mods = await loadModifications(bike.id, userId);
+        const title = (parameters.title as string).toLowerCase();
+        const mod = mods.find((m) => m.title.toLowerCase().includes(title));
+        if (!mod) return `No modification matching "${parameters.title}" found for ${bike.nickname ?? bike.model}.`;
+        try {
+          await deleteModification(bike.id, mod.id, userId);
+          garageStore.bumpMaintenanceRefresh();
+        } catch (e: any) {
+          return `Failed to delete: ${e?.message ?? 'unknown error'}`;
+        }
+        const bikeLabel = bike.nickname ?? [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+        return `Deleted "${mod.title}" from ${bikeLabel}'s modifications.`;
+      }
+
+      case 'update_bike': {
+        const bikeName = (parameters.bike_name as string).toLowerCase();
+        const match = garageStore.bikes.find(
+          (b) => b.nickname?.toLowerCase().includes(bikeName) || b.model?.toLowerCase().includes(bikeName) || b.make?.toLowerCase().includes(bikeName),
+        );
+        if (!match) return `No bike matching "${parameters.bike_name}" found in your garage.`;
+
+        const updated = { ...match };
+        if (parameters.nickname) updated.nickname = parameters.nickname as string;
+        if (parameters.odometer != null) updated.odometer = parameters.odometer as number;
+        if (parameters.year != null) updated.year = parameters.year as number;
+        if (parameters.make) updated.make = parameters.make as string;
+        if (parameters.model) updated.model = parameters.model as string;
+
+        // Update store
+        garageStore.updateBike(updated);
+
+        // Persist to Supabase
+        try {
+          await supabase.from('bikes').update({
+            nickname: updated.nickname,
+            odometer: updated.odometer,
+            year: updated.year,
+            make: updated.make,
+            model: updated.model,
+          }).eq('id', updated.id);
+        } catch {}
+
+        const oldLabel = match.nickname ?? [match.year, match.make, match.model].filter(Boolean).join(' ');
+        const newLabel = updated.nickname ?? [updated.year, updated.make, updated.model].filter(Boolean).join(' ');
+        const changes: string[] = [];
+        if (parameters.nickname) changes.push(`nickname → "${updated.nickname}"`);
+        if (parameters.odometer != null) changes.push(`odometer → ${(updated.odometer ?? 0).toLocaleString()} mi`);
+        if (parameters.year != null || parameters.make || parameters.model) changes.push(`${newLabel}`);
+        return `Updated ${oldLabel}: ${changes.join(', ')}.`;
+      }
+
+      // ── Ride Controls ────────────────────────────────────────────────
+      case 'pause_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to pause.';
+        if (safety.isRidePaused) return 'Ride is already paused.';
+        safety.setRidePaused(true);
+        return 'Ride paused.';
+      }
+
+      case 'resume_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to resume.';
+        if (!safety.isRidePaused) return 'Ride is not paused.';
+        safety.setRidePaused(false);
+        return 'Ride resumed.';
+      }
+
+      case 'get_ride_stats': {
+        const safety = useSafetyStore.getState();
+        const nav = useNavigationStore.getState();
+        if (!safety.isRecording && nav.mode === 'idle') return 'No active ride or navigation.';
+
+        const parts: string[] = [];
+        if (safety.isRecording) {
+          const dist = calcDistance(safety.recordedPoints);
+          parts.push(`Distance: ${dist.toFixed(1)} mi`);
+          parts.push(safety.isRidePaused ? 'Status: paused' : 'Status: recording');
+        }
+        if (nav.speedMph > 0) parts.push(`Speed: ${Math.round(nav.speedMph)} mph`);
+        if (nav.mode !== 'idle') {
+          parts.push(`Remaining: ${nav.remainingDistanceMiles.toFixed(1)} mi`);
+          if (nav.eta) parts.push(`ETA: ${nav.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`);
+          if (nav.destination) parts.push(`Heading to: ${nav.destination.name}`);
+        }
+        return parts.join(' · ');
+      }
+
+      case 'get_navigation_status': {
+        const nav = useNavigationStore.getState();
+        if (nav.mode === 'idle') return 'No active navigation.';
+
+        const parts: string[] = [];
+        parts.push(`Mode: ${nav.mode}`);
+        if (nav.destination) parts.push(`Destination: ${nav.destination.name}`);
+        parts.push(`Remaining: ${nav.remainingDistanceMiles.toFixed(1)} mi`);
+        if (nav.eta) parts.push(`ETA: ${nav.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`);
+        if (nav.speedMph > 0) parts.push(`Speed: ${Math.round(nav.speedMph)} mph`);
+        if (nav.isOffRoute) parts.push('⚠️ OFF ROUTE');
+        if (nav.activeRoute?.steps?.[nav.currentStepIndex]) {
+          const step = nav.activeRoute.steps[nav.currentStepIndex];
+          parts.push(`Next: ${step.instruction}`);
+        }
+        return parts.join(' · ');
+      }
+
+      case 'find_nearby': {
+        const query = parameters.query as string;
+        // Use current location, or fall back to route origin/midpoint
+        const proximity = context.currentLocation ?? (() => {
+          const ts = useTripPlannerStore.getState();
+          const o = ts.tripOrigin;
+          const d = ts.tripDestination;
+          if (o && d) return { lat: (o.lat + d.lat) / 2, lng: (o.lng + d.lng) / 2 };
+          if (o) return { lat: o.lat, lng: o.lng };
+          return null;
+        })();
+        // Append city hint to avoid matching road names in other states
+        const cityHint = context.currentLocation?.city
+          ?? (proximity ? await reverseGeocode(proximity.lat, proximity.lng) : '');
+        const searchQuery = cityHint ? `${query} near ${cityHint}` : query;
+        const results = await geocodeLocation(searchQuery, proximity);
+        if (results.length === 0) return `No "${query}" found nearby.`;
+        const place = results[0];
+        return `Found: ${place.name}. Want me to add it as a stop?`;
+      }
+
+      case 'stop_ride': {
+        const safety = useSafetyStore.getState();
+        if (!safety.isRecording) return 'No active ride to stop.';
+
+        const confirmed = parameters.confirmed as boolean;
+        if (!confirmed) {
+          stopRideConfirmationPending = true;
+          const dist = calcDistance(safety.recordedPoints);
+          return `You've ridden ${dist.toFixed(1)} miles. Are you sure you want to stop and save your ride?`;
+        }
+
+        // Only allow confirmed:true if a prior call set the confirmation flag
+        if (!stopRideConfirmationPending) {
+          stopRideConfirmationPending = true;
+          const dist = calcDistance(safety.recordedPoints);
+          return `You've ridden ${dist.toFixed(1)} miles. Are you sure you want to stop and save your ride?`;
+        }
+
+        stopRideConfirmationPending = false;
+        safety.setRecording(false);
+        return 'Ride stopped. Save your ride from the Ride screen.';
+      }
+
+      case 'add_stop_to_navigation': {
+        const query = parameters.query as string;
+        const nav = useNavigationStore.getState();
+        const isNavigating = nav.mode === 'navigating' || nav.mode === 'off_route' || nav.mode === 'recalculating';
+
+        const results = await geocodeLocation(query, context.currentLocation);
+        if (results.length === 0) return `No "${query}" found nearby.`;
+        const place = results[0];
+
+        if (isNavigating && nav.activeRoute) {
+          // Insert as next waypoint in active navigation
+          // Calculate distance from current location
+          let distToStop = 0;
+          if (context.currentLocation) {
+            const { haversineMiles } = await import('./distance');
+            distToStop = haversineMiles(context.currentLocation.lat, context.currentLocation.lng, place.lat, place.lng);
+          }
+          // Add to trip planner store as a waypoint (navigation will pick it up)
+          const wps = [...(tripStore.tripWaypoints as TripStop[])];
+          wps.push({ name: place.name, lat: place.lat, lng: place.lng });
+          tripStore.setTripWaypoints(wps);
+          return `Added ${place.name} as your next stop — ${distToStop.toFixed(1)} mi away.`;
+        }
+
+        // Not navigating — add to trip planner
+        const wps = [...(tripStore.tripWaypoints as TripStop[])];
+        wps.push({ name: place.name, lat: place.lat, lng: place.lng });
+        tripStore.setTripWaypoints(wps);
+        return `Added ${place.name} to your trip. Head to Trip Planner to see it on the map.`;
+      }
+
       // ── Saving ──────────────────────────────────────────────────────
       case 'describe_saved_route': {
         const match = findSavedRoute(parameters.query as string);
@@ -912,7 +1462,14 @@ export async function executeScoutTool(
           const mins = Math.round((match.duration_seconds % 3600) / 60);
           parts.push(`Duration: ${hrs}h ${mins}m`);
         }
-        if (match.departure_time) parts.push(`Departure: ${match.departure_time}`);
+        if (match.departure_time) {
+          const dep = new Date(match.departure_time);
+          if (!isNaN(dep.getTime())) {
+            const dateStr = dep.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            const hasTime = dep.getHours() !== 0 || dep.getMinutes() !== 0;
+            parts.push(`Departure: ${dateStr}${hasTime ? ` at ${dep.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`);
+          }
+        }
         if (match.source) parts.push(`Source: ${match.source}`);
         parts.push(`Points: ${match.points.length}`);
         parts.push(`Created: ${new Date(match.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
@@ -993,6 +1550,57 @@ export async function executeScoutTool(
         return JSON.stringify({ suggestedName, summary });
       }
 
+      // ── Safety tools ─────────────────────────────────────────────────
+      case 'cancel_crash_alert': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.isCrashAlertActive) return 'No crash alert is currently active.';
+        if (safetyStore.cancelCrashAlert) {
+          safetyStore.cancelCrashAlert();
+          return 'Crash alert cancelled. Rider confirmed they are OK.';
+        }
+        return 'Crash alert is active but cancel handler is not available.';
+      }
+
+      case 'trigger_emergency': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.isCrashAlertActive) return 'No crash alert is currently active.';
+        if (safetyStore.triggerEmergencyNow) {
+          safetyStore.triggerEmergencyNow();
+          return 'Emergency contacts are being notified immediately.';
+        }
+        return 'Crash alert is active but emergency handler is not available.';
+      }
+
+      case 'checkin_now': {
+        const safetyStore = useSafetyStore.getState();
+        if (!safetyStore.checkInActive) return 'No check-in timer is currently active.';
+        if (safetyStore.checkInNotifId) {
+          try {
+            const Notifs = require('expo-notifications');
+            Notifs.cancelScheduledNotificationAsync(safetyStore.checkInNotifId).catch(() => {});
+          } catch {}
+        }
+        safetyStore.clearCheckIn();
+        return 'Check-in timer reset. Your contacts will not be alerted.';
+      }
+
+      case 'get_safety_status': {
+        const ss = useSafetyStore.getState();
+        const parts: string[] = [];
+        parts.push(`Crash detection: ${ss.isMonitoring ? 'ON' : 'OFF'}`);
+        parts.push(`Crash alert active: ${ss.isCrashAlertActive ? 'YES' : 'no'}`);
+        parts.push(`Live share: ${ss.shareActive ? 'ON' : 'OFF'}${ss.shareToken ? ` (token: ${ss.shareToken.slice(0, 8)}…)` : ''}`);
+        if (ss.checkInActive && ss.checkInDeadline) {
+          const secsLeft = Math.max(0, Math.round((ss.checkInDeadline - Date.now()) / 1000));
+          const mins = Math.floor(secsLeft / 60);
+          parts.push(`Check-in timer: ${mins}m ${secsLeft % 60}s remaining`);
+        } else {
+          parts.push('Check-in timer: OFF');
+        }
+        parts.push(`Emergency contacts: ${ss.emergencyContacts.length}`);
+        return parts.join('\n');
+      }
+
       default:
         return `Unknown tool "${toolName}".`;
     }
@@ -1019,8 +1627,10 @@ function findSavedRoute(query: string) {
   const catMatch = allRoutes.find((r) => r.category?.toLowerCase().includes(q));
   if (catMatch) return catMatch;
 
-  // 3. Word-level match — split query into words, find route where most words match name+category
-  const queryWords = q.split(/[\s\-_]+/).filter((w) => w.length > 1);
+  // 3. Word-level match — split query into words, require at least half to match
+  const queryWords = q.split(/[\s\-_]+/).filter((w) => w.length > 2); // skip short words like "my", "to"
+  if (queryWords.length === 0) return null;
+  const minScore = Math.max(1, Math.ceil(queryWords.length / 2));
   let bestRoute: typeof allRoutes[0] | null = null;
   let bestScore = 0;
   for (const r of allRoutes) {
@@ -1028,7 +1638,7 @@ function findSavedRoute(query: string) {
     const score = queryWords.filter((w) => text.includes(w)).length;
     if (score > bestScore) { bestScore = score; bestRoute = r; }
   }
-  return bestScore > 0 ? bestRoute : null;
+  return bestScore >= minScore ? bestRoute : null;
 }
 
 function fmtTime(totalMinutes: number): string {

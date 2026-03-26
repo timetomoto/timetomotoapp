@@ -40,6 +40,13 @@ export const FAVORITE_LOCATIONS_PREFIX = 'ttm_favorite_locations';
 export const favoriteCacheKey = (userId?: string | null) =>
   userId && userId !== 'local' ? `${FAVORITE_LOCATIONS_PREFIX}_${userId}` : FAVORITE_LOCATIONS_PREFIX;
 
+// Garage
+export const SELECTED_BIKE_KEY = 'ttm_selected_bike_id';
+
+// Safety defaults
+export const SAFETY_CRASH_DETECTION_KEY = 'ttm_safety_crash_detection';
+export const SAFETY_LIVE_SHARE_KEY = 'ttm_safety_live_share';
+
 // Scout
 export const SCOUT_QUOTA_PREFIX = 'ttm_scout_quota';
 export const scoutQuotaKey = (userId: string) => `${SCOUT_QUOTA_PREFIX}_${userId}`;

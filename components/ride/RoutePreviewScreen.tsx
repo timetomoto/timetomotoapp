@@ -362,7 +362,7 @@ export default function RoutePreviewScreen({
             <View style={st.bikeSelector}>
               <Text style={[st.bikeSelectorLabel, { color: theme.textSecondary }]}>RIDING</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.bikePills}>
-                {bikes.map((bike) => {
+                {[...bikes].sort((a, b) => a.id === navBikeId ? -1 : b.id === navBikeId ? 1 : 0).map((bike) => {
                   const active = bike.id === navBikeId;
                   return (
                     <Pressable key={bike.id} style={[st.bikePill, { borderColor: active ? theme.red : theme.border }, active && { backgroundColor: theme.red + '1F' }]} onPress={() => setNavBikeId(active ? null : bike.id)}>

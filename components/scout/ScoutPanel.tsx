@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Animated,
   Easing,
   FlatList,
@@ -27,8 +28,13 @@ import {
 import { useScoutStore } from '../../lib/scoutStore';
 import { sendScoutMessage, abortScoutRequest } from '../../lib/scoutAgent';
 import { useActiveBike } from '../../lib/useActiveBike';
+import { useNavigationStore } from '../../lib/navigationStore';
+import { calcDistance } from '../../lib/gpx';
 import SlideUpWrapper from '../ui/SlideUpWrapper';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadFavorites } from '../../lib/favorites';
+import { loadMaintenance } from '../../lib/garage';
+import { reverseGeocode } from '../../lib/geocode';
 import { canSend, recordUsage, getRemaining, getDailyLimit, isQuotaBypassed } from '../../lib/scoutQuota';
 import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes';
 
@@ -37,6 +43,7 @@ import type { ScoutContext, ScoutMessage, TripStop } from '../../lib/scoutTypes'
 // ---------------------------------------------------------------------------
 
 const MAX_MESSAGES_PER_SESSION = 50;
+const SCREEN_H = Dimensions.get('window').height;
 
 const ROUTE_MODIFYING_TOOLS = new Set([
   'set_origin', 'set_destination', 'add_waypoint', 'steer_segment',
@@ -144,12 +151,16 @@ export default function ScoutPanel() {
   const closeScout = useScoutStore((s) => s.closeScout);
   const insets = useSafeAreaInsets();
 
+  const isRiding = useSafetyStore((s) => s.isRecording);
+  const navMode = useNavigationStore((s) => s.mode);
+  const rideActive = isRiding || (navMode !== 'idle' && navMode !== 'preview');
+
   if (!isScoutOpen) return null;
 
   return (
     <SlideUpWrapper visible={isScoutOpen} onClose={closeScout} bottomOffset={0}>
-      {/* Top spacer so panel starts below status bar */}
-      <View style={{ height: insets.top + 60 }} />
+      {/* Top spacer — smaller when riding so map stays visible */}
+      <View style={{ height: rideActive ? SCREEN_H * 0.55 : insets.top + 60 }} />
       <ScoutPanelContent />
     </SlideUpWrapper>
   );
@@ -183,8 +194,11 @@ function ScoutPanelContent() {
   const tripDeparture = useTripPlannerStore((s) => s.tripDeparture);
   const tripRouteDistance = useTripPlannerStore((s) => s.tripRouteDistance);
   const tripRouteDuration = useTripPlannerStore((s) => s.tripRouteDuration);
+  const tripRoutePreference = useTripPlannerStore((s) => s.tripRoutePreference);
   const routes = useRoutesStore((s) => s.routes);
   const currentLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const isRecording = useSafetyStore((s) => s.isRecording);
+  const isRidePaused = useSafetyStore((s) => s.isRidePaused);
   const userId = useAuthStore((s) => s.user?.id) ?? 'local';
 
   // Local state
@@ -193,6 +207,9 @@ function ScoutPanelContent() {
   const initialSent = useRef(false);
   const [favorites, setFavorites] = useState<Array<{ id: string; nickname: string; address: string; isHome: boolean }>>([]);
   const [favoritesLoaded, setFavoritesLoaded] = useState(false);
+  const [maintenanceLogs, setMaintenanceLogs] = useState<Awaited<ReturnType<typeof loadMaintenance>>>([]);
+  const [serviceIntervals, setServiceIntervals] = useState<any>(null);
+  const [cachedCity, setCachedCity] = useState<{ lat: number; lng: number; city: string } | null>(null);
   const [quotaRemaining, setQuotaRemaining] = useState<number>(Infinity);
   const [quotaExhausted, setQuotaExhausted] = useState(false);
   const bypassed = isQuotaBypassed(userId);
@@ -218,12 +235,33 @@ function ScoutPanelContent() {
         );
         setFavoritesLoaded(true);
       });
+      // Load maintenance for active bike
+      const ab = useGarageStore.getState().bikes.find(
+        (b) => b.id === useGarageStore.getState().selectedBikeId
+      );
+      if (ab?.id) {
+        loadMaintenance(ab.id, userId).then((logs) => setMaintenanceLogs(logs.slice(0, 5)));
+        // Load cached service intervals for active bike
+        AsyncStorage.getItem(`ttm_service_intervals_${ab.id}`).then((raw) => {
+          if (raw) {
+            try { setServiceIntervals(JSON.parse(raw)); } catch {}
+          }
+        });
+      }
+      // Reverse geocode current location for city name (cached)
+      const loc = useSafetyStore.getState().lastKnownLocation;
+      if (loc && (!cachedCity || Math.abs(loc.lat - cachedCity.lat) > 0.01 || Math.abs(loc.lng - cachedCity.lng) > 0.01)) {
+        reverseGeocode(loc.lat, loc.lng).then((city) => {
+          setCachedCity({ lat: loc.lat, lng: loc.lng, city });
+        });
+      }
     }
   }, [isScoutOpen, userId]);
 
   // Auto-send initialMessage (wait for favorites to load first)
+  // Works for both fresh sessions (no messages) and existing sessions (appends as new message)
   useEffect(() => {
-    if (isScoutOpen && favoritesLoaded && storeInitialMessage && !initialSent.current && messages.length === 0) {
+    if (isScoutOpen && favoritesLoaded && storeInitialMessage && !initialSent.current) {
       initialSent.current = true;
       const timer = setTimeout(() => handleSend(storeInitialMessage), 300);
       return () => clearTimeout(timer);
@@ -238,24 +276,60 @@ function ScoutPanelContent() {
     }
   }, [isScoutOpen]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change or panel reopens
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length, isLoading]);
 
+  // Scroll to bottom on mount (panel reopen with existing messages)
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 200);
+    }
+  }, []);
+
   // ── Context assembly ───────────────────────────────────────────────────
 
   const buildContext = useCallback((): ScoutContext => {
     const loc = currentLocation
-      ? { lat: currentLocation.lat, lng: currentLocation.lng }
+      ? {
+          lat: currentLocation.lat,
+          lng: currentLocation.lng,
+          // FIX 3: city from cached reverse geocode
+          city: cachedCity && Math.abs(currentLocation.lat - cachedCity.lat) < 0.01
+            ? cachedCity.city : undefined,
+        }
       : null;
 
     const tripWps = tripWaypoints as TripStop[];
 
+    // Build ride state from stores
+    const navState = useNavigationStore.getState();
+    const safetyState = useSafetyStore.getState();
+    const isNavigating = navState.mode === 'navigating' || navState.mode === 'off_route' || navState.mode === 'recalculating';
+    const rideActive = isRecording || isNavigating;
+
+    const rideState = rideActive ? {
+      isRecording,
+      isPaused: isRidePaused,
+      isNavigating,
+      speedMph: Math.round(navState.speedMph ?? 0),
+      distanceMiles: isRecording ? Math.round(calcDistance(safetyState.recordedPoints) * 10) / 10 : 0,
+      // TODO: elapsedSeconds lives in a useRef in ride.tsx (elapsedRef) — not in any store.
+      // To wire this, either move the timer to safetyStore or expose via a shared ref.
+      elapsedSeconds: 0,
+      remainingDistanceMiles: Math.round((navState.remainingDistanceMiles ?? 0) * 10) / 10,
+      eta: navState.eta ? navState.eta.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : null,
+      destinationName: navState.destination?.name ?? null,
+    } : null;
+
     return {
       currentScreen,
+      isVoiceInput: false, // Set true when message comes from voice input (dev build)
+      isCrashAlertActive: safetyState.isCrashAlertActive,
+      rideState,
       bikes,
       activeBike,
       currentLocation: loc,
@@ -267,7 +341,7 @@ function ScoutPanelContent() {
         departureTime: tripDeparture && (tripDeparture.getHours() !== 0 || tripDeparture.getMinutes() !== 0)
           ? tripDeparture.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
           : null,
-        preference: null,
+        preference: tripRoutePreference,
         routeDistance: tripRouteDistance || undefined,
         routeDuration: tripRouteDuration || undefined,
       },
@@ -278,10 +352,10 @@ function ScoutPanelContent() {
         distance: r.distance_miles ?? 0,
       })),
       favoriteLocations: favorites,
-      recentMaintenanceLogs: [],
-      serviceIntervals: null,
+      recentMaintenanceLogs: maintenanceLogs,
+      serviceIntervals: serviceIntervals?.items?.length > 0 ? serviceIntervals : null,
     };
-  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, favorites, routes, currentScreen]);
+  }, [bikes, activeBike, currentLocation, tripOrigin, tripDestination, tripWaypoints, tripDeparture, tripRouteDistance, tripRouteDuration, tripRoutePreference, favorites, routes, currentScreen, maintenanceLogs, serviceIntervals, cachedCity]);
 
   // ── Send message ───────────────────────────────────────────────────────
 
@@ -298,6 +372,32 @@ function ScoutPanelContent() {
 
     if (!text) setInput('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Easter egg — joke response
+    if (/tell me a joke|know any jokes|got a joke/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const jokeMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'How many bikes should you have?', timestamp: new Date() };
+      addMessage(jokeMsg);
+      return;
+    }
+    if (/how many/i.test(msg) && messages.length > 0 && messages[messages.length - 1]?.content === 'How many bikes should you have?') {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const punchline: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'One more.', timestamp: new Date() };
+      addMessage(punchline);
+      return;
+    }
+
+    // Debug trigger — simulate crash alert (dev only)
+    if (__DEV__ && /simulate crash/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Crash simulation triggered. SMS will fire if countdown expires. Tap I\'M OK to cancel.', timestamp: new Date() };
+      addMessage(ackMsg);
+      useSafetyStore.getState().setCrashDetected(true);
+      return;
+    }
 
     const userMsg: ScoutMessage = {
       id: `u_${Date.now()}`,
@@ -338,21 +438,22 @@ function ScoutPanelContent() {
       // Silent return if request was aborted (empty string from abortScoutRequest)
       if (!result.text) { setLoading(false); return; }
 
-      // Append nav hint before adding to store
-      let content = result.text;
+      // Always strip Gemini-generated nav hints (it often adds them unprompted)
+      let content = result.text
+        .replace(/\n*Head (over )?(to|on over to) (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Close Scout[^\n]*/gi, '')
+        .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Your route is ready[^\n]*/gi, '')
+        .replace(/\n*Check (the |your )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
+        .replace(/[,.]? *(but )?(you can )?(adjust|edit|modify|view|see|check) (it |the route |this )?(in |on |at )?(the )?Trip Planner[^\n]*/gi, '')
+        .trimEnd();
+
+      // Only append our nav hint after route-modifying tool calls
       const routeModified = result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t));
       if (routeModified) {
-        // Strip any Gemini-generated nav hints before appending ours
-        content = content
-          .replace(/\n*Head (over )?(to|on over to) (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Close Scout[^\n]*/gi, '')
-          .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Your route is ready[^\n]*/gi, '')
-          .replace(/\n*Check (the |your )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
-          .trimEnd();
         content += '\n\nHead to Trip Planner to see your route.';
       }
 
@@ -372,10 +473,9 @@ function ScoutPanelContent() {
         if (remaining <= 0) setQuotaExhausted(true);
       }
 
-      // Notify TripPlanner if route was modified
-      if (routeModified) {
-        useScoutStore.getState().onRouteUpdated?.();
-      }
+      // Notify TripPlanner if route was modified — skip toast while Scout is open
+      // (Scout's response + auto-appended nav hint handle the UX)
+      // The callback will fire when Scout closes and user lands on Trip Planner
     } catch {
       const errMsg: ScoutMessage = {
         id: `a_${Date.now()}`,
@@ -394,40 +494,83 @@ function ScoutPanelContent() {
 
   const bikeLabel = activeBike?.nickname ?? (activeBike ? [activeBike.year, activeBike.make, activeBike.model].filter(Boolean).join(' ') : null) ?? 'my bike';
 
-  const welcomeExamples = [
-    'Plan a 2-hour loop from here on back roads',
-    'Check weather for my route this Saturday',
-    `What oil does ${bikeLabel} take?`,
-    'Add a fuel stop halfway through my trip',
-  ];
+  // Contextual welcome message based on current screen
+  const WELCOME_BY_SCREEN: Record<string, { headline: string; subtext: string; prompts: string[] }> = {
+    ride: {
+      headline: "I'm Scout. Ready to ride.",
+      subtext: 'Controls, navigation, and safety — while you\'re on the move.',
+      prompts: [
+        'How far to my destination?',
+        'Find gas near me',
+        'Pause my ride',
+        "What's my safety status?",
+      ],
+    },
+    trip: {
+      headline: "I'm Scout — your AI riding assistant.",
+      subtext: 'Routes, weather, and road conditions — just ask.',
+      prompts: [
+        'Plan a scenic route for this weekend',
+        'Check weather for my route Saturday',
+        'What time should I leave tomorrow?',
+        'Add a fuel stop halfway through my trip',
+      ],
+    },
+    garage: {
+      headline: "I'm Scout. Your bike, managed.",
+      subtext: 'Specs, maintenance, and mods — all in one place.',
+      prompts: [
+        'Log an oil change today',
+        'What maintenance have I done this year?',
+        'Add a new exhaust to my mods',
+        'When was my last tire change?',
+      ],
+    },
+    other: {
+      headline: "I'm Scout — your AI riding assistant.",
+      subtext: 'Ask me anything about your ride.',
+      prompts: [
+        'Plan a scenic route for this weekend',
+        'Check weather for my route Saturday',
+        'Log an oil change today',
+        "What's my safety status?",
+      ],
+    },
+  };
 
-  const WelcomeMessage = () => (
-    <View style={[st.bubbleRow, st.bubbleRowLeft, { maxWidth: '92%' }]}>
-      <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <CompassIcon size={12} color={theme.red} />
-      </View>
-      <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
-        <Text style={[st.bubbleText, { color: theme.textPrimary }]}>
-          {'I\'m Scout. I can plan routes, check weather and road conditions, log maintenance and mods to your bikes, and answer questions about your ride.\n\n'}
-          {'Try:'}
-        </Text>
-        <View style={{ marginTop: 8, gap: 6 }}>
-          {welcomeExamples.map((ex, i) => (
-            <Pressable
-              key={i}
-              style={[st.promptChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
-              onPress={() => handleSend(ex)}
-            >
-              <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{ex}</Text>
-            </Pressable>
-          ))}
+  const WelcomeMessage = () => {
+    if (messages.length > 0) return null;
+    const msg = WELCOME_BY_SCREEN[currentScreen] ?? WELCOME_BY_SCREEN.other;
+    return (
+      <View style={[st.bubbleRow, st.bubbleRowLeft, { maxWidth: '92%' }]}>
+        <View style={[st.avatar, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <CompassIcon size={12} color={theme.red} />
         </View>
-        <Text style={[st.bubbleText, { color: theme.textPrimary, marginTop: 10 }]}>
-          Where are we riding today?
-        </Text>
+        <View style={[st.bubble, { backgroundColor: theme.bgCard, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 }]}>
+          <Text style={[st.bubbleText, { color: theme.textPrimary, fontWeight: '700', fontSize: 15 }]}>
+            {msg.headline}
+          </Text>
+          <Text style={[st.bubbleText, { color: theme.textSecondary, marginTop: 4 }]}>
+            {msg.subtext}
+          </Text>
+          <View style={{ marginTop: 10, gap: 6 }}>
+            {msg.prompts.map((ex, i) => (
+              <Pressable
+                key={i}
+                style={[st.promptChip, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+                onPress={() => handleSend(ex)}
+              >
+                <Text style={[st.promptChipText, { color: theme.textSecondary }]}>{ex}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={[st.bubbleText, { color: theme.textMuted, fontSize: 10, marginTop: 10 }]}>
+            Powered by AI — verify important details before riding.
+          </Text>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   // ── Render (always mounted, display toggled) ───────────────────────────
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -171,6 +172,19 @@ export default function RideSettingsBlock({ onChange, onCloseModal }: Props) {
     setShareOverride(false);
   }
 
+  function handleGpsTap() {
+    if (gpsStatus === 'warn') {
+      Alert.alert(
+        'Location Access Required',
+        'Open Settings to enable location access for Time to Moto',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+    }
+  }
+
   const alertsActive = crashOn || shareEnabled || checkInOn;
 
   return (
@@ -178,11 +192,13 @@ export default function RideSettingsBlock({ onChange, onCloseModal }: Props) {
       {/* ── RIDE SETTINGS ── */}
       <Text style={[s.sectionLabel, { color: theme.textSecondary }]}>RIDE SETTINGS</Text>
       <View style={[s.card, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <CheckRow
-          icon="map-pin" title="GPS LOCK"
-          detail={gpsStatus === 'loading' ? 'Checking…' : gpsStatus === 'ok' ? 'Location permission granted' : 'Location permission denied — enable in Settings'}
-          status={gpsStatus === 'loading' ? 'loading' : gpsStatus}
-        />
+        <Pressable onPress={handleGpsTap} disabled={gpsStatus !== 'warn'}>
+          <CheckRow
+            icon="map-pin" title="GPS LOCK"
+            detail={gpsStatus === 'loading' ? 'Checking…' : gpsStatus === 'ok' ? 'Location permission granted' : 'Location permission denied — tap to open Settings'}
+            status={gpsStatus === 'loading' ? 'loading' : gpsStatus}
+          />
+        </Pressable>
         <View style={[s.divider, { backgroundColor: theme.border }]} />
         <CheckRow
           icon="shield" title="CRASH DETECTION"

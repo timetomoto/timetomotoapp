@@ -87,6 +87,8 @@ export default function DiscoverRoutes({ onDismiss }: { onDismiss?: () => void }
     if (route.points.length < 2) return;
     onDismiss?.();
     const tripStore = useTripPlannerStore.getState();
+    // Clear previous trip before loading new one
+    tripStore.clearTrip();
     const pts = route.points;
     const first = pts[0];
     const last = pts[pts.length - 1];

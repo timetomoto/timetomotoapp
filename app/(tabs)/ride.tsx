@@ -10,17 +10,26 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Mapbox, {
-  Camera,
-  CircleLayer,
-  LineLayer,
-  LocationPuck,
-  MapView,
-  PointAnnotation,
-  RasterLayer,
-  RasterSource,
-  ShapeSource,
-} from '@rnmapbox/maps';
+let Mapbox: any;
+let Camera: any, CircleLayer: any, LineLayer: any, LocationPuck: any, MapView: any;
+let PointAnnotation: any, RasterLayer: any, RasterSource: any, ShapeSource: any;
+let _mapboxAvailable = false;
+try {
+  const MB = require('@rnmapbox/maps');
+  Mapbox = MB.default ?? MB;
+  Camera = MB.Camera;
+  CircleLayer = MB.CircleLayer;
+  LineLayer = MB.LineLayer;
+  LocationPuck = MB.LocationPuck;
+  MapView = MB.MapView;
+  PointAnnotation = MB.PointAnnotation;
+  RasterLayer = MB.RasterLayer;
+  RasterSource = MB.RasterSource;
+  ShapeSource = MB.ShapeSource;
+  _mapboxAvailable = true;
+} catch {
+  // Mapbox native module not available (Expo Go) — ride screen shows fallback
+}
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
@@ -28,6 +37,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useActiveBike } from '../../lib/useActiveBike';
+import { reverseGeocodeAddress } from '../../lib/geocode';
 import { useRouter } from 'expo-router';
 import { startShare, endShare, shareUrl } from '../../lib/liveShare';
 import { startBackgroundLocation, stopBackgroundLocation } from '../../lib/backgroundTasks';
@@ -63,12 +73,19 @@ import { fetchRouteWeather, getRouteWarningMessage, hasRouteWeatherConcern, type
 import { fetchHEREConditions } from '../../lib/discoverStore';
 import StatsBar from '../../components/ride/StatsBar';
 import CompletionScreen from '../../components/ride/CompletionScreen';
+import ScoutVoiceIndicator from '../../components/ride/ScoutVoiceIndicator';
+import { speakResponse } from '../../lib/scoutVoice';
+import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
-// Mapbox init — runs once
+// Mapbox init — runs once (skip if native module unavailable)
 // ---------------------------------------------------------------------------
-Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
-Mapbox.setTelemetryEnabled(false);
+if (_mapboxAvailable && Mapbox) {
+  try {
+    Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
+    Mapbox.setTelemetryEnabled(false);
+  } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -289,7 +306,7 @@ function RecordScreen({
               Check in: {formatCountdown(checkInSecsLeft)} remaining
             </Text>
             <Pressable style={[styles.checkInBtn, { backgroundColor: theme.green }]} onPress={handleCheckIn}>
-              <Text style={styles.checkInBtnText}>CHECK IN</Text>
+              <Text style={styles.checkInBtnText}>CHECK IN NOW</Text>
             </Pressable>
           </View>
         )}
@@ -305,6 +322,19 @@ function RecordScreen({
 export default function RideScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+
+  // Fallback when Mapbox native module is not available (Expo Go)
+  if (!_mapboxAvailable) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Feather name="map" size={48} color={theme.textMuted} />
+        <Text style={{ color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>Map Unavailable</Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+          The Ride screen requires a dev build for map features. All other screens work in Expo Go.
+        </Text>
+      </SafeAreaView>
+    );
+  }
   const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
   const { mapStyle: globalMapStyleUrl, setMapStyle: setGlobalMapStyle } = useMapStyleStore();
 
@@ -366,14 +396,9 @@ export default function RideScreen() {
     pinScaleAnim.setValue(0);
     RNAnimated.spring(pinScaleAnim, { toValue: 1, useNativeDriver: true, damping: 12, stiffness: 200 }).start();
 
-    // Reverse geocode
-    Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
-      .then(([place]) => {
-        if (place) {
-          const parts = [place.name, place.street, place.city, place.region].filter(Boolean);
-          setDroppedPinAddress(parts.slice(0, 3).join(', '));
-        }
-      })
+    // Reverse geocode — street-level address
+    reverseGeocodeAddress(lat, lng)
+      .then((addr) => { if (addr) setDroppedPinAddress(addr); })
       .catch(() => {});
   }
 
@@ -574,8 +599,8 @@ export default function RideScreen() {
     toastTimer.current = setTimeout(() => setToastMsg(''), durationMs);
   }
 
-  const mapRef       = useRef<Mapbox.MapView>(null);
-  const cameraRef    = useRef<Mapbox.Camera>(null);
+  const mapRef       = useRef<any>(null);
+  const cameraRef    = useRef<any>(null);
   const [mapStyleReady, setMapStyleReady] = useState(false);
 
   // ── Compass / map orientation ──
@@ -614,6 +639,9 @@ export default function RideScreen() {
   const panResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recordingBikeIdRef = useRef<string | null>(null);
   const elapsedRef   = useRef(0);
+  // Voice announcement tracking — which threshold was last spoken for the current step
+  const lastAnnouncedThreshold = useRef<number>(0);
+  const lastAnnouncedStepIdx   = useRef<number>(-1);
   const elapsedTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Single source-of-truth elapsed timer — drives both RecordScreen overlay and StatsOverlay
@@ -666,6 +694,8 @@ export default function RideScreen() {
       if (destination) {
         const distToDest = haversineMeters(pos.lat, pos.lng, destination.lat, destination.lng);
         if (distToDest < 30) {
+          // TODO: dev build — announce arrival via TTS
+          speakResponse('You have arrived at your destination.');
           setNavMode('completed');
           // Only clear overrides if not still recording — recording has its own cleanup
           if (!useSafetyStore.getState().isRecording) {
@@ -680,33 +710,71 @@ export default function RideScreen() {
       const nextStep = findNextStepIndex(pos.lat, pos.lng, activeRoute.steps, currentStepIndex);
       if (nextStep !== currentStepIndex) {
         setCurrentStepIndex(nextStep);
+        // Reset voice threshold tracking for new step
+        lastAnnouncedStepIdx.current = nextStep;
+        lastAnnouncedThreshold.current = 0;
+      }
+
+      // Distance-based voice announcements at 800m, 150m, 30m thresholds
+      const currentStep = activeRoute.steps[currentStepIndex];
+      if (currentStep?.maneuverLocation && currentStep.instruction) {
+        const [mLng, mLat] = currentStep.maneuverLocation;
+        const distToManeuver = haversineMeters(pos.lat, pos.lng, mLat, mLng);
+        const prevThreshold = lastAnnouncedStepIdx.current === currentStepIndex
+          ? lastAnnouncedThreshold.current : 0;
+
+        if (distToManeuver <= 30 && prevThreshold < 30) {
+          speakResponse(currentStep.instruction);
+          lastAnnouncedThreshold.current = 30;
+          lastAnnouncedStepIdx.current = currentStepIndex;
+        } else if (distToManeuver <= 150 && prevThreshold < 150 && prevThreshold < 30) {
+          speakResponse(`In 500 feet, ${currentStep.instruction}`);
+          lastAnnouncedThreshold.current = 150;
+          lastAnnouncedStepIdx.current = currentStepIndex;
+        } else if (distToManeuver <= 800 && prevThreshold < 800 && prevThreshold < 150) {
+          speakResponse(`In half a mile, ${currentStep.instruction}`);
+          lastAnnouncedThreshold.current = 800;
+          lastAnnouncedStepIdx.current = currentStepIndex;
+        }
       }
 
       // Off-route check
       if (navMode === 'navigating') {
         const offDist = distanceToRouteMeters(pos.lat, pos.lng, activeRoute.geometry.coordinates);
         if (offDist > 50) {
-          setNavMode('off_route');
-          setIsOffRoute(true);
-          // Auto-recalculate after 3 seconds
-          setTimeout(async () => {
-            if (!destination) return;
-            setNavMode('recalculating');
-            try {
-              const newRoutes = await fetchDirections(
-                pos.lng, pos.lat, destination.lng, destination.lat, routePreference,
-              );
-              if (newRoutes.length > 0) {
-                setActiveRoute(newRoutes[0]);
-                setNavRouteGeojson(newRoutes[0].geometry);
-                setCurrentStepIndex(0);
-                setIsOffRoute(false);
+          const isManualRoute = activeRoute.steps.length === 0;
+          if (isManualRoute) {
+            // Imported/GPX route — don't recalculate via Mapbox (would snap to roads)
+            // Just show off-route indicator, keep original geometry
+            setIsOffRoute(true);
+            speakResponse('Off route.');
+          } else {
+            // Mapbox-calculated route — recalculate to get back on track
+            speakResponse('Off route. Recalculating.');
+            setNavMode('off_route');
+            setIsOffRoute(true);
+            setTimeout(async () => {
+              if (!destination) return;
+              setNavMode('recalculating');
+              try {
+                const newRoutes = await fetchDirections(
+                  pos.lng, pos.lat, destination.lng, destination.lat, routePreference,
+                );
+                if (newRoutes.length > 0) {
+                  setActiveRoute(newRoutes[0]);
+                  setNavRouteGeojson(newRoutes[0].geometry);
+                  setCurrentStepIndex(0);
+                  setIsOffRoute(false);
+                  setNavMode('navigating');
+                }
+              } catch {
                 setNavMode('navigating');
               }
-            } catch {
-              setNavMode('navigating'); // Resume even if recalc fails
-            }
-          }, 3000);
+            }, 3000);
+          }
+        } else if (useNavigationStore.getState().isOffRoute) {
+          // Back on route — clear off-route indicator
+          setIsOffRoute(false);
         }
       }
 
@@ -906,6 +974,11 @@ export default function RideScreen() {
     setShowChecklist(false);
     setRecording(true);
     setRidePaused(false);
+
+    // Store selected contacts for crash/check-in alerts
+    if (cfg.notifyContactIds && cfg.notifyContactIds.length > 0) {
+      useSafetyStore.getState().setNotifyContactPhones(cfg.notifyContactIds);
+    }
 
     // Live share
     if (cfg.shareEnabled && user) {
@@ -1160,7 +1233,7 @@ export default function RideScreen() {
             if (mapStyleReady) handleMapIdle();
           }}
           onTouchStart={() => { userIsPanning.current = true; }}
-          onLongPress={(e) => {
+          onLongPress={(e: any) => {
             const geom = e.geometry as any;
             const coords = geom?.coordinates;
             if (coords) handleDropPin({ latitude: coords[1], longitude: coords[0] });
@@ -1202,7 +1275,7 @@ export default function RideScreen() {
             <ShapeSource
               id="fuel-stations-src"
               shape={fuelStationsGeoJsonData}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 const dist = lastKnownLocation
@@ -1229,7 +1302,7 @@ export default function RideScreen() {
             <ShapeSource
               id="food-places-src"
               shape={foodPlacesGeoJsonData}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 const dist = lastKnownLocation
@@ -1256,7 +1329,7 @@ export default function RideScreen() {
             <ShapeSource
               id="construction-src"
               shape={constructionGeoJSON}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);
@@ -1437,6 +1510,13 @@ export default function RideScreen() {
 
         {/* Weather legend — bottom-left when weather is on */}
         {weatherOn && <WeatherLegend />}
+
+        {/* Scout voice indicator — hidden until voice is enabled */}
+        <ScoutVoiceIndicator
+          isActive={false}
+          voiceState="idle"
+          onPress={() => useScoutStore.getState().openScout()}
+        />
 
         {/* ── Stats bar: navigation stats or recording stats (hidden in free ride) ── */}
         {isNavigatingActive ? (
@@ -1676,6 +1756,8 @@ export default function RideScreen() {
               const pts = activeRoute.geometry.coordinates;
               if (pts.length < 2) return;
               const tripStore = useTripPlannerStore.getState();
+              // Clear previous trip before loading new one
+              tripStore.clearTrip();
               const first = pts[0];
               const last = pts[pts.length - 1];
               tripStore.setTripOrigin({ name: destination?.name?.split('→')[0]?.trim() || 'Start', lat: first[1], lng: first[0] });
@@ -1699,6 +1781,8 @@ export default function RideScreen() {
               setNavMode('idle');
               setDestination(null);
               setActiveRoute(null);
+              setOverlayPoints(null);
+              setNavRouteGeojson(null);
               setIsSavedRoutePreview(false);
               router.navigate('/(tabs)/trip' as any);
               if (wasSampled) {
@@ -2168,7 +2252,7 @@ const styles = StyleSheet.create({
   // Pin callout
   pinCallout: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 200,
     left: 16,
     right: 16,
     borderRadius: 12,

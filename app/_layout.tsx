@@ -23,6 +23,7 @@ import { stopBackgroundLocation } from '../lib/backgroundTasks';
 import CrashAlertModal from '../components/safety/CrashAlertModal';
 import ScoutPanel from '../components/scout/ScoutPanel';
 import { useTheme } from '../lib/useTheme';
+import { SAFETY_CRASH_DETECTION_KEY, SAFETY_LIVE_SHARE_KEY } from '../lib/storageKeys';
 
 // Configure how notifications are presented when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -112,7 +113,26 @@ function SafetyService() {
   // Lazy-init detector singleton
   if (!detectorRef.current) {
     detectorRef.current = new CrashDetector(() => setCrashDetected(true));
+    // Register voice hook so CrashAlertModal can call it when SMS fires
+    useSafetyStore.getState().setOnCrashAlertsSent(
+      () => detectorRef.current?.onAlertsSent()
+    );
   }
+
+  // ── Restore persisted safety defaults + load contacts on mount ──
+  useEffect(() => {
+    (async () => {
+      const [crashVal, shareVal] = await Promise.all([
+        AsyncStorage.getItem(SAFETY_CRASH_DETECTION_KEY),
+        AsyncStorage.getItem(SAFETY_LIVE_SHARE_KEY),
+      ]);
+      if (crashVal === 'true') useSafetyStore.getState().setMonitoring(true);
+      if (shareVal === 'true') useSafetyStore.getState().setShareActive(true);
+    })();
+    // Always load emergency contacts so crash detection has them ready
+    const userId = useAuthStore.getState().user?.id ?? 'local';
+    useSafetyStore.getState().loadContacts(userId);
+  }, []);
 
   // ── Crash detector lifecycle ──
   useEffect(() => {
@@ -151,7 +171,13 @@ function SafetyService() {
       }
       clearCheckIn();
 
-      // Send SMS to all emergency contacts
+      // Send SMS to selected contacts (or primary, or first)
+      const notifyPhones = useSafetyStore.getState().notifyContactPhones;
+      const alertList = notifyPhones.length > 0
+        ? emergencyContacts.filter((c) => notifyPhones.includes(c.phone))
+        : emergencyContacts.filter((c) => c.is_primary).length > 0
+          ? emergencyContacts.filter((c) => c.is_primary)
+          : emergencyContacts.slice(0, 1);
       const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
       const mapsUrl = `https://maps.google.com/maps?q=${loc.lat},${loc.lng}`;
       const riderName = user?.email ?? 'A rider';
@@ -163,19 +189,15 @@ function SafetyService() {
         ? new Date(checkInDeadline).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
         : '—';
 
-      for (const contact of emergencyContacts) {
+      for (const contact of alertList) {
         try {
-          await (await import('../lib/supabase')).supabase.functions.invoke('send-crash-alert', {
+          await supabase.functions.invoke('send-checkin-alert', {
             body: {
               contactPhone: contact.phone,
-              contactName:  contact.name,
               riderName,
-              lat:          loc.lat,
-              lng:          loc.lng,
               mapsUrl,
               timestamp,
-              // Edge function uses the message field; pass overriding body text
-              overrideBody: `TIME to MOTO: ${riderName} hasn't checked in.\nThey were last seen at: ${mapsUrl}\nCheck-in was set for: ${checkInTime}`,
+              checkInTime,
             },
           });
         } catch {}

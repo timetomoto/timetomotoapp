@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,8 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import { useAuthStore } from '@/lib/store';
+import { useAuthStore, useGarageStore } from '@/lib/store';
 import { useTheme } from '@/lib/useTheme';
 
 // ---------------------------------------------------------------------------
@@ -165,8 +167,10 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
 export default function AccountScreen() {
   const { theme } = useTheme();
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, setSession } = useAuthStore();
+  const { bikes } = useGarageStore();
 
+  const [deleting, setDeleting] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
@@ -208,6 +212,128 @@ export default function AccountScreen() {
     } else {
       Alert.alert('Check your email', 'A password reset link has been sent to ' + user.email);
     }
+  }
+
+  // ── Delete account ────────────────────────────────────────────────────
+  async function performAccountDeletion() {
+    const userId = user?.id;
+    // Capture bike IDs before deletion so we can clear per-bike cache keys
+    const bikeIds = bikes.map((b) => b.id);
+
+    setDeleting(true);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('delete-account');
+
+      if (fnError || !data?.success) {
+        throw new Error(fnError?.message ?? data?.error ?? 'Unknown error');
+      }
+
+      // Clear per-user AsyncStorage keys
+      if (userId) {
+        const perUserKeys = [
+          `ttm_routes_${userId}`,
+          `ttm_favorite_locations_${userId}`,
+          `ttm_scout_quota_${userId}`,
+          `@ttm/bdr_cleanup_done_${userId}`,
+          `@ttm/routes_seeded_${userId}`,
+          `@ttm/routes_sort_order_${userId}`,
+          `@ttm/routes_expanded_state_${userId}`,
+        ];
+        await AsyncStorage.multiRemove(perUserKeys);
+      }
+
+      // Clear per-bike AsyncStorage keys
+      for (const bikeId of bikeIds) {
+        const perBikeKeys = [
+          `ttm_maintenance_${bikeId}`,
+          `ttm_modifications_${bikeId}`,
+          `ttm_documents_${bikeId}`,
+          `wiki_photo_${bikeId}`,
+          `@ttm/garage_sections_${bikeId}`,
+        ];
+        await AsyncStorage.multiRemove(perBikeKeys);
+      }
+
+      // Clear global keys
+      await AsyncStorage.multiRemove([
+        'ttm_theme_mode',
+        '@ttm/onboarding_v1',
+        '@ttm/map_style_preference',
+        'ttm_bikes_local',
+        'ttm_contacts_local',
+        'ttm_nav_recents',
+        'ttm_weather_recents',
+        'ttm_route_category_order',
+      ]);
+
+      // Reset auth state
+      setSession(null);
+
+      // Navigate to auth screen
+      router.replace('/auth' as any);
+
+      // Show success toast
+      setTimeout(() => Alert.alert('Account deleted'), 300);
+    } catch {
+      Alert.alert(
+        'Could not delete account',
+        'Please try again or contact support@timetomoto.com',
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete Account?',
+      'This will permanently delete your account, all your bikes, routes, maintenance records, and ride history. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => {
+            if (Platform.OS === 'ios') {
+              Alert.prompt(
+                'Are you sure?',
+                'Type DELETE to confirm you want to permanently delete your account.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: (value?: string) => {
+                      if (value === 'DELETE') {
+                        performAccountDeletion();
+                      } else {
+                        Alert.alert('Type DELETE to confirm');
+                      }
+                    },
+                  },
+                ],
+                'plain-text',
+                '',
+              );
+            } else {
+              // Android fallback — no Alert.prompt available
+              Alert.alert(
+                'Are you sure?',
+                'This action is permanent and cannot be undone. Tap "Delete Forever" to confirm.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete Forever',
+                    style: 'destructive',
+                    onPress: () => performAccountDeletion(),
+                  },
+                ],
+              );
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -300,7 +426,31 @@ export default function AccountScreen() {
           )}
           <SettingRow label="Reset Password via Email" onPress={handleResetPassword} />
         </View>
+
+        {/* DELETE ACCOUNT */}
+        <View style={styles.deleteSection}>
+          <Pressable
+            onPress={handleDeleteAccount}
+            disabled={deleting}
+            style={styles.deleteBtn}
+          >
+            <Text style={[styles.deleteBtnText, { color: theme.red }]}>Delete Account</Text>
+          </Pressable>
+          <Text style={[styles.deleteSubtitle, { color: theme.textMuted }]}>
+            Permanently deletes your account and all data
+          </Text>
+        </View>
       </ScrollView>
+
+      {/* Full-screen loading overlay */}
+      {deleting && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={theme.red} />
+          <Text style={[styles.loadingText, { color: theme.textPrimary }]}>
+            Deleting account...
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -422,4 +572,35 @@ const styles = StyleSheet.create({
 
   errorText: { fontSize: 13, textAlign: 'center' },
   successText: { fontSize: 13, textAlign: 'center' },
+
+  deleteSection: {
+    marginTop: 40,
+    alignItems: 'center',
+    paddingBottom: 16,
+  },
+  deleteBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  deleteBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  deleteSubtitle: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    zIndex: 100,
+  },
+  loadingText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

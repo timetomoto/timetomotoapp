@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore, useSafetyStore } from '@/lib/store';
 import { useTheme } from '@/lib/useTheme';
+import { SAFETY_CRASH_DETECTION_KEY, SAFETY_LIVE_SHARE_KEY } from '@/lib/storageKeys';
 
 // ---------------------------------------------------------------------------
 // Section header
@@ -282,11 +284,12 @@ export default function SettingsScreen() {
                         [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
-                          { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
+                          { text: 'Enable Anyway', onPress: () => { setMonitoring(true); AsyncStorage.setItem(SAFETY_CRASH_DETECTION_KEY, 'true'); } },
                         ],
                       );
                     } else {
                       setMonitoring(v);
+                      AsyncStorage.setItem(SAFETY_CRASH_DETECTION_KEY, String(v));
                     }
                   }}
                 />
@@ -299,7 +302,7 @@ export default function SettingsScreen() {
               <ToggleRow
                 label="Live Location Sharing"
                 value={shareActive}
-                onValueChange={setShareActive}
+                onValueChange={(v) => { setShareActive(v); AsyncStorage.setItem(SAFETY_LIVE_SHARE_KEY, String(v)); }}
               />
             </View>
 
@@ -377,11 +380,12 @@ export default function SettingsScreen() {
                         [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Add Contact', onPress: () => router.push('/emergency-contacts' as any) },
-                          { text: 'Enable Anyway', onPress: () => setMonitoring(true) },
+                          { text: 'Enable Anyway', onPress: () => { setMonitoring(true); AsyncStorage.setItem(SAFETY_CRASH_DETECTION_KEY, 'true'); } },
                         ],
                       );
                     } else {
                       setMonitoring(v);
+                      AsyncStorage.setItem(SAFETY_CRASH_DETECTION_KEY, String(v));
                     }
                   }}
                 />
@@ -394,7 +398,7 @@ export default function SettingsScreen() {
               <ToggleRow
                 label="Live Location Sharing"
                 value={shareActive}
-                onValueChange={setShareActive}
+                onValueChange={(v) => { setShareActive(v); AsyncStorage.setItem(SAFETY_LIVE_SHARE_KEY, String(v)); }}
               />
             </View>
           </>
@@ -430,6 +434,37 @@ export default function SettingsScreen() {
             </View>
           </>
         )}
+
+        {/* ACCOUNT */}
+        <SectionHeader label="ACCOUNT" />
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
+          <Pressable
+            style={[styles.row, { borderBottomWidth: 0 }]}
+            onPress={() => router.push('/account')}
+          >
+            <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Account Settings</Text>
+            <Feather name="chevron-right" size={16} color={theme.textSecondary} />
+          </Pressable>
+        </View>
+
+        {/* LEGAL */}
+        <SectionHeader label="LEGAL" />
+        <View style={[styles.card, { backgroundColor: theme.bgCard, borderColor: theme.border }, theme.cardBorderTop && { borderTopColor: theme.cardBorderTop, borderBottomColor: theme.cardBorderBottom }]}>
+          <Pressable
+            style={[styles.row, { borderBottomColor: theme.border }]}
+            onPress={() => Linking.openURL('https://timetomoto.com/privacy')}
+          >
+            <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Privacy Policy</Text>
+            <Feather name="external-link" size={14} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable
+            style={[styles.row, { borderBottomWidth: 0 }]}
+            onPress={() => Linking.openURL('https://timetomoto.com/terms')}
+          >
+            <Text style={[styles.rowLabel, { color: theme.textPrimary }]}>Terms of Service</Text>
+            <Feather name="external-link" size={14} color={theme.textSecondary} />
+          </Pressable>
+        </View>
 
       </ScrollView>
     </SafeAreaView>

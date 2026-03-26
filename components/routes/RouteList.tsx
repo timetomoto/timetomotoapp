@@ -47,18 +47,23 @@ function fmtDuration(secs: number | null) {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function fmtDate(iso: string | null | undefined) {
+function fmtDate(iso: string | null | undefined, includeTime = false) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (!includeTime) return dateStr;
+  // Include time if it's not midnight (i.e. a real departure time was set)
+  if (d.getHours() === 0 && d.getMinutes() === 0) return dateStr;
+  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return `${dateStr} at ${timeStr}`;
 }
 
 function routeDateLabel(route: Route): string | null {
   const src = route.source;
   if (src === 'planned') {
     const parts: string[] = [];
-    if (route.departure_time) parts.push(`Departure: ${fmtDate(route.departure_time)}`);
+    if (route.departure_time) parts.push(`Departure: ${fmtDate(route.departure_time, true)}`);
     parts.push(`Saved: ${fmtDate(route.created_at)}`);
     return parts.join('  ·  ');
   }

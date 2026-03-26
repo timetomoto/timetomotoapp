@@ -45,6 +45,14 @@ interface SafetyState {
   // Session-only overrides (not persisted)
   crashDetectionOverride: boolean;
   locationSharingOverride: boolean;
+  notifyContactPhones: string[]; // contacts selected for this ride's alerts
+
+  // Crash alert state (managed by CrashAlertModal, read by Scout tools)
+  isCrashAlertActive: boolean;
+  crashSimulated: boolean; // dev-only: skip SMS on simulated crashes
+  cancelCrashAlert: (() => void) | null;
+  triggerEmergencyNow: (() => void) | null;
+  onCrashAlertsSent: (() => void) | null;
 
   // Actions
   setMonitoring: (v: boolean) => void;
@@ -61,7 +69,10 @@ interface SafetyState {
   clearRecordedPoints: () => void;
   setCrashDetectionOverride: (v: boolean) => void;
   setLocationSharingOverride: (v: boolean) => void;
+  setNotifyContactPhones: (phones: string[]) => void;
   clearSessionOverrides: () => void;
+  setCrashAlertHandlers: (cancel: (() => void) | null, emergency: (() => void) | null) => void;
+  setOnCrashAlertsSent: (fn: (() => void) | null) => void;
   loadContacts: (userId: string) => Promise<void>;
   saveContacts: (userId: string, contacts: EmergencyContact[]) => Promise<string | null>;
 }
@@ -72,6 +83,11 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   emergencyContacts: [],
   lastKnownLocation: null,
   crashDetected: false,
+  isCrashAlertActive: false,
+  crashSimulated: false,
+  cancelCrashAlert: null,
+  triggerEmergencyNow: null,
+  onCrashAlertsSent: null,
   shareToken: null,
   shareActive: false,
   checkInDeadline: null,
@@ -81,10 +97,11 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   recordedPoints: [],
   crashDetectionOverride: false,
   locationSharingOverride: false,
+  notifyContactPhones: [],
 
   setMonitoring:    (isMonitoring) => set({ isMonitoring }),
   setRecording:     (isRecording)  => set({ isRecording }),
-  setCrashDetected: (crashDetected) => set({ crashDetected }),
+  setCrashDetected: (crashDetected) => set({ crashDetected, isCrashAlertActive: crashDetected }),
   updateLocation:   (lat, lng) =>
     set({ lastKnownLocation: { lat, lng, timestamp: Date.now() } }),
   setContacts:    (emergencyContacts) => set({ emergencyContacts }),
@@ -92,13 +109,20 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   setShareActive: (shareActive) => set({ shareActive }),
   setCrashDetectionOverride: (crashDetectionOverride) => set({ crashDetectionOverride }),
   setLocationSharingOverride: (locationSharingOverride) => set({ locationSharingOverride }),
+  setNotifyContactPhones: (notifyContactPhones) => set({ notifyContactPhones }),
   clearSessionOverrides: () => set((s) => ({
     // Revert global toggles that were only enabled for this ride
     isMonitoring: s.crashDetectionOverride ? false : s.isMonitoring,
     shareActive: s.locationSharingOverride ? false : s.shareActive,
     crashDetectionOverride: false,
     locationSharingOverride: false,
+    notifyContactPhones: [],
   })),
+
+  setCrashAlertHandlers: (cancel, emergency) =>
+    set({ cancelCrashAlert: cancel, triggerEmergencyNow: emergency }),
+
+  setOnCrashAlertsSent: (fn) => set({ onCrashAlertsSent: fn }),
 
   setCheckIn: (deadline, notifId) =>
     set({ checkInDeadline: deadline, checkInActive: true, checkInNotifId: notifId }),
@@ -250,6 +274,7 @@ export interface Bike {
 
 const LOCAL_BIKES_KEY    = 'ttm_bikes_local';
 const LOCAL_CONTACTS_KEY = 'ttm_contacts_local';
+const SELECTED_BIKE_KEY  = 'ttm_selected_bike_id';
 
 interface GarageState {
   bikes: Bike[];
@@ -275,10 +300,12 @@ export const useGarageStore = create<GarageState>((set, get) => ({
 
   fetchBikes: async (userId) => {
     set({ loading: true });
+    // Restore persisted bike selection
+    const persisted = await AsyncStorage.getItem(SELECTED_BIKE_KEY).catch(() => null);
     if (userId === 'local') {
       const stored = await AsyncStorage.getItem(LOCAL_BIKES_KEY);
       const bikes: Bike[] = stored ? JSON.parse(stored) : [];
-      const current = get().selectedBikeId;
+      const current = persisted ?? get().selectedBikeId;
       const selected = (current && bikes.some((b) => b.id === current)) ? current : (bikes[0]?.id ?? null);
       set({ bikes, selectedBikeId: selected, loading: false });
       return;
@@ -289,15 +316,17 @@ export const useGarageStore = create<GarageState>((set, get) => ({
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {
-      const current = get().selectedBikeId;
+      const current = persisted ?? get().selectedBikeId;
       const selected = (current && data.some((b) => b.id === current)) ? current : (data[0]?.id ?? null);
       set({ bikes: data as Bike[], selectedBikeId: selected });
     }
     set({ loading: false });
   },
 
-  addBike: (bike) =>
-    set((s) => ({ bikes: [bike, ...s.bikes], selectedBikeId: bike.id })),
+  addBike: (bike) => {
+    set((s) => ({ bikes: [bike, ...s.bikes], selectedBikeId: bike.id }));
+    AsyncStorage.setItem(SELECTED_BIKE_KEY, bike.id).catch(() => {});
+  },
 
   updateBike: (bike) =>
     set((s) => ({ bikes: s.bikes.map((b) => b.id === bike.id ? bike : b) })),
@@ -320,7 +349,10 @@ export const useGarageStore = create<GarageState>((set, get) => ({
     });
   },
 
-  selectBike: (id) => set({ selectedBikeId: id }),
+  selectBike: (id) => {
+    set({ selectedBikeId: id });
+    AsyncStorage.setItem(SELECTED_BIKE_KEY, id).catch(() => {});
+  },
   bumpMaintenanceRefresh: () => set((s) => ({ maintenanceRefresh: s.maintenanceRefresh + 1 })),
   bumpGarageDataRefresh: () => set((s) => ({ garageDataRefresh: s.garageDataRefresh + 1 })),
 }));

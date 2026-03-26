@@ -92,9 +92,12 @@ export async function fetchHEREConditions(lat: number, lng: number): Promise<Roa
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
+    // Only fetch incidents from the last 14 days
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const url =
       `${HERE_INCIDENTS_URL}?locationReferencing=shape` +
       `&in=circle:${lat},${lng};r=${RADIUS_METERS}` +
+      `&startTime=${twoWeeksAgo}` +
       `&apiKey=${key}`;
 
     const res = await fetch(url, { signal: controller.signal });

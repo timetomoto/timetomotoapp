@@ -42,7 +42,14 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
   } = useSafetyStore();
   const { bikes, selectedBikeId, selectBike } = useGarageStore();
 
-  const [selectedBike, setSelectedBike] = useState<string | null>(selectedBikeId);
+  const [selectedBike, setSelectedBike] = useState<string | null>(selectedBikeId ?? bikes[0]?.id ?? null);
+
+  // Update selection if store loads bikes after mount
+  useEffect(() => {
+    if (!selectedBike && (selectedBikeId || bikes.length > 0)) {
+      setSelectedBike(selectedBikeId ?? bikes[0]?.id ?? null);
+    }
+  }, [selectedBikeId, bikes.length]);
   const { lastKnownLocation } = useSafetyStore();
 
   // Weather alert — fetch on modal open
@@ -240,7 +247,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
           contentContainerStyle={styles.bikeChipContent}
           nestedScrollEnabled
         >
-          {bikes.map((bike) => (
+          {[...bikes].sort((a, b) => a.id === selectedBike ? -1 : b.id === selectedBike ? 1 : 0).map((bike) => (
             <Pressable
               key={bike.id}
               style={[
@@ -371,7 +378,7 @@ const styles = StyleSheet.create({
   dragHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12 },
   headerTitle: { fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
-  content: { padding: 14, paddingBottom: 124 },
+  content: { padding: 14, paddingBottom: 160 },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 20 },
   bikeChipRow: { marginBottom: 10 },
   bikeChipContent: { gap: 8, paddingHorizontal: 2 },

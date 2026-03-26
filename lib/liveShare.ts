@@ -4,7 +4,7 @@
 
 import { supabase } from './supabase';
 
-export const SHARE_BASE = 'https://timetomoto.app/track';
+export const SHARE_BASE = 'https://timetomoto.com/track';
 
 // ---------------------------------------------------------------------------
 // UUID v4 generator (no external dep)

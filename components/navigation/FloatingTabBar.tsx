@@ -24,31 +24,24 @@ export default function FloatingTabBar() {
 
   return (
     <View style={[s.wrapper, { bottom: insets.bottom - 7 }]} pointerEvents="box-none">
-      {/* Scout FAB — positioned absolutely so pill stays centered */}
+      {/* Scout FAB — pill bleeds off left edge, icon stacked above text */}
       {!isScoutOpen && (
         <Pressable
-          style={s.scoutFab}
+          style={[s.scoutPill, { backgroundColor: theme.red }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             openScout();
           }}
+          hitSlop={{ top: 8, bottom: 8, right: 12 }}
         >
-          <View style={[s.scoutCircle, { backgroundColor: theme.red }]}>
-            <View style={{ width: 22, height: 22 }}>
-              <View style={{ position: 'absolute', width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: '#fff' }} />
-              <View style={{ position: 'absolute', left: 10, top: 3, width: 2, height: 8, backgroundColor: '#fff', borderRadius: 1 }} />
-              <View style={{ position: 'absolute', left: 10, top: 11, width: 2, height: 8, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', top: 10, left: 11, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', top: 10, left: 3, width: 8, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
-            </View>
+          <View style={{ width: 28, height: 28 }}>
+            <View style={{ position: 'absolute', width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#fff' }} />
+            <View style={{ position: 'absolute', left: 13, top: 4, width: 2, height: 9, backgroundColor: '#fff', borderRadius: 1 }} />
+            <View style={{ position: 'absolute', left: 13, top: 15, width: 2, height: 9, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+            <View style={{ position: 'absolute', top: 13, left: 15, width: 9, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
+            <View style={{ position: 'absolute', top: 13, left: 4, width: 9, height: 2, backgroundColor: '#fff', opacity: 0.4, borderRadius: 1 }} />
           </View>
-          <View style={{ position: 'relative' }}>
-            {/* Black stroke copies */}
-            {[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]].map(([x,y],i) => (
-              <Text key={i} style={[s.scoutLabel, { color: '#000', position: 'absolute', left: x, top: y }]}>SCOUT</Text>
-            ))}
-            <Text style={s.scoutLabel}>SCOUT</Text>
-          </View>
+          <Text style={s.scoutPillLabel}>SCOUT</Text>
         </Pressable>
       )}
 
@@ -114,33 +107,30 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Scout FAB
-  scoutFab: {
+  // Scout FAB — pill that bleeds off left edge, icon stacked above text
+  scoutPill: {
     position: 'absolute',
-    left: 13,
-    bottom: 20,
+    left: -38,
+    bottom: 30,
     alignItems: 'center',
-    gap: 3,
-  },
-  scoutCircle: {
-    width: 53,
-    height: 53,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    paddingLeft: 47,
+    paddingRight: 17,
+    paddingTop: 12,
+    paddingBottom: 10,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#EF5350',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 10,
   },
-  scoutLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  scoutPillLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: -0.2,
     color: '#fff',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
 });

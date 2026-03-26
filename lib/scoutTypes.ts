@@ -27,6 +27,19 @@ export type ScoutMessage = {
 
 export type ScoutContext = {
   currentScreen: 'ride' | 'trip' | 'garage' | 'other';
+  isVoiceInput: boolean;
+  isCrashAlertActive: boolean;
+  rideState: {
+    isRecording: boolean;
+    isPaused: boolean;
+    isNavigating: boolean;
+    speedMph: number;
+    distanceMiles: number;
+    elapsedSeconds: number;
+    remainingDistanceMiles: number;
+    eta: string | null;
+    destinationName: string | null;
+  } | null;
   bikes: Bike[];
   activeBike: Bike | null;
   currentLocation: { lat: number; lng: number; city?: string } | null;

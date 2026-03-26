@@ -23,7 +23,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import Mapbox, { Camera, CircleLayer, LineLayer, MapView, MarkerView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+let Mapbox: any, Camera: any, CircleLayer: any, LineLayer: any, MapView: any, MarkerView: any, PointAnnotation: any, ShapeSource: any;
+let _mapboxAvailable = false;
+try {
+  const MB = require('@rnmapbox/maps');
+  Mapbox = MB.default ?? MB;
+  Camera = MB.Camera; CircleLayer = MB.CircleLayer; LineLayer = MB.LineLayer;
+  MapView = MB.MapView; MarkerView = MB.MarkerView; PointAnnotation = MB.PointAnnotation; ShapeSource = MB.ShapeSource;
+  _mapboxAvailable = true;
+} catch {}
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -122,9 +130,22 @@ export default function TripPlanner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
+
+  // Fallback when Mapbox native module is not available (Expo Go)
+  if (!_mapboxAvailable) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Feather name="map" size={48} color={theme.textMuted} />
+        <Text style={{ color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>Map Unavailable</Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+          Trip Planner requires a dev build for map features. Scout and Garage work in Expo Go.
+        </Text>
+      </View>
+    );
+  }
   const { routes: savedRoutes, addRoute, loading: routesStoreLoading, setRoutes, setLoading: setRoutesLoading } = useRoutesStore();
   const userId = user?.id ?? 'local';
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<any>(null);
   const panelScrollRef = useRef<ScrollView>(null);
   const isDark = theme.bg === darkTheme.bg;
   const mapStyle = useMapStyleStore((s) => s.mapStyle);
@@ -260,16 +281,16 @@ export default function TripPlanner() {
   // Full-screen map mode
   const [fullScreen, setFullScreen] = useState(false);
 
-  // Scroll to Add Stop area when a waypoint is added
+  // Scroll to Add Stop area when user manually adds a single stop (not bulk load)
   const prevWaypointCount = useRef(waypoints.length);
   const addStopRef = useRef<View>(null);
   useEffect(() => {
-    if (waypoints.length > prevWaypointCount.current) {
+    const diff = waypoints.length - prevWaypointCount.current;
+    // Only scroll when exactly 1 stop was added (manual add, not bulk import)
+    if (diff === 1) {
       if (waypoints.length >= MAX_WAYPOINTS) {
-        // At limit — scroll to top so user sees the banner
         setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: true }), 300);
       } else {
-        // Scroll to the Add Stop anchor
         setTimeout(() => {
           addStopRef.current?.measureLayout(
             panelScrollRef.current as any,
@@ -1087,7 +1108,7 @@ export default function TripPlanner() {
             <ShapeSource
               id="tp-construction-src"
               shape={constructionGeoJSON}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);

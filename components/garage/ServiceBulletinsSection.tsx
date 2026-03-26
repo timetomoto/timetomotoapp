@@ -269,7 +269,7 @@ export default function ServiceBulletinsSection({ bike, onCountChange }: { bike:
           <Text style={[s.emptySubtitle, { color: theme.textSecondary }]}>
             NHTSA has no records for{' '}
             <Text style={{ fontWeight: '700' }}>{result.nhtsaMake} {result.nhtsaModel}</Text>.
-            This may mean NHTSA doesn't cover this make/model, or no issues have been reported.
+            This may mean NHTSA doesn't cover this make/model, or no issues have been reported. If the name looks wrong, edit your bike's year, make, or model to match the manufacturer's exact name.
           </Text>
           <Pressable style={[s.tsbBtn, { borderColor: theme.border }]} onPress={openTSBSearch}>
             <Feather name="external-link" size={13} color={theme.textSecondary} />

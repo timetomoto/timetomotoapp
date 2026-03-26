@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Platform,
@@ -20,6 +20,7 @@ import ModificationsSection from '../../components/garage/ModificationsSection';
 import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSection';
 import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
+import { useScoutStore } from '../../lib/scoutStore';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
@@ -204,7 +205,7 @@ export default function GarageScreen() {
               style={styles.chipRow}
               contentContainerStyle={styles.chipContent}
             >
-              {bikes.map((bike) => (
+              {[...bikes].sort((a, b) => a.id === selectedBikeId ? -1 : b.id === selectedBikeId ? 1 : 0).map((bike) => (
                 <Pressable
                   key={bike.id}
                   style={[
@@ -288,6 +289,23 @@ export default function GarageScreen() {
               </View>
 
             </View>
+
+            {/* ASK SCOUT about this bike */}
+            <Pressable
+              style={[styles.askScoutBtn, { borderColor: theme.red }]}
+              onPress={() => {
+                const bike = selectedBike;
+                const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+                // Select this bike so Scout context picks it up
+                useGarageStore.getState().selectBike(bike.id);
+                useScoutStore.getState().openScout({
+                  initialMessage: `Tell me about my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''} — specs, maintenance, modifications, and service intervals.`,
+                });
+              }}
+            >
+              <Feather name="compass" size={14} color={theme.red} />
+              <Text style={[styles.askScoutBtnText, { color: theme.red }]}>ASK SCOUT ABOUT THIS BIKE</Text>
+            </Pressable>
 
             {/* Collapsible sections */}
                 {[
@@ -576,5 +594,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-
+  askScoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 12,
+    marginBottom: 12,
+    marginHorizontal: 16,
+  },
+  askScoutBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
 });
