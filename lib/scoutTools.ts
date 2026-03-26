@@ -893,15 +893,25 @@ export async function executeScoutTool(
         parts.push(`Bike: ${label}${isActive ? ' (active)' : ' (not active)'}`);
         if (bike.odometer) parts.push(`Odometer: ${bike.odometer.toLocaleString()} mi`);
         if (Object.keys(specs).length > 0) parts.push(`Specs: ${JSON.stringify(specs)}`);
-        // Only include maintenance/intervals for the active bike (they're loaded per-bike)
+        // Include maintenance and modifications for the queried bike
+        const userId = garageStore.bikes[0]?.user_id ?? 'local';
+        const maintenance = isActive
+          ? context.recentMaintenanceLogs.slice(0, 10)
+          : await loadMaintenance(bike.id, userId);
+        if (maintenance.length > 0) {
+          const mList = maintenance.slice(0, 10)
+            .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}${m.cost ? ` ($${m.cost})` : ''}`)
+            .join('; ');
+          parts.push(`Recent maintenance: ${mList}`);
+        }
+        const mods = await loadModifications(bike.id, userId);
+        if (mods.length > 0) {
+          const modList = mods
+            .map((m) => `${m.title}${m.brand ? ` (${m.brand})` : ''}${m.cost ? ` $${m.cost}` : ''}`)
+            .join('; ');
+          parts.push(`Modifications: ${modList}`);
+        }
         if (isActive) {
-          const maintenance = context.recentMaintenanceLogs.slice(0, 10);
-          if (maintenance.length > 0) {
-            const mList = maintenance
-              .map((m) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`)
-              .join('; ');
-            parts.push(`Recent maintenance: ${mList}`);
-          }
           const intervals = context.serviceIntervals;
           if (intervals) parts.push(`Service intervals: ${JSON.stringify(intervals)}`);
         }
