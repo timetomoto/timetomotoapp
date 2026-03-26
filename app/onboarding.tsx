@@ -101,7 +101,7 @@ function Screen2() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <View style={s.twoLineBlock}>
+      <View style={[s.twoLineBlock, { marginTop: 20 }]}>
         <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
           <Feather name="map" size={28} color={theme.red} />
         </View>
