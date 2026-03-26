@@ -10,17 +10,26 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Mapbox, {
-  Camera,
-  CircleLayer,
-  LineLayer,
-  LocationPuck,
-  MapView,
-  PointAnnotation,
-  RasterLayer,
-  RasterSource,
-  ShapeSource,
-} from '@rnmapbox/maps';
+let Mapbox: any;
+let Camera: any, CircleLayer: any, LineLayer: any, LocationPuck: any, MapView: any;
+let PointAnnotation: any, RasterLayer: any, RasterSource: any, ShapeSource: any;
+let _mapboxAvailable = false;
+try {
+  const MB = require('@rnmapbox/maps');
+  Mapbox = MB.default ?? MB;
+  Camera = MB.Camera;
+  CircleLayer = MB.CircleLayer;
+  LineLayer = MB.LineLayer;
+  LocationPuck = MB.LocationPuck;
+  MapView = MB.MapView;
+  PointAnnotation = MB.PointAnnotation;
+  RasterLayer = MB.RasterLayer;
+  RasterSource = MB.RasterSource;
+  ShapeSource = MB.ShapeSource;
+  _mapboxAvailable = true;
+} catch {
+  // Mapbox native module not available (Expo Go) — ride screen shows fallback
+}
 import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
@@ -69,10 +78,14 @@ import { speakResponse } from '../../lib/scoutVoice';
 import { useScoutStore } from '../../lib/scoutStore';
 
 // ---------------------------------------------------------------------------
-// Mapbox init — runs once
+// Mapbox init — runs once (skip if native module unavailable)
 // ---------------------------------------------------------------------------
-Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
-Mapbox.setTelemetryEnabled(false);
+if (_mapboxAvailable && Mapbox) {
+  try {
+    Mapbox.setAccessToken(process.env.EXPO_PUBLIC_MAPBOX_TOKEN ?? '');
+    Mapbox.setTelemetryEnabled(false);
+  } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -309,6 +322,19 @@ function RecordScreen({
 export default function RideScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+
+  // Fallback when Mapbox native module is not available (Expo Go)
+  if (!_mapboxAvailable) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+        <Feather name="map" size={48} color={theme.textMuted} />
+        <Text style={{ color: theme.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 16 }}>Map Unavailable</Text>
+        <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
+          The Ride screen requires a dev build for map features. All other screens work in Expo Go.
+        </Text>
+      </SafeAreaView>
+    );
+  }
   const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
   const { mapStyle: globalMapStyleUrl, setMapStyle: setGlobalMapStyle } = useMapStyleStore();
 
@@ -573,8 +599,8 @@ export default function RideScreen() {
     toastTimer.current = setTimeout(() => setToastMsg(''), durationMs);
   }
 
-  const mapRef       = useRef<Mapbox.MapView>(null);
-  const cameraRef    = useRef<Mapbox.Camera>(null);
+  const mapRef       = useRef<any>(null);
+  const cameraRef    = useRef<any>(null);
   const [mapStyleReady, setMapStyleReady] = useState(false);
 
   // ── Compass / map orientation ──
@@ -1207,7 +1233,7 @@ export default function RideScreen() {
             if (mapStyleReady) handleMapIdle();
           }}
           onTouchStart={() => { userIsPanning.current = true; }}
-          onLongPress={(e) => {
+          onLongPress={(e: any) => {
             const geom = e.geometry as any;
             const coords = geom?.coordinates;
             if (coords) handleDropPin({ latitude: coords[1], longitude: coords[0] });
@@ -1249,7 +1275,7 @@ export default function RideScreen() {
             <ShapeSource
               id="fuel-stations-src"
               shape={fuelStationsGeoJsonData}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 const dist = lastKnownLocation
@@ -1276,7 +1302,7 @@ export default function RideScreen() {
             <ShapeSource
               id="food-places-src"
               shape={foodPlacesGeoJsonData}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 const dist = lastKnownLocation
@@ -1303,7 +1329,7 @@ export default function RideScreen() {
             <ShapeSource
               id="construction-src"
               shape={constructionGeoJSON}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);

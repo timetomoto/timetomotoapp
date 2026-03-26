@@ -23,7 +23,15 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import Mapbox, { Camera, CircleLayer, LineLayer, MapView, MarkerView, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+let Mapbox: any, Camera: any, CircleLayer: any, LineLayer: any, MapView: any, MarkerView: any, PointAnnotation: any, ShapeSource: any;
+let _mapboxAvailable = false;
+try {
+  const MB = require('@rnmapbox/maps');
+  Mapbox = MB.default ?? MB;
+  Camera = MB.Camera; CircleLayer = MB.CircleLayer; LineLayer = MB.LineLayer;
+  MapView = MB.MapView; MarkerView = MB.MarkerView; PointAnnotation = MB.PointAnnotation; ShapeSource = MB.ShapeSource;
+  _mapboxAvailable = true;
+} catch {}
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -124,7 +132,7 @@ export default function TripPlanner() {
   const { user } = useAuthStore();
   const { routes: savedRoutes, addRoute, loading: routesStoreLoading, setRoutes, setLoading: setRoutesLoading } = useRoutesStore();
   const userId = user?.id ?? 'local';
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<any>(null);
   const panelScrollRef = useRef<ScrollView>(null);
   const isDark = theme.bg === darkTheme.bg;
   const mapStyle = useMapStyleStore((s) => s.mapStyle);
@@ -1087,7 +1095,7 @@ export default function TripPlanner() {
             <ShapeSource
               id="tp-construction-src"
               shape={constructionGeoJSON}
-              onPress={(e) => {
+              onPress={(e: any) => {
                 const props = e.features?.[0]?.properties;
                 if (!props) return;
                 Alert.alert(props.title ?? 'Construction', `${props.description ?? ''}${props.severity ? `\nSeverity: ${props.severity}` : ''}`);
