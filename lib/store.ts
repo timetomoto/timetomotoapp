@@ -269,6 +269,7 @@ export interface Bike {
 
 const LOCAL_BIKES_KEY    = 'ttm_bikes_local';
 const LOCAL_CONTACTS_KEY = 'ttm_contacts_local';
+const SELECTED_BIKE_KEY  = 'ttm_selected_bike_id';
 
 interface GarageState {
   bikes: Bike[];
@@ -294,10 +295,12 @@ export const useGarageStore = create<GarageState>((set, get) => ({
 
   fetchBikes: async (userId) => {
     set({ loading: true });
+    // Restore persisted bike selection
+    const persisted = await AsyncStorage.getItem(SELECTED_BIKE_KEY).catch(() => null);
     if (userId === 'local') {
       const stored = await AsyncStorage.getItem(LOCAL_BIKES_KEY);
       const bikes: Bike[] = stored ? JSON.parse(stored) : [];
-      const current = get().selectedBikeId;
+      const current = persisted ?? get().selectedBikeId;
       const selected = (current && bikes.some((b) => b.id === current)) ? current : (bikes[0]?.id ?? null);
       set({ bikes, selectedBikeId: selected, loading: false });
       return;
@@ -308,15 +311,17 @@ export const useGarageStore = create<GarageState>((set, get) => ({
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!error && data) {
-      const current = get().selectedBikeId;
+      const current = persisted ?? get().selectedBikeId;
       const selected = (current && data.some((b) => b.id === current)) ? current : (data[0]?.id ?? null);
       set({ bikes: data as Bike[], selectedBikeId: selected });
     }
     set({ loading: false });
   },
 
-  addBike: (bike) =>
-    set((s) => ({ bikes: [bike, ...s.bikes], selectedBikeId: bike.id })),
+  addBike: (bike) => {
+    set((s) => ({ bikes: [bike, ...s.bikes], selectedBikeId: bike.id }));
+    AsyncStorage.setItem(SELECTED_BIKE_KEY, bike.id).catch(() => {});
+  },
 
   updateBike: (bike) =>
     set((s) => ({ bikes: s.bikes.map((b) => b.id === bike.id ? bike : b) })),
@@ -339,7 +344,10 @@ export const useGarageStore = create<GarageState>((set, get) => ({
     });
   },
 
-  selectBike: (id) => set({ selectedBikeId: id }),
+  selectBike: (id) => {
+    set({ selectedBikeId: id });
+    AsyncStorage.setItem(SELECTED_BIKE_KEY, id).catch(() => {});
+  },
   bumpMaintenanceRefresh: () => set((s) => ({ maintenanceRefresh: s.maintenanceRefresh + 1 })),
   bumpGarageDataRefresh: () => set((s) => ({ garageDataRefresh: s.garageDataRefresh + 1 })),
 }));
