@@ -110,12 +110,12 @@ const s = StyleSheet.create({
   // Scout FAB — pill that bleeds off left edge, icon stacked above text
   scoutPill: {
     position: 'absolute',
-    left: -18,
+    left: -28,
     bottom: 30,
     alignItems: 'center',
     gap: 4,
-    paddingLeft: 28,
-    paddingRight: 16,
+    paddingLeft: 43,
+    paddingRight: 21,
     paddingTop: 12,
     paddingBottom: 10,
     borderRadius: 28,
