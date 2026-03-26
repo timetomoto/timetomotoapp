@@ -9,7 +9,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 LogBox.ignoreLogs(['InteractionManager has been deprecated']);
 LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered']);
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ONBOARDING_KEY } from './onboarding';
+import { ONBOARDING_KEY, onboardingKey } from './onboarding';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Location from 'expo-location';
@@ -22,6 +22,7 @@ import { endShare } from '../lib/liveShare';
 import { stopBackgroundLocation } from '../lib/backgroundTasks';
 import CrashAlertModal from '../components/safety/CrashAlertModal';
 import ScoutPanel from '../components/scout/ScoutPanel';
+import AnimatedSplash from '../components/common/AnimatedSplash';
 import { useTheme } from '../lib/useTheme';
 import { SAFETY_CRASH_DETECTION_KEY, SAFETY_LIVE_SHARE_KEY } from '../lib/storageKeys';
 
@@ -66,9 +67,13 @@ function AuthGuard() {
         }
       },
     );
-    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => {
-      if (mounted) setOnboardingDone(v === 'done');
-    }).catch((e) => console.error('onboarding key read failed:', e));
+    // Check per-user key first, fall back to legacy key
+    (async () => {
+      const userId = (await supabase.auth.getSession()).data.session?.user?.id;
+      const perUser = await AsyncStorage.getItem(onboardingKey(userId)).catch(() => null);
+      const legacy = await AsyncStorage.getItem(ONBOARDING_KEY).catch(() => null);
+      if (mounted) setOnboardingDone(perUser === 'done' || legacy === 'done');
+    })();
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
@@ -268,10 +273,16 @@ function SafetyService() {
 function RootLayoutInner() {
   const { mode, theme } = useTheme();
   const { loadSavedMode } = useThemeStore();
+  const [appReady, setAppReady] = useState(false);
   useEffect(() => {
     loadSavedMode();
     useMapStyleStore.getState().loadSavedMapStyle();
+    // Show splash for minimum 1.5s while auth initializes
+    const timer = setTimeout(() => setAppReady(true), 1500);
+    return () => clearTimeout(timer);
   }, []);
+
+  if (!appReady) return <AnimatedSplash />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.bg }}>

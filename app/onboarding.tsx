@@ -23,70 +23,123 @@ import { StyledInput, MakeAutocomplete, BikeTypeSelector } from '../components/g
 import ContactPickerSheet from '../components/contacts/ContactPickerSheet';
 import type { BikeType, EmergencyContact } from '../lib/store';
 
+// Per-user onboarding key — prevents re-showing on shared devices
+export function onboardingKey(userId?: string | null) {
+  return `@ttm/onboarding_v1_${userId ?? 'local'}`;
+}
+// Legacy key for migration
 export const ONBOARDING_KEY = '@ttm/onboarding_v1';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const LOGO_W = Math.round(SCREEN_W * 0.65);
-const LOGO_H = Math.round(LOGO_W * (31 / 162)); // preserve aspect ratio
+const LOGO_H = Math.round(LOGO_W * (31 / 162));
 
 // ---------------------------------------------------------------------------
-// Screen 1 — Welcome
+// Screen 1 — Meet Scout
 // ---------------------------------------------------------------------------
 
 function Screen1() {
   const { theme } = useTheme();
-  const features = [
-    { icon: 'map' as const, title: 'Plan & Ride', body: 'Trip planning, route weather, and turn-by-turn navigation.' },
-    { icon: 'tool' as const, title: 'Know Your Bike', body: 'Specs, service intervals, and maintenance tracking — all in one place.' },
-    { icon: 'shield' as const, title: 'Ride Protected', body: 'Crash detection with instant alerts to your emergency contacts.' },
-  ];
-
   return (
     <View style={s.screen}>
       <View style={s.logoBlock}>
         <TimetomotoLogo width={LOGO_W} height={LOGO_H} disableLink />
       </View>
 
-      <View style={s.featureList}>
-        {features.map((f) => (
-          <View key={f.icon} style={[s.featureRow, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-            <View style={[s.featureIcon, { backgroundColor: theme.red + '18' }]}>
-              <Feather name={f.icon} size={16} color={theme.red} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.featureTitle, { color: theme.textPrimary }]}>{f.title}</Text>
-              <Text style={[s.featureText, { color: theme.textSecondary }]}>{f.body}</Text>
-            </View>
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
+      <Text style={[s.screenBody, { color: theme.textSecondary }]}>
+        Your riding assistant. Plan routes, check weather, manage your bikes — just ask.
+      </Text>
+
+      {/* Mock Scout conversation */}
+      <View style={s.mockChat}>
+        <View style={[s.mockBubbleUser, { backgroundColor: theme.red }]}>
+          <Text style={s.mockBubbleUserText}>Plan a ride from Austin to Fredericksburg</Text>
+        </View>
+        <View style={[s.mockBubbleBot, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
+          <View style={[s.mockAvatar, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+            <Feather name="compass" size={10} color={theme.red} />
           </View>
-        ))}
+          <View style={{ flex: 1 }}>
+            <Text style={[s.mockBubbleBotText, { color: theme.textPrimary }]}>
+              Route set. 97 miles, about 2 hours.{'\n'}Want to check weather for Saturday?
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Screen 2 — Add your bike
+// Screen 2 — What You Get (two bold lines)
 // ---------------------------------------------------------------------------
 
 function Screen2() {
   const { theme } = useTheme();
+  return (
+    <View style={s.screen}>
+      <View style={s.twoLineBlock}>
+        <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
+          <Feather name="map" size={28} color={theme.red} />
+        </View>
+        <Text style={[s.twoLineHeadline, { color: theme.textPrimary }]}>
+          Plan routes. Check weather.{'\n'}Just ride.
+        </Text>
+        <Text style={[s.twoLineBody, { color: theme.textSecondary }]}>
+          Trip planning, turn-by-turn navigation, and route weather — all with Scout or on the map.
+        </Text>
+      </View>
+
+      <View style={[s.divider, { backgroundColor: theme.border }]} />
+
+      <View style={s.twoLineBlock}>
+        <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
+          <Feather name="shield" size={28} color={theme.red} />
+        </View>
+        <Text style={[s.twoLineHeadline, { color: theme.textPrimary }]}>
+          Crash detection. Check-in timers.{'\n'}Your people know you're safe.
+        </Text>
+        <Text style={[s.twoLineBody, { color: theme.textSecondary }]}>
+          Automatic SMS alerts to your emergency contacts if something goes wrong.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen 3 — Add your first bike + emergency contact
+// ---------------------------------------------------------------------------
+
+function Screen3() {
+  const { theme } = useTheme();
   const { user } = useAuthStore();
   const { addBike } = useGarageStore();
+  const { saveContacts } = useSafetyStore();
+
+  // Bike form
   const [make, setMake]             = useState('');
   const [model, setModel]           = useState('');
   const [year, setYear]             = useState(String(new Date().getFullYear()));
   const [nickname, setNickname]     = useState('');
   const [bikeType, setBikeType]     = useState<BikeType | null>(null);
   const [tankSize, setTankSize]     = useState('');
-  const [saved, setSaved]           = useState(false);
-  const [saving, setSaving]         = useState(false);
+  const [bikeSaved, setBikeSaved]   = useState(false);
+  const [bikeSaving, setBikeSaving] = useState(false);
 
-  async function handleSave() {
+  // Contact form
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [contactName, setContactName]   = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactSaving, setContactSaving] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+
+  async function handleSaveBike() {
     if (!make.trim() || !model.trim()) return;
-    setSaving(true);
+    setBikeSaving(true);
     Keyboard.dismiss();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
     const userId = user?.id;
     if (userId) {
       const { data } = await supabase
@@ -104,11 +157,38 @@ function Screen2() {
         .single();
       if (data) addBike(data);
     }
-    setSaved(true);
-    setSaving(false);
+    setBikeSaved(true);
+    setBikeSaving(false);
   }
 
-  const canSave = make.trim().length > 0 && model.trim().length > 0 && !saving;
+  async function handleAddContact() {
+    if (!contactName.trim() || !contactPhone.trim() || contacts.length >= 3) return;
+    setContactSaving(true);
+    Keyboard.dismiss();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const updated = [...contacts, { name: contactName.trim(), phone: contactPhone.trim() }];
+    const userId = user?.id ?? 'local';
+    await saveContacts(userId, updated);
+    setContacts(updated);
+    setContactName('');
+    setContactPhone('');
+    setContactSaving(false);
+  }
+
+  function handlePickerSelect(pickedName: string, pickedPhone: string) {
+    setContactName(pickedName);
+    setContactPhone(pickedPhone);
+    setShowPicker(false);
+  }
+
+  function handleRemoveContact(idx: number) {
+    const updated = contacts.filter((_, i) => i !== idx);
+    setContacts(updated);
+    saveContacts(user?.id ?? 'local', updated);
+  }
+
+  const canSaveBike = make.trim().length > 0 && model.trim().length > 0 && !bikeSaving;
+  const canAddContact = contactName.trim().length > 0 && contactPhone.trim().length > 0 && !contactSaving && contacts.length < 3;
 
   return (
     <ScrollView
@@ -117,135 +197,57 @@ function Screen2() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <Feather name="tool" size={36} color={theme.red} />
-      </View>
-      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>ADD YOUR BIKE</Text>
+      {/* Bike section */}
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Add your first bike</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
-        Get personalized fuel range, maintenance tracking, and ride stats.
+        Specs, maintenance, and service intervals — unlocked when your bike is added.
       </Text>
 
       <View style={s.form}>
         <MakeAutocomplete value={make} onChange={setMake} />
-        <StyledInput
-          value={model}
-          onChangeText={setModel}
-          placeholder="Model (e.g. Tiger 900)"
-          autoCorrect={false}
-        />
-        <StyledInput
-          value={year}
-          onChangeText={setYear}
-          placeholder="Year"
-          keyboardType="number-pad"
-          maxLength={4}
-        />
-        <StyledInput
-          value={nickname}
-          onChangeText={setNickname}
-          placeholder="Nickname (optional)"
-          autoCorrect={false}
-          autoCapitalize="words"
-        />
+        <StyledInput value={model} onChangeText={setModel} placeholder="Model (e.g. Tiger 900)" autoCorrect={false} />
+        <StyledInput value={year} onChangeText={setYear} placeholder="Year" keyboardType="number-pad" maxLength={4} />
+        <StyledInput value={nickname} onChangeText={setNickname} placeholder="Nickname (optional)" autoCorrect={false} autoCapitalize="words" />
 
         <Text style={[s.fieldLabel, { color: theme.textSecondary }]}>BIKE TYPE</Text>
         <BikeTypeSelector value={bikeType} onChange={setBikeType} />
 
         <Text style={[s.fieldLabel, { color: theme.textSecondary, marginTop: 16 }]}>TANK SIZE</Text>
-        <StyledInput
-          value={tankSize}
-          onChangeText={setTankSize}
-          placeholder="Gallons (optional)"
-          keyboardType="decimal-pad"
-        />
+        <StyledInput value={tankSize} onChangeText={setTankSize} placeholder="Gallons (optional)" keyboardType="decimal-pad" />
 
         <Pressable
-          style={[s.formBtn, { backgroundColor: theme.red }, !canSave && s.formBtnDisabled]}
-          onPress={handleSave}
-          disabled={!canSave || saved}
+          style={[s.formBtn, { backgroundColor: theme.red }, !canSaveBike && s.formBtnDisabled]}
+          onPress={handleSaveBike}
+          disabled={!canSaveBike || bikeSaved}
         >
-          {saved ? (
-            <View style={s.savedInlineRow}>
-              <Feather name="check" size={16} color={theme.white} />
+          {bikeSaved ? (
+            <View style={s.savedRow}>
+              <Feather name="check" size={16} color="#fff" />
               <Text style={s.formBtnText}>Bike Saved</Text>
             </View>
           ) : (
-            <Text style={s.formBtnText}>{saving ? 'SAVING...' : 'SAVE BIKE'}</Text>
+            <Text style={s.formBtnText}>{bikeSaving ? 'SAVING...' : 'SAVE BIKE'}</Text>
           )}
         </Pressable>
       </View>
-    </ScrollView>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// Screen 3 — Emergency contact
-// ---------------------------------------------------------------------------
+      {/* Divider */}
+      <View style={[s.sectionDivider, { backgroundColor: theme.border }]} />
 
-function Screen3() {
-  const { theme } = useTheme();
-  const { user } = useAuthStore();
-  const { saveContacts } = useSafetyStore();
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [name, setName]   = useState('');
-  const [phone, setPhone] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-
-  async function handleAdd() {
-    if (!name.trim() || !phone.trim() || contacts.length >= 3) return;
-    setSaving(true);
-    Keyboard.dismiss();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    const updated = [...contacts, { name: name.trim(), phone: phone.trim() }];
-    const userId = user?.id ?? 'local';
-    await saveContacts(userId, updated);
-    setContacts(updated);
-    setName('');
-    setPhone('');
-    setSaving(false);
-  }
-
-  function handlePickerSelect(pickedName: string, pickedPhone: string) {
-    setName(pickedName);
-    setPhone(pickedPhone);
-    setShowPicker(false);
-  }
-
-  function handleRemove(idx: number) {
-    const updated = contacts.filter((_, i) => i !== idx);
-    setContacts(updated);
-    const userId = user?.id ?? 'local';
-    saveContacts(userId, updated);
-  }
-
-  const canAdd = name.trim().length > 0 && phone.trim().length > 0 && !saving && contacts.length < 3;
-
-  return (
-    <ScrollView
-      style={{ width: SCREEN_W }}
-      contentContainerStyle={s.scrollScreen}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={[s.screenIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <Feather name="shield" size={36} color={theme.red} />
-      </View>
-      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>STAY SAFE OUT THERE</Text>
+      {/* Emergency contact section */}
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Emergency contact</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
-        Add trusted contacts who'll be notified instantly if crash detection triggers.
+        Who should we notify if crash detection triggers?
       </Text>
 
       <View style={s.form}>
-        {/* Added contacts */}
         {contacts.map((c, i) => (
           <View key={i} style={[s.contactPill, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[s.contactPillName, { color: theme.textPrimary }]}>{c.name}</Text>
               <Text style={[s.contactPillPhone, { color: theme.textMuted }]}>{c.phone}</Text>
             </View>
-            <Pressable onPress={() => handleRemove(i)} hitSlop={8}>
+            <Pressable onPress={() => handleRemoveContact(i)} hitSlop={8}>
               <Feather name="x" size={16} color={theme.textMuted} />
             </Pressable>
           </View>
@@ -253,43 +255,20 @@ function Screen3() {
 
         {contacts.length < 3 && (
           <>
-            {/* Load from contacts button */}
-            <Pressable
-              style={[s.outlineBtn, { borderColor: theme.border }]}
-              onPress={() => setShowPicker(true)}
-            >
+            <Pressable style={[s.outlineBtn, { borderColor: theme.border }]} onPress={() => setShowPicker(true)}>
               <Feather name="users" size={14} color={theme.textSecondary} />
               <Text style={[s.outlineBtnText, { color: theme.textSecondary }]}>LOAD FROM CONTACTS</Text>
             </Pressable>
-
-            {/* Manual entry */}
-            <StyledInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Contact name"
-              autoCorrect={false}
-            />
-            <StyledInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="Phone number"
-              keyboardType="phone-pad"
-            />
+            <StyledInput value={contactName} onChangeText={setContactName} placeholder="Contact name" autoCorrect={false} />
+            <StyledInput value={contactPhone} onChangeText={setContactPhone} placeholder="Phone number" keyboardType="phone-pad" />
             <Pressable
-              style={[s.formBtn, { backgroundColor: theme.red }, !canAdd && s.formBtnDisabled]}
-              onPress={handleAdd}
-              disabled={!canAdd}
+              style={[s.formBtn, { backgroundColor: theme.red }, !canAddContact && s.formBtnDisabled]}
+              onPress={handleAddContact}
+              disabled={!canAddContact}
             >
-              <Text style={s.formBtnText}>{saving ? 'SAVING...' : 'ADD CONTACT'}</Text>
+              <Text style={s.formBtnText}>{contactSaving ? 'SAVING...' : 'ADD CONTACT'}</Text>
             </Pressable>
           </>
-        )}
-
-        {contacts.length >= 3 && (
-          <View style={s.savedInlineRow}>
-            <Feather name="check-circle" size={16} color={theme.green} />
-            <Text style={[s.formBtnText, { color: theme.green }]}>All contacts added</Text>
-          </View>
         )}
 
         <Text style={[s.privacyNote, { color: theme.textMuted }]}>
@@ -298,10 +277,7 @@ function Screen3() {
       </View>
 
       {showPicker && (
-        <ContactPickerSheet
-          onClose={() => setShowPicker(false)}
-          onSelect={handlePickerSelect}
-        />
+        <ContactPickerSheet onClose={() => setShowPicker(false)} onSelect={handlePickerSelect} />
       )}
     </ScrollView>
   );
@@ -312,11 +288,10 @@ function Screen3() {
 // ---------------------------------------------------------------------------
 
 const SCREENS = [Screen1, Screen2, Screen3];
-const TITLES  = ['01 / 03', '02 / 03', '03 / 03'];
 
 export default function OnboardingScreen() {
   const { theme } = useTheme();
-  const { setOnboardingDone } = useAuthStore();
+  const { user, setOnboardingDone } = useAuthStore();
   const router   = useRouter();
   const listRef  = useRef<FlatList>(null);
   const [index, setIndex] = useState(0);
@@ -327,6 +302,9 @@ export default function OnboardingScreen() {
 
   async function finish() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Per-user key + legacy key for migration
+    const key = onboardingKey(user?.id);
+    await AsyncStorage.setItem(key, 'done');
     await AsyncStorage.setItem(ONBOARDING_KEY, 'done');
     setOnboardingDone(true);
     router.replace('/(tabs)/ride');
@@ -345,15 +323,14 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: theme.bg }]} edges={['top', 'bottom']}>
-      {/* Skip */}
+      {/* Top bar */}
       <View style={s.topBar}>
-        <Text style={[s.stepLabel, { color: theme.textSecondary }]}>{TITLES[index]}</Text>
-        <Pressable
-          onPress={finish}
-          style={s.skipBtn}
-          accessibilityLabel="Skip onboarding"
-          accessibilityRole="button"
-        >
+        <View style={s.dots}>
+          {SCREENS.map((_, i) => (
+            <View key={i} style={[s.dot, { backgroundColor: theme.border }, i === index && { width: 20, backgroundColor: theme.red }]} />
+          ))}
+        </View>
+        <Pressable onPress={finish} style={s.skipBtn} accessibilityLabel="Skip onboarding">
           <Text style={[s.skipText, { color: theme.textSecondary }]}>SKIP</Text>
         </Pressable>
       </View>
@@ -373,25 +350,11 @@ export default function OnboardingScreen() {
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
       />
 
-      {/* Dots */}
-      <View style={s.dots}>
-        {SCREENS.map((_, i) => (
-          <View key={i} style={[s.dot, { backgroundColor: theme.border }, i === index && { width: 20, backgroundColor: theme.red }]} />
-        ))}
-      </View>
-
       {/* CTA */}
       <View style={s.footer}>
-        <Pressable
-          style={[s.nextBtn, { backgroundColor: theme.red }]}
-          onPress={next}
-          accessibilityLabel={isLast ? 'Start riding' : 'Next'}
-          accessibilityRole="button"
-        >
-          <Text style={s.nextBtnText}>
-            {isLast ? "LET'S RIDE" : 'NEXT'}
-          </Text>
-          <Feather name={isLast ? 'check' : 'arrow-right'} size={18} color={theme.white} />
+        <Pressable style={[s.nextBtn, { backgroundColor: theme.red }]} onPress={next}>
+          <Text style={s.nextBtnText}>{isLast ? "LET'S RIDE" : 'NEXT'}</Text>
+          <Feather name={isLast ? 'check' : 'arrow-right'} size={18} color="#fff" />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -412,9 +375,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  stepLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7 },
   skipBtn: { paddingHorizontal: 4, paddingVertical: 8, minWidth: 44, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center' },
   skipText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+  dots: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  dot: { width: 6, height: 6, borderRadius: 3 },
 
   screen: {
     flex: 1,
@@ -428,52 +392,16 @@ const s = StyleSheet.create({
     paddingTop: 20,
     alignItems: 'center',
     flexGrow: 1,
+    paddingBottom: 40,
   },
 
   // Screen 1
-  logoBlock: { alignItems: 'center', marginBottom: 48 },
-  logoSub: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-    textAlign: 'center',
-    marginTop: 16,
-  },
-  featureList: { width: '100%', gap: 14 },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  featureIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureTitle: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  featureText: { fontSize: 13, lineHeight: 18 },
-
-  // Screens 2 & 3
-  screenIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
+  logoBlock: { alignItems: 'center', marginBottom: 40 },
   screenTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: 0.7,
-    marginBottom: 12,
+    letterSpacing: 0.5,
+    marginBottom: 10,
     textAlign: 'center',
   },
   screenBody: {
@@ -482,9 +410,62 @@ const s = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
+
+  // Mock chat
+  mockChat: { width: '100%', gap: 12, marginTop: 8 },
+  mockBubbleUser: {
+    alignSelf: 'flex-end',
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: '80%',
+  },
+  mockBubbleUserText: { color: '#fff', fontSize: 14, fontWeight: '500' },
+  mockBubbleBot: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    maxWidth: '90%',
+  },
+  mockAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  mockBubbleBotText: { fontSize: 14, lineHeight: 20 },
+
+  // Screen 2
+  twoLineBlock: { alignItems: 'center', paddingVertical: 24 },
+  twoLineIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  twoLineHeadline: { fontSize: 20, fontWeight: '700', textAlign: 'center', lineHeight: 28, marginBottom: 8 },
+  twoLineBody: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  divider: { width: 60, height: 1, marginVertical: 8 },
+
+  // Screen 3
+  sectionDivider: { width: '100%', height: 1, marginVertical: 28 },
   form: { width: '100%', gap: 12 },
-  helperText: { fontSize: 11, marginTop: -4, letterSpacing: 0.1 },
   fieldLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
+  formBtn: {
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 4,
+    minHeight: 50,
+  },
+  formBtnDisabled: { opacity: 0.45 },
+  formBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.7 },
+  savedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   contactPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -508,28 +489,6 @@ const s = StyleSheet.create({
   },
   outlineBtnText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   privacyNote: { fontSize: 11, textAlign: 'center', marginTop: 12 },
-  formBtn: {
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 4,
-    minHeight: 50,
-  },
-  formBtnDisabled: { opacity: 0.45 },
-  formBtnText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.7 },
-  savedInlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  // Dots
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
 
   // Footer
   footer: { paddingHorizontal: 24, paddingBottom: 8 },
