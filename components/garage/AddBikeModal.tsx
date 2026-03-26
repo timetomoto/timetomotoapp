@@ -463,6 +463,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
           await AsyncStorage.setItem('ttm_bikes_local', JSON.stringify(updated));
           setSaving(false);
           updateBike({ ...editBike, ...fields });
+          if (makeModelChanged) useGarageStore.getState().bumpGarageDataRefresh();
         } catch (e) { console.error('local bike edit failed:', e); setSaving(false); }
       } else {
         const updatePayload: Record<string, any> = {
@@ -484,6 +485,7 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
         setSaving(false);
         if (dbError) { setError(dbError.message); return; }
         updateBike({ ...editBike, ...fields });
+        if (makeModelChanged) useGarageStore.getState().bumpGarageDataRefresh();
       }
     } else if (user) {
       // Add new bike — Supabase

@@ -498,7 +498,7 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
     setLookupDone(s.specsLookedUp === true);
     setLookedUpAt(s.specsLookedUpAt ?? null);
     hasTriggered.current = false;
-  }, [bike.id, garageDataRefresh]);
+  }, [bike.id, bike.make, bike.model, bike.year, garageDataRefresh]);
 
   // Auto-lookup on first expand if not already done (or if previous lookup returned empty)
   useEffect(() => {
