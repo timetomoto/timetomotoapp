@@ -402,21 +402,21 @@ function ScoutPanelContent() {
       // Silent return if request was aborted (empty string from abortScoutRequest)
       if (!result.text) { setLoading(false); return; }
 
-      // Append nav hint before adding to store
-      let content = result.text;
+      // Always strip Gemini-generated nav hints (it often adds them unprompted)
+      let content = result.text
+        .replace(/\n*Head (over )?(to|on over to) (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Close Scout[^\n]*/gi, '')
+        .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Your route is ready[^\n]*/gi, '')
+        .replace(/\n*Check (the |your )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
+        .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
+        .trimEnd();
+
+      // Only append our nav hint after route-modifying tool calls
       const routeModified = result.toolsExecuted.some((t) => ROUTE_MODIFYING_TOOLS.has(t));
       if (routeModified) {
-        // Strip any Gemini-generated nav hints before appending ours
-        content = content
-          .replace(/\n*Head (over )?(to|on over to) (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Close Scout[^\n]*/gi, '')
-          .replace(/\n*Go to (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Your route is ready[^\n]*/gi, '')
-          .replace(/\n*Check (the |your )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Open (the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*Switch (over )?(to )?(the )?Trip Planner[^\n]*/gi, '')
-          .replace(/\n*You can (now )?(see|view|check|find) (it |this |the route )?(in |on )?(the )?Trip Planner[^\n]*/gi, '')
-          .trimEnd();
         content += '\n\nHead to Trip Planner to see your route.';
       }
 

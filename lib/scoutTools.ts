@@ -1276,7 +1276,14 @@ export async function executeScoutTool(
           const mins = Math.round((match.duration_seconds % 3600) / 60);
           parts.push(`Duration: ${hrs}h ${mins}m`);
         }
-        if (match.departure_time) parts.push(`Departure: ${match.departure_time}`);
+        if (match.departure_time) {
+          const dep = new Date(match.departure_time);
+          if (!isNaN(dep.getTime())) {
+            const dateStr = dep.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            const hasTime = dep.getHours() !== 0 || dep.getMinutes() !== 0;
+            parts.push(`Departure: ${dateStr}${hasTime ? ` at ${dep.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`);
+          }
+        }
         if (match.source) parts.push(`Source: ${match.source}`);
         parts.push(`Points: ${match.points.length}`);
         parts.push(`Created: ${new Date(match.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`);
@@ -1434,8 +1441,10 @@ function findSavedRoute(query: string) {
   const catMatch = allRoutes.find((r) => r.category?.toLowerCase().includes(q));
   if (catMatch) return catMatch;
 
-  // 3. Word-level match — split query into words, find route where most words match name+category
-  const queryWords = q.split(/[\s\-_]+/).filter((w) => w.length > 1);
+  // 3. Word-level match — split query into words, require at least half to match
+  const queryWords = q.split(/[\s\-_]+/).filter((w) => w.length > 2); // skip short words like "my", "to"
+  if (queryWords.length === 0) return null;
+  const minScore = Math.max(1, Math.ceil(queryWords.length / 2));
   let bestRoute: typeof allRoutes[0] | null = null;
   let bestScore = 0;
   for (const r of allRoutes) {
@@ -1443,7 +1452,7 @@ function findSavedRoute(query: string) {
     const score = queryWords.filter((w) => text.includes(w)).length;
     if (score > bestScore) { bestScore = score; bestRoute = r; }
   }
-  return bestScore > 0 ? bestRoute : null;
+  return bestScore >= minScore ? bestRoute : null;
 }
 
 function fmtTime(totalMinutes: number): string {
