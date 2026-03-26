@@ -10,6 +10,7 @@ import { fetchRouteWeather, sampleRouteCoordinates, hasRouteWeatherConcern, getR
 import { fetchHEREConditions } from './discoverStore';
 import { createRoute } from './routes';
 import { useServiceBulletinsStore, bulletinKey } from './serviceBulletinsStore';
+import { getOrFetchIntervals } from './serviceIntervalsFetcher';
 import type { ScoutContext, TripStop } from './scoutTypes';
 
 // Re-export from split files so existing imports from './scoutTools' still work
@@ -452,18 +453,14 @@ export async function executeScoutTool(
             .join('; ');
           parts.push(`Modifications: ${modList}`);
         }
-        // Load cached service intervals
-        const intervalCacheKey = `ttm_service_intervals_${bike.id}`;
+        // Load or fetch service intervals (fetches from Gemini if not cached)
         try {
-          const intervalRaw = await AsyncStorage.getItem(intervalCacheKey);
-          if (intervalRaw) {
-            const cached = JSON.parse(intervalRaw);
-            if (cached.items?.length > 0) {
-              const intervalList = cached.items
-                .map((it: any) => `${it.item}: ${it.interval}${it.notes ? ` (${it.notes})` : ''}`)
-                .join('\n  ');
-              parts.push(`Service intervals:\n  ${intervalList}`);
-            }
+          const intervals = await getOrFetchIntervals(bike.id, bike.year, bike.make, bike.model);
+          if (intervals && intervals.items.length > 0) {
+            const intervalList = intervals.items
+              .map((it) => `${it.item}: ${it.interval}${it.notes ? ` (${it.notes})` : ''}`)
+              .join('\n  ');
+            parts.push(`Service intervals:\n  ${intervalList}`);
           }
         } catch {}
 
