@@ -496,6 +496,9 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
 // PART B — Tool executor
 // ---------------------------------------------------------------------------
 
+// Gate for stop_ride two-step confirmation — prevents model from skipping confirmation
+let stopRideConfirmationPending = false;
+
 // Preference alias mapping
 const PREFERENCE_MAP: Record<string, string> = {
   scenic: 'scenic',
@@ -607,7 +610,9 @@ export async function executeScoutTool(
         if (results.length === 0) return `Could not find "${parameters.query}". Try a more specific place name.`;
         const place = results[0];
         const wp: TripStop = { name: parameters.label || place.name, lat: place.lat, lng: place.lng };
-        const waypoints = [...context.currentTrip.waypoints];
+        // Read LIVE waypoints from store (not stale context) so sequential calls see prior additions
+        const liveWaypoints = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWaypoints];
         const pos = parameters.position != null ? parameters.position : waypoints.length;
         waypoints.splice(pos, 0, wp);
         tripStore.setTripWaypoints(waypoints);
@@ -1206,12 +1211,19 @@ export async function executeScoutTool(
 
         const confirmed = parameters.confirmed as boolean;
         if (!confirmed) {
+          stopRideConfirmationPending = true;
           const dist = calcDistance(safety.recordedPoints);
           return `You've ridden ${dist.toFixed(1)} miles. Are you sure you want to stop and save your ride?`;
         }
 
-        // Confirmed — trigger stop. We can't directly call handleStopRequested (it's in ride.tsx).
-        // Instead, set a flag the ride screen watches.
+        // Only allow confirmed:true if a prior call set the confirmation flag
+        if (!stopRideConfirmationPending) {
+          stopRideConfirmationPending = true;
+          const dist = calcDistance(safety.recordedPoints);
+          return `You've ridden ${dist.toFixed(1)} miles. Are you sure you want to stop and save your ride?`;
+        }
+
+        stopRideConfirmationPending = false;
         safety.setRecording(false);
         return 'Ride stopped. Save your ride from the Ride screen.';
       }

@@ -267,12 +267,19 @@ function ScoutPanelContent() {
     }
   }, [isScoutOpen]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change or panel reopens
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length, isLoading]);
+
+  // Scroll to bottom on mount (panel reopen with existing messages)
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 200);
+    }
+  }, []);
 
   // ── Context assembly ───────────────────────────────────────────────────
 
@@ -429,10 +436,9 @@ function ScoutPanelContent() {
         if (remaining <= 0) setQuotaExhausted(true);
       }
 
-      // Notify TripPlanner if route was modified
-      if (routeModified) {
-        useScoutStore.getState().onRouteUpdated?.();
-      }
+      // Notify TripPlanner if route was modified — skip toast while Scout is open
+      // (Scout's response + auto-appended nav hint handle the UX)
+      // The callback will fire when Scout closes and user lands on Trip Planner
     } catch {
       const errMsg: ScoutMessage = {
         id: `a_${Date.now()}`,

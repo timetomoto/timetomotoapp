@@ -168,7 +168,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- When modifying a route segment, mention which road or town was used to steer the route.\n` +
     `- MAINTENANCE INTENT: When a rider says "I need to change the oil" or "I need to do X maintenance", they are asking for HELP — look up the bike's specs (oil type, capacity, etc.) using ask_garage and share what you know. Ask if they want to log it when done. Only call add_maintenance_log when the rider explicitly says they DID the work ("I changed the oil", "just did an oil change", "log an oil change").\n` +
     `- MAINTENANCE LOGGING: When logging maintenance, briefly ask "Want to include mileage or cost?" If the rider says no or just wants to log it, call add_maintenance_log immediately with all known details — mileage and cost are optional.\n` +
-    `- MAINTENANCE UPDATES: If the rider provides mileage or cost AFTER you already logged a maintenance item, call update_maintenance_log (not add_maintenance_log). Never create a duplicate — always update the existing entry. Same applies to modifications — use update_modification to change details on an existing mod.`
+    `- MAINTENANCE UPDATES: If the rider provides mileage or cost AFTER you already logged a maintenance item, call update_maintenance_log (not add_maintenance_log). Never create a duplicate — always update the existing entry. Same applies to modifications — use update_modification to change details on an existing mod.\n` +
+    `- DUPLICATE CHECK: If the rider asks to log maintenance of the same type that was already logged earlier in this conversation, confirm first: "You already logged an oil change earlier — want to update that one or log a new entry?" Do not auto-create a second entry of the same type without asking.`
   );
 
   // ── Voice behavior ──────────────────────────────────────────────────
@@ -251,7 +252,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- If you cannot complete a route or trip action (missing Home, missing origin, etc.), suggest the rider set it up in Trip Planner or Garage — always use those exact names so they render as tappable links.\n` +
     `- Their conversation is preserved — they can reopen Scout anytime to continue.\n` +
     `- When confirming a route change, keep it brief.\n` +
-    `- CRITICAL: When adding a waypoint, ALWAYS include the state or nearest city in the geocode query to avoid results far from the route. For example, use "McDonald's near Sturgis SD" not just "McDonald's". If the rider doesn't specify a location, infer it from the route — look at the origin, destination, and existing waypoints to determine the relevant region.`
+    `- CRITICAL: When adding a waypoint, ALWAYS include the state or nearest city in the geocode query to avoid results far from the route. For example, use "McDonald's near Sturgis SD" not just "McDonald's". If the rider doesn't specify a location, infer it from the route — look at the origin, destination, and existing waypoints to determine the relevant region.\n` +
+    `- NEVER call clear_route unless the rider explicitly asks to clear, reset, or start over. If the rider says "plan a ride" with no details, ask where they want to go — do NOT clear the existing trip.`
   );
 
   return sections.join('\n\n');

@@ -101,19 +101,20 @@ export async function sendScoutMessage(
       const functionCalls = extractFunctionCalls(response);
       if (functionCalls.length === 0) break;
 
-      // Execute tool calls in parallel
+      // Execute tool calls sequentially so each sees the store mutations from prior calls
       functionCalls.forEach((fc) => toolsExecuted.push(fc.name));
-      const settled = await Promise.allSettled(
-        functionCalls.map((fc) => executeScoutTool(fc.name, fc.args, context)),
-      );
+      const results: string[] = [];
+      for (const fc of functionCalls) {
+        try {
+          results.push(await executeScoutTool(fc.name, fc.args, context));
+        } catch (err: any) {
+          results.push(`Tool "${fc.name}" failed: ${err?.message ?? 'unknown error'}`);
+        }
+      }
       const responseParts: GeminiPart[] = functionCalls.map((fc, i) => ({
         functionResponse: {
           name: fc.name,
-          response: {
-            content: settled[i].status === 'fulfilled'
-              ? (settled[i] as PromiseFulfilledResult<string>).value
-              : `Tool "${fc.name}" failed: ${(settled[i] as PromiseRejectedResult).reason?.message ?? 'unknown error'}`,
-          },
+          response: { content: results[i] },
         },
       }));
 
