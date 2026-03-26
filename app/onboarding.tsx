@@ -428,7 +428,7 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
   screenTitle: {
-    fontSize: 22,
+    fontSize: 44,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 10,
