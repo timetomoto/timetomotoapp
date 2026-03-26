@@ -9,6 +9,7 @@ import { fetchDirections } from './directions';
 import { fetchRouteWeather, sampleRouteCoordinates, hasRouteWeatherConcern, getRouteWarningMessage } from './routeWeather';
 import { fetchHEREConditions } from './discoverStore';
 import { createRoute } from './routes';
+import { useServiceBulletinsStore, bulletinKey } from './serviceBulletinsStore';
 import type { ScoutContext, TripStop } from './scoutTypes';
 
 // Re-export from split files so existing imports from './scoutTools' still work
@@ -465,6 +466,27 @@ export async function executeScoutTool(
             }
           }
         } catch {}
+
+        // Load cached service bulletins (NHTSA recalls + complaints)
+        const bKey = bulletinKey(String(bike.year ?? ''), bike.make ?? '', bike.model ?? '');
+        const bulletinResult = useServiceBulletinsStore.getState().results[bKey];
+        if (bulletinResult) {
+          if (bulletinResult.recalls.length > 0) {
+            const recallList = bulletinResult.recalls.slice(0, 5)
+              .map((r) => `${r.Component}: ${r.Summary.slice(0, 100)}`)
+              .join('\n  ');
+            parts.push(`NHTSA Recalls (${bulletinResult.recalls.length}):\n  ${recallList}`);
+          }
+          if (bulletinResult.complaints.length > 0) {
+            parts.push(`NHTSA Complaints: ${bulletinResult.totalComplaints} reported. Most common: ${bulletinResult.complaints[0]?.components ?? 'N/A'}.`);
+          }
+          if (bulletinResult.recalls.length === 0 && bulletinResult.complaints.length === 0) {
+            parts.push(`NHTSA: No recalls or complaints found for ${bulletinResult.nhtsaMake} ${bulletinResult.nhtsaModel}.`);
+          }
+        } else {
+          parts.push('NHTSA service bulletins: Not yet checked. The rider can check from the Service Bulletins section in Garage.');
+        }
+
         parts.push(`Question: ${parameters.question}`);
         return parts.join('\n');
       }
