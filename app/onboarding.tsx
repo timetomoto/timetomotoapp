@@ -61,6 +61,7 @@ function Screen1() {
         <TimetomotoLogo width={LOGO_W} height={LOGO_H} disableLink />
       </View>
 
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
       <View style={[s.scoutIconLarge, { backgroundColor: theme.red }]}>
         {/* Scout crosshair icon */}
         <View style={{ width: 176, height: 176 }}>
@@ -71,10 +72,9 @@ function Screen1() {
           <View style={{ position: 'absolute', top: 84, left: 24, width: 56, height: 10, backgroundColor: '#fff', opacity: 0.4, borderRadius: 5 }} />
         </View>
       </View>
-      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
       <Text style={[s.screenSubBold, { color: theme.textPrimary }]}>Your Riding Assistant</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
-        Plan routes, check weather, manage your bikes — just ask.
+        Plan routes, check weather, manage bikes.
       </Text>
 
       {/* Mock Scout conversation */}
