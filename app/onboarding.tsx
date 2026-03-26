@@ -100,8 +100,26 @@ function Screen1() {
 function Screen2() {
   const { theme } = useTheme();
   return (
-    <View style={s.screen}>
-      <View style={[s.twoLineBlock, { marginTop: 20 }]}>
+    <ScrollView
+      style={{ width: SCREEN_W }}
+      contentContainerStyle={[s.screen, { paddingTop: 32, paddingBottom: 40 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={s.twoLineBlock}>
+        <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
+          <Feather name="shield" size={28} color={theme.red} />
+        </View>
+        <Text style={[s.twoLineHeadline, { color: theme.textPrimary }]}>
+          Ride protected.
+        </Text>
+        <Text style={[s.twoLineBody, { color: theme.textSecondary }]}>
+          Crash detection and check-in timers with automatic SMS alerts to your emergency contacts.
+        </Text>
+      </View>
+
+      <View style={[s.divider, { backgroundColor: theme.border }]} />
+
+      <View style={s.twoLineBlock}>
         <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
           <Feather name="map" size={28} color={theme.red} />
         </View>
@@ -117,16 +135,16 @@ function Screen2() {
 
       <View style={s.twoLineBlock}>
         <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18' }]}>
-          <Feather name="shield" size={28} color={theme.red} />
+          <Feather name="tool" size={28} color={theme.red} />
         </View>
         <Text style={[s.twoLineHeadline, { color: theme.textPrimary }]}>
-          Crash detection. Check-in timers.{'\n'}Your people know you're safe.
+          Know your bike inside out.
         </Text>
         <Text style={[s.twoLineBody, { color: theme.textSecondary }]}>
-          Automatic SMS alerts to your emergency contacts if something goes wrong.
+          Specs, service intervals, maintenance logs, and modifications — all tracked in your garage.
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
