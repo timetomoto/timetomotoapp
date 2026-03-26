@@ -53,25 +53,32 @@
 - [ ] Code consolidation — colors into theme.ts (warningOrange, fuelYellow, rainBlue)
 - [ ] Code consolidation — lib/animationConstants.ts, lib/layoutConstants.ts
 
-## TESTING — Simulator (Retest After Fixes)
+## TESTING — Simulator (Retested & Passed March 26)
 
-- [ ] Multi-waypoint — "Add stops in Marble Falls and Burnet" → both appear (sequential exec fix)
-- [ ] Stop ride confirmation — two-step gate prevents skipping
-- [ ] Scroll on reopen — Scout auto-scrolls to latest message
-- [ ] "Plan a ride" without details — no longer clears existing trip
-- [ ] Departure time in My Routes — shows time for planned routes
-- [ ] Departure timezone — describe_saved_route shows local time not UTC
-- [ ] Fuzzy route search — "Load my weekend warrior route" returns no match (not false positive)
-- [ ] Nav hints — stripped on all responses, only appended after route-modifying tools
-- [ ] initialMessage — ASK SCOUT button works with existing conversation
-- [ ] Duplicate maintenance — Scout asks before logging same type twice
-- [ ] ask_garage specs — returns actual specs from live store
-- [ ] ask_garage bike matching — "2019 YAMAHA WR250R" finds DuelFort
-- [ ] ask_garage modifications — returns all mods not just current session
-- [ ] Emergency contacts — loaded on app startup, shown in crash modal
-- [ ] Today's date — relative dates ("this Saturday") calculate correctly
-- [ ] Bike pre-selection — PreRideChecklist defaults to first bike
-- [ ] Weather badge — Scout weather briefing auto-sends from checklist
+- [x] Multi-waypoint — "Add stops in Marble Falls and Burnet" → both appear
+- [x] Stop ride confirmation — two-step gate prevents skipping
+- [x] Scroll on reopen — Scout auto-scrolls to latest message
+- [x] "Plan a ride" without details — no longer clears existing trip
+- [x] Departure time in My Routes — shows time for planned routes
+- [x] Departure timezone — describe_saved_route shows local time not UTC
+- [x] Fuzzy route search — "Load my weekend warrior route" returns no match
+- [x] Nav hints — stripped on all responses, only appended after route-modifying tools
+- [x] initialMessage — ASK SCOUT button works with existing conversation
+- [x] Duplicate maintenance — Scout asks before logging same type twice
+- [x] ask_garage specs — returns actual specs from live store
+- [x] ask_garage bike matching — "2019 YAMAHA WR250R" finds DuelFort
+- [x] ask_garage modifications — returns all mods not just current session
+- [x] Emergency contacts — loaded on app startup, shown in crash modal
+- [x] Today's date — relative dates ("this Saturday") calculate correctly
+- [x] Bike pre-selection — PreRideChecklist defaults to first bike
+- [x] Weather badge — Scout weather briefing auto-sends from checklist
+- [x] Specs clearing on model name change — clears and re-fetches
+- [x] Selected bike persists across app restart
+- [x] Selected bike first in chip lists (Garage, PreRideChecklist, RoutePreview)
+- [x] Crash alerts sent to selected contacts only (not all)
+- [x] Service intervals wired into Scout context
+- [x] Ambiguous requests — all 6 edge cases handled gracefully
+- [x] Safe Mapbox import — Expo Go shows fallback, dev build works normally
 
 ## TESTING — Device Required
 
