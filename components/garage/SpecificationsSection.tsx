@@ -650,6 +650,8 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             style={[st.askScoutBtn, { borderColor: theme.red }]}
             onPress={() => {
               const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+              // Select this bike so Scout context picks it up as active
+              useGarageStore.getState().selectBike(bike.id);
               useScoutStore.getState().openScout({
                 initialMessage: `Tell me about my ${label} and what I should know about it.`,
               });
