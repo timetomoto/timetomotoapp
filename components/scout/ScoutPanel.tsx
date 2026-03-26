@@ -380,6 +380,16 @@ function ScoutPanelContent() {
       return;
     }
 
+    // Debug trigger — simulate crash alert (dev only)
+    if (__DEV__ && /simulate crash/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Crash simulation triggered. Modal should appear now.', timestamp: new Date() };
+      addMessage(ackMsg);
+      useSafetyStore.getState().setCrashDetected(true);
+      return;
+    }
+
     const userMsg: ScoutMessage = {
       id: `u_${Date.now()}`,
       role: 'user',
