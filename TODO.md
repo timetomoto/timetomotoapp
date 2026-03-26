@@ -2,7 +2,8 @@
 
 ## DEV — P0 (Blockers)
 
-- [ ] Twilio crash SMS — crash detection fires but no SMS sent, connect handler → Supabase Edge Function → Twilio send
+- [ ] Apple Developer account — required for dev build, TestFlight, App Store
+- [ ] Twilio secrets — configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in Supabase dashboard
 - [ ] Onboarding flag — change @ttm/onboarding_v1 to @ttm/onboarding_v1_{userId} (per-user not per-device)
 
 ## DEV — P1 (High — Pre-Launch)
@@ -10,10 +11,11 @@
 - [ ] EAS build setup — eas.json, Apple Developer account link, push notification certificates
 - [ ] Social auth — Apple + Google Sign-In via Supabase Auth providers
 - [ ] Subscription — single tier $4.99/month Apple IAP with 14-day trial
-- [ ] Account deletion — delete all Supabase data + AsyncStorage for user (App Store requirement)
-- [ ] Live Share — ride_shares table migration, Share.share(), viewer page at timetomoto.app/track/[token]
-- [ ] Scout Phase 1 — full device testing per testing script
-- [ ] Voice — expo-av Scout input, expo-speech turn-by-turn (dev build required)
+- [ ] Live Share viewer page — timetomoto.com/track/[token] (backend wired, needs web page)
+- [ ] Privacy Policy — host at timetomoto.com/privacy (Settings links ready)
+- [ ] Terms of Service — host at timetomoto.com/terms (Settings links ready)
+- [ ] Voice implementation — replace stubs in lib/scoutVoice.ts with expo-av + expo-speech (dev build required)
+- [ ] Wake word — "Hey Scout" continuous listening during active ride (dev build required)
 
 ## DEV — P2 (Medium — Quality)
 
@@ -30,13 +32,13 @@
 ## DEV — P3 (Scout Improvements)
 
 - [ ] Scout — clear tripRouteIsManual when user drags waypoint on loaded route
-- [ ] Scout — add update_maintenance_log tool (update mileage/cost on existing entry)
-- [ ] Scout — add update_modification tool (same pattern)
-- [ ] Scout — mid-ride navigation commands
-- [ ] Scout — ride controls via chat (start/stop recording)
-- [ ] Scout — Hey Scout wake word during active ride
+- [ ] Scout — "plan a loop" should add waypoints to fill requested duration
+- [ ] Scout — avoid_road needs multi-waypoint strategy (single bypass can't force avoidance of long segments)
+- [ ] Scout — steer_segment needs entry+exit waypoints for full loop roads
+- [ ] Scout — load_saved_route should extract intermediate waypoints as markers
 - [ ] Scout — detect truncated responses and append friendly message
-- [ ] Scout — "plan a loop" workflow with actual loop shape waypoints
+- [ ] Scout — screen awareness ("What screen am I on?" — data exists, prompt doesn't report it)
+- [ ] Scout — "I can't" phrasing (Gemini says "I can't" instead of offering alternatives per personality rules)
 - [ ] Scout quota bypass — configure with Supabase user ID before launch
 
 ## DEV — P4 (Nice to Have)
@@ -48,38 +50,56 @@
 - [ ] Code consolidation — colors into theme.ts (warningOrange, fuelYellow, rainBlue)
 - [ ] Code consolidation — lib/animationConstants.ts, lib/layoutConstants.ts
 
-## TESTING (Device Required)
+## TESTING — Simulator (Retest After Fixes)
 
-- [ ] Screen navigation lag — verify improved after Reanimated cleanup
-- [ ] Scout conversation persistence after close/reopen
-- [ ] All modal positioning on different iPhone sizes
-- [ ] fitRoute accuracy — collapsed vs expanded panel
-- [ ] Scout home location race — force quit test
-- [ ] Crash detection SMS end to end
+- [ ] Multi-waypoint — "Add stops in Marble Falls and Burnet" → both appear (sequential exec fix)
+- [ ] Stop ride confirmation — two-step gate prevents skipping
+- [ ] Scroll on reopen — Scout auto-scrolls to latest message
+- [ ] "Plan a ride" without details — no longer clears existing trip
+- [ ] Departure time in My Routes — shows time for planned routes
+- [ ] Departure timezone — describe_saved_route shows local time not UTC
+- [ ] Fuzzy route search — "Load my weekend warrior route" returns no match (not false positive)
+- [ ] Nav hints — stripped on all responses, only appended after route-modifying tools
+- [ ] initialMessage — ASK SCOUT button works with existing conversation
+- [ ] Duplicate maintenance — Scout asks before logging same type twice
+- [ ] ask_garage specs — returns actual specs from live store
+- [ ] ask_garage bike matching — "2019 YAMAHA WR250R" finds DuelFort
+- [ ] ask_garage modifications — returns all mods not just current session
+- [ ] Emergency contacts — loaded on app startup, shown in crash modal
+- [ ] Today's date — relative dates ("this Saturday") calculate correctly
+- [ ] Bike pre-selection — PreRideChecklist defaults to first bike
+- [ ] Weather badge — Scout weather briefing auto-sends from checklist
+
+## TESTING — Device Required
+
+- [ ] Crash detection accelerometer — impact + 2s stillness fires modal
+- [ ] Crash SMS end to end — Twilio delivers to emergency contact
+- [ ] Check-in timer SMS — send-checkin-alert Edge Function delivers
+- [ ] GPS lock — current location, navigation, turn-by-turn
+- [ ] Turn-by-turn voice — speakResponse at 800m/150m/30m thresholds
+- [ ] Background location — live share updates during ride
+- [ ] Voice input — expo-av recording + transcription
+- [ ] Voice output — expo-speech TTS responses
+- [ ] Wake word — "Hey Scout" detection during ride
+- [ ] Crash voice response — speak warning, listen for "I'm ok"/"help"
 - [ ] Pause/resume GPS recording — no gap jumps
 - [ ] Compass heading — track-up/north-up toggle
-- [ ] Voice input microphone and transcription (dev build)
-- [ ] Turn-by-turn voice announcements (dev build)
-- [ ] Background location threshold
-- [ ] Pre-ride checklist — default bike selection working
-- [ ] Stale refresh badges — weather 30min TTL, conditions 15min TTL
-- [ ] Dashed overlay lines — cleared on navigation end
+- [ ] Pre-ride checklist — crash/share toggle defaults from Settings
 - [ ] Navigate from imported route — full geometry sent to ride screen
-- [ ] Weather on imported route — populates in Trip Planner
+- [ ] All modal positioning on different iPhone sizes
+- [ ] fitRoute accuracy — collapsed vs expanded panel
 - [ ] Map style consistency — RIDE↔PLAN sync, thumbnail style, persists on relaunch
 - [ ] Floating tab bar — all screens, modals hide/show correctly
 - [ ] Auth edge cases — stale token, two users same device, sign out/in
-- [ ] Scout maintenance/modification log — records appear in Garage
 
 ## RELEASE
 
 - [ ] Sentry crash reporting — install, wrap app, add SENTRY_DSN
 - [ ] Firebase Analytics — project setup, plist, log key events
 - [ ] Remove __DEV__ developer section — app/settings.tsx
+- [ ] Remove "simulate crash" Scout command — dev-only but verify
 - [ ] API key rotation — Mapbox, HERE, OWM, Gemini, Supabase (do last)
 - [ ] Open-Meteo commercial plan — $29/month before launch
-- [ ] Privacy Policy — host at timetomoto.com/privacy
-- [ ] Terms of Service — host at timetomoto.com/terms
 - [ ] App Store listing — screenshots, description, keywords, category
 - [ ] TestFlight beta — eas build --profile preview
 - [ ] App Store submission — eas build --profile production
@@ -137,4 +157,32 @@
 - [x] Trip planner waypoint limit Kurviger message
 - [x] Bike selector syncs globally
 - [x] Scout thinking budget enabled (1024)
-- [x] Scout home location race fix attempted
+- [x] Scout home location race fix
+- [x] Account deletion — Apple compliant, Supabase Edge Function
+- [x] Scout ride integration — ride-aware context, controls, navigation
+- [x] Voice stubs — scoutVoice.ts, voiceConfig.ts, ScoutVoiceIndicator
+- [x] Turn-by-turn placeholders at 800m/150m/30m
+- [x] Safety defaults persist across app restarts (AsyncStorage)
+- [x] GPS Lock opens iOS Settings when denied
+- [x] Crash countdown 30s → 60s
+- [x] Scout crash response — voice hooks, phrase matching, safety tools
+- [x] send-crash-alert Edge Function deployed
+- [x] send-checkin-alert Edge Function deployed
+- [x] Privacy Policy + Terms links in Settings
+- [x] AI disclosure in Scout welcome message
+- [x] Permission strings — NSMotion, NSMicrophone, NSSpeech, NSLocationWhenInUse
+- [x] ASK SCOUT button in Garage SpecificationsSection
+- [x] isVoiceInput flag — conditional voice mode in prompt
+- [x] Today's date in system prompt (relative date math)
+- [x] Sequential tool execution (multi-waypoint fix)
+- [x] stop_ride two-step confirmation gate
+- [x] ask_garage — bidirectional bike matching, live specs, modifications
+- [x] Emergency contacts loaded on app startup
+- [x] Departure time timezone fix (UTC → local)
+- [x] Fuzzy route search tightened
+- [x] Nav hints stripped on all responses
+- [x] initialMessage works with existing sessions
+- [x] PreRideChecklist bike pre-selection + FAB overlap fix
+- [x] Easter egg joke — "Tell me a joke"
+- [x] URLs updated timetomoto.app → timetomoto.com
+- [x] Simulate crash dev command
