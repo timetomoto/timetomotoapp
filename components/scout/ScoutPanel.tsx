@@ -319,6 +319,7 @@ function ScoutPanelContent() {
 
     return {
       currentScreen,
+      isVoiceInput: false, // Set true when message comes from voice input (dev build)
       isCrashAlertActive: safetyState.isCrashAlertActive,
       rideState,
       bikes,

@@ -178,16 +178,20 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- DUPLICATE CHECK: If the rider asks to log maintenance of the same type that was already logged earlier in this conversation, confirm first: "You already logged an oil change earlier — want to update that one or log a new entry?" Do not auto-create a second entry of the same type without asking.`
   );
 
-  // ── Voice behavior ──────────────────────────────────────────────────
-  sections.push(
-    `VOICE MODE RULES (apply when the rider sends a message via voice):\n` +
-    `- Start with the answer immediately — no preamble, no filler.\n` +
-    `- Keep responses under 15 words so TTS reads them quickly.\n` +
-    `- Never start a sentence with "I".\n` +
-    `- Use road names and cardinal directions ("Turn left on Route 66", not "Make a left turn on the upcoming road").\n` +
-    `- Numbers: say "half a mile" not "0.5 miles", "two hours" not "2h".\n` +
-    `- For weather/conditions: lead with the actionable detail ("Rain in 20 miles — consider stopping").`
-  );
+  // ── Voice behavior (only when voice input is active) ────────────────
+  if (ctx.isVoiceInput) {
+    sections.push(
+      `VOICE MODE — ACTIVE. The rider is speaking, not typing. You MUST follow these rules:\n` +
+      `- Start with the answer immediately — no preamble, no filler.\n` +
+      `- Keep responses under 15 words so TTS reads them quickly.\n` +
+      `- Never start a sentence with "I".\n` +
+      `- Use road names and cardinal directions ("Turn left on Route 66", not "Make a left turn on the upcoming road").\n` +
+      `- Numbers: say "half a mile" not "0.5 miles", "two hours" not "2h".\n` +
+      `- For weather/conditions: lead with the actionable detail ("Rain in 20 miles — consider stopping").\n` +
+      `- No follow-up questions. Just answer and stop.\n` +
+      `- Never mention Trip Planner, Garage, or screen names — the rider can't tap while riding.`
+    );
+  }
 
   // ── Constraints ────────────────────────────────────────────────────────
   sections.push(

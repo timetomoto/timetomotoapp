@@ -27,6 +27,7 @@ export type ScoutMessage = {
 
 export type ScoutContext = {
   currentScreen: 'ride' | 'trip' | 'garage' | 'other';
+  isVoiceInput: boolean;
   isCrashAlertActive: boolean;
   rideState: {
     isRecording: boolean;
