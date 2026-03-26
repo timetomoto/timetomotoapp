@@ -57,14 +57,14 @@ function Screen1() {
   const { theme } = useTheme();
   return (
     <View style={s.screen}>
-      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 10 }]}>
+      <View style={[s.scoutIconLarge, { backgroundColor: theme.red, marginTop: 10, marginBottom: 20 }]}>
         {/* Scout crosshair icon */}
-        <View style={{ width: 176, height: 176 }}>
-          <View style={{ position: 'absolute', width: 176, height: 176, borderRadius: 88, borderWidth: 10, borderColor: '#fff' }} />
-          <View style={{ position: 'absolute', left: 84, top: 24, width: 10, height: 56, backgroundColor: '#fff', borderRadius: 5 }} />
-          <View style={{ position: 'absolute', left: 84, top: 96, width: 10, height: 56, backgroundColor: '#fff', opacity: 0.4, borderRadius: 5 }} />
-          <View style={{ position: 'absolute', top: 84, left: 96, width: 56, height: 10, backgroundColor: '#fff', opacity: 0.4, borderRadius: 5 }} />
-          <View style={{ position: 'absolute', top: 84, left: 24, width: 56, height: 10, backgroundColor: '#fff', opacity: 0.4, borderRadius: 5 }} />
+        <View style={{ width: 88, height: 88 }}>
+          <View style={{ position: 'absolute', width: 88, height: 88, borderRadius: 44, borderWidth: 5, borderColor: '#fff' }} />
+          <View style={{ position: 'absolute', left: 42, top: 12, width: 5, height: 28, backgroundColor: '#fff', borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', left: 42, top: 48, width: 5, height: 28, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', top: 42, left: 48, width: 28, height: 5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
+          <View style={{ position: 'absolute', top: 42, left: 12, width: 28, height: 5, backgroundColor: '#fff', opacity: 0.4, borderRadius: 2.5 }} />
         </View>
       </View>
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Meet Scout</Text>
@@ -452,9 +452,9 @@ const s = StyleSheet.create({
   // Screen 1
   logoBlock: { alignItems: 'center', marginBottom: 40 },
   scoutIconLarge: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
