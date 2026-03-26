@@ -251,8 +251,9 @@ function ScoutPanelContent() {
   }, [isScoutOpen, userId]);
 
   // Auto-send initialMessage (wait for favorites to load first)
+  // Works for both fresh sessions (no messages) and existing sessions (appends as new message)
   useEffect(() => {
-    if (isScoutOpen && favoritesLoaded && storeInitialMessage && !initialSent.current && messages.length === 0) {
+    if (isScoutOpen && favoritesLoaded && storeInitialMessage && !initialSent.current) {
       initialSent.current = true;
       const timer = setTimeout(() => handleSend(storeInitialMessage), 300);
       return () => clearTimeout(timer);
