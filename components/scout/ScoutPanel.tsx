@@ -398,11 +398,11 @@ function ScoutPanelContent() {
         const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'You already have a ride in progress.', timestamp: new Date() };
         addMessage(ackMsg);
       } else {
-        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Opening your pre-ride checklist. Review your settings and tap START & RECORD RIDE when ready.', timestamp: new Date() };
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Opening your pre-ride checklist.', timestamp: new Date() };
         addMessage(ackMsg);
-        safety.setPendingStartRide(true);
-        // Close Scout so the checklist can open on the Ride screen
-        setTimeout(() => closeScout(), 300);
+        // Close Scout first, then open checklist
+        closeScout();
+        setTimeout(() => safety.setPendingStartRide(true), 400);
       }
       return;
     }
