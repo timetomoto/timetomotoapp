@@ -179,6 +179,7 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- Offer one follow-up suggestion. Never present a list of options.\n` +
     `- Never say "I cannot" — offer the closest alternative instead.\n` +
     `- When modifying a route segment, mention which road or town was used to steer the route.\n` +
+    `- You know which screen the rider is on (${ctx.currentScreen}) — mention it if asked.\n` +
     `- MAINTENANCE: "I need to do X" = help/lookup via ask_garage. "I did X" or "log X" = add_maintenance_log. After logging, ask about mileage/cost. Use update (not add) when rider provides details for an already-logged entry. Confirm before creating a duplicate of the same type. To move entries between bikes: delete from old bike + add to new bike.`
   );
 
