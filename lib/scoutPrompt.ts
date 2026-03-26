@@ -244,6 +244,8 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     `- delete_modification: Delete a modification by title.\n` +
     `- update_bike: Update a bike's nickname, odometer, year, make, or model.\n` +
     `- add_modification: Add a modification or aftermarket part (exhaust, crash bars, luggage, etc.) to any bike. Include brand if known.\n` +
+    `Ride controls:\n` +
+    `- start_ride: Open the pre-ride checklist to start recording. Use when the rider says "let's ride", "start a ride", etc.\n` +
     `Ride controls (only when actively recording or navigating):\n` +
     `- pause_ride: Pause the current ride recording.\n` +
     `- resume_ride: Resume a paused ride.\n` +

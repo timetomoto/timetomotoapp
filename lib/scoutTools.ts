@@ -476,6 +476,13 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
 
+  // ── Ride Start ──────────────────────────────────────────────────────
+  {
+    name: 'start_ride',
+    description: 'Open the pre-ride checklist so the rider can review safety settings and start recording. Use when the rider says "let\'s ride", "start a ride", "start recording", or similar.',
+    parameters: { type: 'object', properties: {}, required: [] },
+  },
+
   // ── Safety ──────────────────────────────────────────────────────────
   {
     name: 'cancel_crash_alert',
@@ -1389,6 +1396,13 @@ export async function executeScoutTool(
         if (results.length === 0) return `No "${query}" found nearby.`;
         const place = results[0];
         return `Found: ${place.name}. Want me to add it as a stop?`;
+      }
+
+      case 'start_ride': {
+        const safety = useSafetyStore.getState();
+        if (safety.isRecording) return 'You already have a ride in progress.';
+        safety.setPendingStartRide(true);
+        return 'Opening your pre-ride checklist. Review your settings and tap START & RECORD RIDE when ready.';
       }
 
       case 'stop_ride': {

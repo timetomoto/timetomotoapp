@@ -1019,6 +1019,15 @@ export default function RideScreen() {
     if (isRecording) setShowChecklist(false);
   }, [isRecording]);
 
+  // Scout "start_ride" tool — opens checklist via store flag
+  const pendingStartRide = useSafetyStore((s) => s.pendingStartRide);
+  useEffect(() => {
+    if (pendingStartRide && !isRecording && !isNavigatingActive) {
+      useSafetyStore.getState().setPendingStartRide(false);
+      setShowChecklist(true);
+    }
+  }, [pendingStartRide]);
+
   // ── Ride guard: prevent starting a new ride/nav while one is active ──
   function guardRideStart(): boolean {
     if (isRecording || isNavigatingActive) {

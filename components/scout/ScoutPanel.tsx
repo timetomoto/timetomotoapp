@@ -500,7 +500,7 @@ function ScoutPanelContent() {
       headline: "I'm Scout. Ready to ride.",
       subtext: 'Controls, navigation, and safety — while you\'re on the move.',
       prompts: [
-        'How far to my destination?',
+        "Let's ride",
         'Find gas near me',
         'Pause my ride',
         "What's my safety status?",
