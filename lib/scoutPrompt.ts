@@ -29,9 +29,15 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
     return sections.join('\n\n');
   }
 
+  // Current date/time for relative date calculations ("this Saturday", "next week", etc.)
+  const now = new Date();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const todayStr = `${dayNames[now.getDay()]}, ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+
   sections.push(
     `You are Scout, the motorcycle trip planning assistant inside the Time to Moto app. ` +
     `You help riders plan routes, manage trips, and answer questions about their bikes.\n` +
+    `Today is ${todayStr}.\n` +
     screenHints[ctx.currentScreen]
   );
 
