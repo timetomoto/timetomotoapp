@@ -12,6 +12,7 @@ import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import { useGarageStore, type Bike, type BikeSpecs } from '../../lib/store';
 import { useScoutStore } from '../../lib/scoutStore';
+import { loadMaintenance, loadModifications } from '../../lib/garage';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -648,11 +649,27 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
           {/* Ask Scout about this bike */}
           <Pressable
             style={[st.askScoutBtn, { borderColor: theme.red }]}
-            onPress={() => {
+            onPress={async () => {
               const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
-              const nameHint = bike.nickname ? ` (${bike.nickname})` : '';
+              const bikeSpecs = bike.specs ?? {};
+              const specSummary = Object.entries(bikeSpecs)
+                .filter(([, v]) => v != null && v !== '' && v !== false)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(', ');
+              // Load maintenance + mods for this specific bike
+              const userId = useGarageStore.getState().bikes[0]?.user_id ?? 'local';
+              const [maint, mods] = await Promise.all([
+                loadMaintenance(bike.id, userId).catch(() => []),
+                loadModifications(bike.id, userId).catch(() => []),
+              ]);
+              const maintStr = maint.length > 0
+                ? `\nMaintenance: ${maint.slice(0, 5).map((m: any) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`).join('; ')}`
+                : '';
+              const modsStr = mods.length > 0
+                ? `\nModifications: ${mods.map((m: any) => `${m.title}${m.brand ? ` (${m.brand})` : ''}`).join('; ')}`
+                : '';
               useScoutStore.getState().openScout({
-                initialMessage: `Look up my ${label}${nameHint} using ask_garage and tell me its specs, maintenance history, and what I should know.`,
+                initialMessage: `Here are the details for my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''}. Odometer: ${bike.odometer ?? 'unknown'} mi. ${specSummary ? `Specs: ${specSummary}` : 'No specs loaded.'}${maintStr}${modsStr}\n\nSummarize what I should know about this bike.`,
               });
             }}
           >
