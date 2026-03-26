@@ -897,12 +897,17 @@ export async function executeScoutTool(
         if (bikeName) {
           const query = bikeName.toLowerCase();
           const allBikes = garageStore.bikes;
-          const match = allBikes.find(
-            (b) =>
-              b.nickname?.toLowerCase().includes(query) ||
-              b.model?.toLowerCase().includes(query) ||
-              b.make?.toLowerCase().includes(query),
-          );
+          const match = allBikes.find((b) => {
+            const nick = b.nickname?.toLowerCase() ?? '';
+            const model = b.model?.toLowerCase() ?? '';
+            const make = b.make?.toLowerCase() ?? '';
+            const year = b.year ? String(b.year) : '';
+            const fullLabel = `${year} ${make} ${model} ${nick}`.toLowerCase();
+            // Match in either direction: query contains bike fields OR bike fields contain query
+            return nick.includes(query) || model.includes(query) || make.includes(query) ||
+              query.includes(nick) || query.includes(model) || query.includes(make) ||
+              fullLabel.includes(query) || query.includes(fullLabel.trim());
+          });
           if (match) {
             bike = match;
             isActive = match.id === (context.activeBike?.id ?? null);
