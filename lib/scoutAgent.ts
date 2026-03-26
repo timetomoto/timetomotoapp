@@ -47,6 +47,7 @@ interface GeminiRequest {
 
 interface GeminiCandidate {
   content?: { parts?: GeminiPart[] };
+  finishReason?: string; // STOP, MAX_TOKENS, SAFETY, etc.
 }
 
 interface GeminiResponse {
@@ -134,10 +135,22 @@ export async function sendScoutMessage(
       response = await callGemini(systemPrompt, contents, controller.signal, toolDefs);
     }
 
-    // 5. Extract final text
-    const text = extractText(response);
+    // 5. Extract final text + detect truncation
+    let text = extractText(response);
     if (!text) {
       return { text: "I didn't get a clear answer. Try rephrasing.", toolsExecuted };
+    }
+
+    // Check for truncated response (Gemini ran out of output tokens)
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason === 'MAX_TOKENS') {
+      text = text.trimEnd().replace(/[,\s]+$/, '') + '… (response cut short — try asking again)';
+    } else if (!finishReason || finishReason !== 'STOP') {
+      // Heuristic: if response doesn't end with punctuation, it was likely truncated
+      const lastChar = text.trimEnd().slice(-1);
+      if (lastChar && !/[.!?)"']/.test(lastChar) && text.length > 100) {
+        text = text.trimEnd() + '…';
+      }
     }
 
     return { text, toolsExecuted };
