@@ -16,6 +16,7 @@
 - [ ] Terms of Service — host at timetomoto.com/terms (Settings links ready)
 - [ ] Voice implementation — replace stubs in lib/scoutVoice.ts with expo-av + expo-speech (dev build required)
 - [ ] Wake word — "Hey Scout" continuous listening during active ride (dev build required)
+- [ ] Hands-free Scout + live map — "Hey Scout" triggers voice input, user watches Trip Planner map while Scout makes changes in real-time via store mutations. Scout speaks responses via TTS. User responds by voice without reopening panel. Full flow: voice command → map updates → Scout speaks follow-up → user replies by voice → repeat. Requires: minimized Scout bar on Plan tab (floating input + last response), voice input active while bar is visible, TTS for all responses in this mode. Build during voice implementation session.
 
 ## DEV — P2 (Medium — Quality)
 
