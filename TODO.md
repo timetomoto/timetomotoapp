@@ -3,7 +3,7 @@
 ## DEV — P0 (Blockers)
 
 - [ ] Apple Developer account — required for dev build, TestFlight, App Store
-- [ ] Twilio secrets — configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in Supabase dashboard
+- [x] Twilio secrets — configured in Supabase (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)
 - [ ] Onboarding flag — change @ttm/onboarding_v1 to @ttm/onboarding_v1_{userId} (per-user not per-device)
 
 ## DEV — P1 (High — Pre-Launch)
