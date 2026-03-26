@@ -11,8 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import { useTheme } from '../../lib/useTheme';
 import { supabase } from '../../lib/supabase';
 import { useGarageStore, type Bike, type BikeSpecs } from '../../lib/store';
-import { useScoutStore } from '../../lib/scoutStore';
-import { loadMaintenance, loadModifications } from '../../lib/garage';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -646,36 +644,6 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             <SpecRow key={def.key} def={def} specs={specs} onSave={handleFieldSave} />
           ))}
 
-          {/* Ask Scout about this bike */}
-          <Pressable
-            style={[st.askScoutBtn, { borderColor: theme.red }]}
-            onPress={async () => {
-              const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
-              const bikeSpecs = bike.specs ?? {};
-              const specSummary = Object.entries(bikeSpecs)
-                .filter(([, v]) => v != null && v !== '' && v !== false)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(', ');
-              // Load maintenance + mods for this specific bike
-              const userId = useGarageStore.getState().bikes[0]?.user_id ?? 'local';
-              const [maint, mods] = await Promise.all([
-                loadMaintenance(bike.id, userId).catch(() => []),
-                loadModifications(bike.id, userId).catch(() => []),
-              ]);
-              const maintStr = maint.length > 0
-                ? `\nMaintenance: ${maint.slice(0, 5).map((m: any) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`).join('; ')}`
-                : '';
-              const modsStr = mods.length > 0
-                ? `\nModifications: ${mods.map((m: any) => `${m.title}${m.brand ? ` (${m.brand})` : ''}`).join('; ')}`
-                : '';
-              useScoutStore.getState().openScout({
-                initialMessage: `Here are the details for my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''}. Odometer: ${bike.odometer ?? 'unknown'} mi. ${specSummary ? `Specs: ${specSummary}` : 'No specs loaded.'}${maintStr}${modsStr}\n\nSummarize what I should know about this bike.`,
-              });
-            }}
-          >
-            <Feather name="compass" size={14} color={theme.red} />
-            <Text style={[st.askScoutBtnText, { color: theme.red }]}>ASK SCOUT ABOUT YOUR BIKE</Text>
-          </Pressable>
 
         </View>
     </View>
@@ -785,15 +753,4 @@ const st = StyleSheet.create({
   },
   refreshBtnText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   dataSource: { fontSize: 10, lineHeight: 14, marginTop: 16, marginBottom: 8, fontStyle: 'italic' },
-  askScoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 14,
-    marginTop: 16,
-  },
-  askScoutBtnText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
 });

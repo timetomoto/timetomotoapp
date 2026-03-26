@@ -20,6 +20,8 @@ import ModificationsSection from '../../components/garage/ModificationsSection';
 import ServiceIntervalsSection from '../../components/garage/ServiceIntervalsSection';
 import ServiceBulletinsSection from '../../components/garage/ServiceBulletinsSection';
 import SpecificationsSection from '../../components/garage/SpecificationsSection';
+import { useScoutStore } from '../../lib/scoutStore';
+import { loadMaintenance, loadModifications } from '../../lib/garage';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
@@ -288,6 +290,37 @@ export default function GarageScreen() {
               </View>
 
             </View>
+
+            {/* ASK SCOUT about this bike */}
+            <Pressable
+              style={[styles.askScoutBtn, { borderColor: theme.red }]}
+              onPress={async () => {
+                const bike = selectedBike;
+                const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
+                const bikeSpecs = bike.specs ?? {};
+                const specSummary = Object.entries(bikeSpecs)
+                  .filter(([, v]) => v != null && v !== '' && v !== false)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(', ');
+                const uid = user?.id ?? 'local';
+                const [maint, mods] = await Promise.all([
+                  loadMaintenance(bike.id, uid).catch(() => []),
+                  loadModifications(bike.id, uid).catch(() => []),
+                ]);
+                const maintStr = maint.length > 0
+                  ? `\nMaintenance: ${maint.slice(0, 5).map((m: any) => `${m.maintenanceType} on ${m.date}${m.mileage ? ` @ ${m.mileage} mi` : ''}`).join('; ')}`
+                  : '';
+                const modsStr = mods.length > 0
+                  ? `\nModifications: ${mods.map((m: any) => `${m.title}${m.brand ? ` (${m.brand})` : ''}`).join('; ')}`
+                  : '';
+                useScoutStore.getState().openScout({
+                  initialMessage: `Here are the details for my ${label}${bike.nickname ? ` "${bike.nickname}"` : ''}. Odometer: ${bike.odometer ?? 'unknown'} mi. ${specSummary ? `Specs: ${specSummary}` : 'No specs loaded.'}${maintStr}${modsStr}\n\nSummarize what I should know about this bike.`,
+                });
+              }}
+            >
+              <Feather name="compass" size={14} color={theme.red} />
+              <Text style={[styles.askScoutBtnText, { color: theme.red }]}>ASK SCOUT ABOUT THIS BIKE</Text>
+            </Pressable>
 
             {/* Collapsible sections */}
                 {[
@@ -576,5 +609,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-
+  askScoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 12,
+    marginHorizontal: 16,
+  },
+  askScoutBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
 });
