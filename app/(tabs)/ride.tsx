@@ -336,40 +336,61 @@ export default function RideScreen() {
     );
   }
   const setPendingWeatherSubTab = useTabResetStore((s) => s.setPendingWeatherSubTab);
-  const { mapStyle: globalMapStyleUrl, setMapStyle: setGlobalMapStyle } = useMapStyleStore();
+  const globalMapStyleUrl = useMapStyleStore((s) => s.mapStyle);
+  const setGlobalMapStyle = useMapStyleStore((s) => s.setMapStyle);
 
   // Derive local MapStyle key from store URL
   const mapStyle: MapStyle = Object.entries(MAP_STYLES).find(([, url]) => url === globalMapStyleUrl)?.[0] as MapStyle ?? 'hybrid';
-  const { user }                = useAuthStore();
-  const { addRoute, pendingNavigateRoute, setPendingNavigateRoute } = useRoutesStore();
-  const { bikes, selectedBikeId, fetchBikes } = useGarageStore();
+  const user = useAuthStore((s) => s.user);
+  const addRoute = useRoutesStore((s) => s.addRoute);
+  const pendingNavigateRoute = useRoutesStore((s) => s.pendingNavigateRoute);
+  const setPendingNavigateRoute = useRoutesStore((s) => s.setPendingNavigateRoute);
+  const bikes = useGarageStore((s) => s.bikes);
+  const selectedBikeId = useGarageStore((s) => s.selectedBikeId);
+  const fetchBikes = useGarageStore((s) => s.fetchBikes);
 
   useEffect(() => {
     fetchBikes(user?.id ?? 'local');
   }, [user?.id]);
-  const {
-    isRecording, setRecording,
-    isRidePaused, setRidePaused,
-    recordedPoints, clearRecordedPoints,
-    lastKnownLocation,
-  } = useSafetyStore();
+
+  const isRecording = useSafetyStore((s) => s.isRecording);
+  const setRecording = useSafetyStore((s) => s.setRecording);
+  const isRidePaused = useSafetyStore((s) => s.isRidePaused);
+  const setRidePaused = useSafetyStore((s) => s.setRidePaused);
+  const recordedPoints = useSafetyStore((s) => s.recordedPoints);
+  const clearRecordedPoints = useSafetyStore((s) => s.clearRecordedPoints);
+  const lastKnownLocation = useSafetyStore((s) => s.lastKnownLocation);
+  const isMonitoring = useSafetyStore((s) => s.isMonitoring);
+  const setMonitoring = useSafetyStore((s) => s.setMonitoring);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const { isMonitoring, setMonitoring } = useSafetyStore();
-
   const selectedBike = useActiveBike();
 
   // ── Navigation store ──
-  const {
-    mode: navMode, destination, activeRoute, alternateRoutes,
-    currentStepIndex, remainingDistanceMiles, eta,
-    routePreference, speedMph, headingDeg,
-    setMode: setNavMode, setDestination, setActiveRoute, setAlternateRoutes,
-    setCurrentStepIndex, setRemainingDistance, setEta,
-    setRoutePreference, setSpeed, setHeading, setIsOffRoute,
-    resetNavigation,
-    pendingSearchDest, setPendingSearchDest,
-  } = useNavigationStore();
+  const navMode = useNavigationStore((s) => s.mode);
+  const destination = useNavigationStore((s) => s.destination);
+  const activeRoute = useNavigationStore((s) => s.activeRoute);
+  const alternateRoutes = useNavigationStore((s) => s.alternateRoutes);
+  const currentStepIndex = useNavigationStore((s) => s.currentStepIndex);
+  const remainingDistanceMiles = useNavigationStore((s) => s.remainingDistanceMiles);
+  const eta = useNavigationStore((s) => s.eta);
+  const routePreference = useNavigationStore((s) => s.routePreference);
+  const speedMph = useNavigationStore((s) => s.speedMph);
+  const headingDeg = useNavigationStore((s) => s.headingDeg);
+  const setNavMode = useNavigationStore((s) => s.setMode);
+  const setDestination = useNavigationStore((s) => s.setDestination);
+  const setActiveRoute = useNavigationStore((s) => s.setActiveRoute);
+  const setAlternateRoutes = useNavigationStore((s) => s.setAlternateRoutes);
+  const setCurrentStepIndex = useNavigationStore((s) => s.setCurrentStepIndex);
+  const setRemainingDistance = useNavigationStore((s) => s.setRemainingDistance);
+  const setEta = useNavigationStore((s) => s.setEta);
+  const setRoutePreference = useNavigationStore((s) => s.setRoutePreference);
+  const setSpeed = useNavigationStore((s) => s.setSpeed);
+  const setHeading = useNavigationStore((s) => s.setHeading);
+  const setIsOffRoute = useNavigationStore((s) => s.setIsOffRoute);
+  const resetNavigation = useNavigationStore((s) => s.resetNavigation);
+  const pendingSearchDest = useNavigationStore((s) => s.pendingSearchDest);
+  const setPendingSearchDest = useNavigationStore((s) => s.setPendingSearchDest);
 
   // ── Drawer / sheet state ──
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -1018,6 +1039,15 @@ export default function RideScreen() {
   useEffect(() => {
     if (isRecording) setShowChecklist(false);
   }, [isRecording]);
+
+  // Scout "start_ride" tool — opens checklist via store flag
+  const pendingStartRide = useSafetyStore((s) => s.pendingStartRide);
+  useEffect(() => {
+    if (pendingStartRide && !isRecording && !isNavigatingActive) {
+      useSafetyStore.getState().setPendingStartRide(false);
+      setShowChecklist(true);
+    }
+  }, [pendingStartRide]);
 
   // ── Ride guard: prevent starting a new ride/nav while one is active ──
   function guardRideStart(): boolean {

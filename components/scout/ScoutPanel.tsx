@@ -351,7 +351,7 @@ function ScoutPanelContent() {
         category: r.category ?? '',
         distance: r.distance_miles ?? 0,
       })),
-      favoriteLocations: favorites,
+      favoriteLocations: favorites.map((f) => ({ id: f.id, nickname: f.nickname, address: f.isHome ? f.address : '', isHome: f.isHome })),
       recentMaintenanceLogs: maintenanceLogs,
       serviceIntervals: serviceIntervals?.items?.length > 0 ? serviceIntervals : null,
     };
@@ -386,6 +386,22 @@ function ScoutPanelContent() {
       addMessage(userMsg);
       const punchline: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'One more.', timestamp: new Date() };
       addMessage(punchline);
+      return;
+    }
+
+    // "Let's ride" — open pre-ride checklist directly, no Gemini needed
+    if (/let'?s ride|start a ride|start recording|start my ride/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const safety = useSafetyStore.getState();
+      if (safety.isRecording) {
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'You already have a ride in progress.', timestamp: new Date() };
+        addMessage(ackMsg);
+      } else {
+        // Show message with tappable link — link handler closes Scout + opens checklist
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Review your settings and tap START & RECORD RIDE on the Pre-Ride Checklist.', timestamp: new Date() };
+        addMessage(ackMsg);
+      }
       return;
     }
 
@@ -500,7 +516,7 @@ function ScoutPanelContent() {
       headline: "I'm Scout. Ready to ride.",
       subtext: 'Controls, navigation, and safety — while you\'re on the move.',
       prompts: [
-        'How far to my destination?',
+        "Let's ride",
         'Find gas near me',
         'Pause my ride',
         "What's my safety status?",
@@ -565,7 +581,7 @@ function ScoutPanelContent() {
             ))}
           </View>
           <Text style={[st.bubbleText, { color: theme.textMuted, fontSize: 10, marginTop: 10 }]}>
-            Powered by AI — verify important details before riding.
+            Scout is powered by AI and can make mistakes.
           </Text>
         </View>
       </View>
@@ -577,25 +593,29 @@ function ScoutPanelContent() {
   const atLimit = messages.length >= MAX_MESSAGES_PER_SESSION;
 
   // Screen link map for tappable navigation in messages
-  const screenLinks: Array<{ pattern: RegExp; route: string }> = [
+  const screenLinks: Array<{ pattern: RegExp; route: string; action?: () => void }> = [
     { pattern: /Trip Planner/g, route: '/(tabs)/trip' },
     { pattern: /Garage/g, route: '/(tabs)/garage' },
     { pattern: /Ride screen/g, route: '/(tabs)/ride' },
+    { pattern: /Pre-Ride Checklist/g, route: '/(tabs)/ride', action: () => {
+      closeScout();
+      setTimeout(() => useSafetyStore.getState().setPendingStartRide(true), 400);
+    }},
   ];
 
   /** Parse message text and replace screen names with tappable links */
   const renderLinkedText = (text: string, textColor: string) => {
     // Build a combined regex
-    const combined = /(Trip Planner|Garage|Ride screen)/g;
-    const parts: Array<{ text: string; link?: string }> = [];
+    const combined = /(Trip Planner|Garage|Ride screen|Pre-Ride Checklist)/g;
+    const parts: Array<{ text: string; link?: string; action?: () => void }> = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = combined.exec(text)) !== null) {
       if (match.index > lastIndex) {
         parts.push({ text: text.slice(lastIndex, match.index) });
       }
-      const route = screenLinks.find((l) => l.pattern.test(match![0]))?.route;
-      parts.push({ text: match[0], link: route });
+      const linkDef = screenLinks.find((l) => l.pattern.test(match![0]));
+      parts.push({ text: match[0], link: linkDef?.route, action: linkDef?.action });
       // Reset the per-link pattern lastIndex
       screenLinks.forEach((l) => { l.pattern.lastIndex = 0; });
       lastIndex = match.index + match[0].length;
@@ -616,8 +636,12 @@ function ScoutPanelContent() {
               key={i}
               style={{ textDecorationLine: 'underline', color: theme.red }}
               onPress={() => {
-                closeScout();
-                router.navigate(p.link as any);
+                if (p.action) {
+                  p.action();
+                } else {
+                  closeScout();
+                  router.navigate(p.link as any);
+                }
               }}
             >
               {p.text}

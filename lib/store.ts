@@ -46,6 +46,7 @@ interface SafetyState {
   crashDetectionOverride: boolean;
   locationSharingOverride: boolean;
   notifyContactPhones: string[]; // contacts selected for this ride's alerts
+  pendingStartRide: boolean; // set by Scout to open pre-ride checklist
 
   // Crash alert state (managed by CrashAlertModal, read by Scout tools)
   isCrashAlertActive: boolean;
@@ -70,6 +71,7 @@ interface SafetyState {
   setCrashDetectionOverride: (v: boolean) => void;
   setLocationSharingOverride: (v: boolean) => void;
   setNotifyContactPhones: (phones: string[]) => void;
+  setPendingStartRide: (v: boolean) => void;
   clearSessionOverrides: () => void;
   setCrashAlertHandlers: (cancel: (() => void) | null, emergency: (() => void) | null) => void;
   setOnCrashAlertsSent: (fn: (() => void) | null) => void;
@@ -98,6 +100,7 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   crashDetectionOverride: false,
   locationSharingOverride: false,
   notifyContactPhones: [],
+  pendingStartRide: false,
 
   setMonitoring:    (isMonitoring) => set({ isMonitoring }),
   setRecording:     (isRecording)  => set({ isRecording }),
@@ -110,6 +113,7 @@ export const useSafetyStore = create<SafetyState>((set) => ({
   setCrashDetectionOverride: (crashDetectionOverride) => set({ crashDetectionOverride }),
   setLocationSharingOverride: (locationSharingOverride) => set({ locationSharingOverride }),
   setNotifyContactPhones: (notifyContactPhones) => set({ notifyContactPhones }),
+  setPendingStartRide: (pendingStartRide) => set({ pendingStartRide }),
   clearSessionOverrides: () => set((s) => ({
     // Revert global toggles that were only enabled for this ride
     isMonitoring: s.crashDetectionOverride ? false : s.isMonitoring,
