@@ -171,7 +171,13 @@ function SafetyService() {
       }
       clearCheckIn();
 
-      // Send SMS to all emergency contacts
+      // Send SMS to selected contacts (or primary, or first)
+      const notifyPhones = useSafetyStore.getState().notifyContactPhones;
+      const alertList = notifyPhones.length > 0
+        ? emergencyContacts.filter((c) => notifyPhones.includes(c.phone))
+        : emergencyContacts.filter((c) => c.is_primary).length > 0
+          ? emergencyContacts.filter((c) => c.is_primary)
+          : emergencyContacts.slice(0, 1);
       const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
       const mapsUrl = `https://maps.google.com/maps?q=${loc.lat},${loc.lng}`;
       const riderName = user?.email ?? 'A rider';
@@ -183,7 +189,7 @@ function SafetyService() {
         ? new Date(checkInDeadline).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
         : '—';
 
-      for (const contact of emergencyContacts) {
+      for (const contact of alertList) {
         try {
           await supabase.functions.invoke('send-checkin-alert', {
             body: {

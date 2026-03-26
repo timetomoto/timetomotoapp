@@ -54,7 +54,20 @@ async function sendCrashAlerts(
 export default function CrashAlertModal() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
-  const { crashDetected, emergencyContacts, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
+  const { crashDetected, emergencyContacts, notifyContactPhones, lastKnownLocation, setCrashDetected, setCrashAlertHandlers, onCrashAlertsSent } = useSafetyStore();
+
+  // Determine which contacts to alert:
+  // 1. If ride is active with selected contacts, use those
+  // 2. Otherwise fall back to primary contact
+  // 3. If no primary, use first contact
+  const alertContacts = (() => {
+    if (notifyContactPhones.length > 0) {
+      return emergencyContacts.filter((c) => notifyContactPhones.includes(c.phone));
+    }
+    const primary = emergencyContacts.find((c) => c.is_primary);
+    if (primary) return [primary];
+    return emergencyContacts.length > 0 ? [emergencyContacts[0]] : [];
+  })();
 
   const [countdown, setCountdown] = useState(COUNTDOWN_SEC);
   const pulseAnim   = useRef(new Animated.Value(1)).current;
@@ -123,7 +136,7 @@ export default function CrashAlertModal() {
           stopRecordingCommand();
           const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
           const name = user?.email ?? 'A rider';
-          sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+          sendCrashAlerts(name, loc.lat, loc.lng, alertContacts).finally(() => {
             onCrashAlertsSent?.();
             setCrashDetected(false);
           });
@@ -165,7 +178,7 @@ export default function CrashAlertModal() {
     speakResponse('Alerting your emergency contacts now.');
     const loc = lastKnownLocation ?? { lat: 0, lng: 0 };
     const name = user?.email ?? 'A rider';
-    sendCrashAlerts(name, loc.lat, loc.lng, emergencyContacts).finally(() => {
+    sendCrashAlerts(name, loc.lat, loc.lng, alertContacts).finally(() => {
       onCrashAlertsSent?.();
       setCrashDetected(false);
     });
@@ -192,8 +205,8 @@ export default function CrashAlertModal() {
           {/* Header */}
           <Text style={[s.warningLabel, { color: theme.red }]}>⚠ CRASH DETECTED</Text>
           <Text style={[s.subLabel, { color: theme.textSecondary }]}>
-            {emergencyContacts.length > 0
-              ? `Alerting your emergency contacts in`
+            {alertContacts.length > 0
+              ? `Alerting your emergency contact${alertContacts.length > 1 ? 's' : ''} in`
               : 'No emergency contacts saved.\nCancel if you are OK.'}
           </Text>
 
@@ -203,10 +216,10 @@ export default function CrashAlertModal() {
             <Text style={[s.countdownUnit, { color: theme.textSecondary }]}>seconds</Text>
           </View>
 
-          {/* Contacts preview */}
-          {emergencyContacts.length > 0 && (
+          {/* Contacts preview — only show who will be alerted */}
+          {alertContacts.length > 0 && (
             <View style={[s.contactList, { backgroundColor: theme.bgCard }]}>
-              {emergencyContacts.map((c, i) => (
+              {alertContacts.map((c, i) => (
                 <Text key={i} style={[s.contactItem, { color: theme.textSecondary }]}>
                   {c.name} · {c.phone}
                 </Text>

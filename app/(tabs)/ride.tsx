@@ -939,6 +939,11 @@ export default function RideScreen() {
     setRecording(true);
     setRidePaused(false);
 
+    // Store selected contacts for crash/check-in alerts
+    if (cfg.notifyContactIds && cfg.notifyContactIds.length > 0) {
+      useSafetyStore.getState().setNotifyContactPhones(cfg.notifyContactIds);
+    }
+
     // Live share
     if (cfg.shareEnabled && user) {
       try {
