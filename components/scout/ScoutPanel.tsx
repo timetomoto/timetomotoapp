@@ -565,7 +565,7 @@ function ScoutPanelContent() {
             ))}
           </View>
           <Text style={[st.bubbleText, { color: theme.textMuted, fontSize: 10, marginTop: 10 }]}>
-            Powered by AI — verify important details before riding.
+            Scout is powered by AI and can make mistakes.
           </Text>
         </View>
       </View>
