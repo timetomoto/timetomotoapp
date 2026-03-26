@@ -389,6 +389,24 @@ function ScoutPanelContent() {
       return;
     }
 
+    // "Let's ride" — open pre-ride checklist directly, no Gemini needed
+    if (/let'?s ride|start a ride|start recording|start my ride/i.test(msg)) {
+      const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
+      addMessage(userMsg);
+      const safety = useSafetyStore.getState();
+      if (safety.isRecording) {
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'You already have a ride in progress.', timestamp: new Date() };
+        addMessage(ackMsg);
+      } else {
+        const ackMsg: ScoutMessage = { id: `a_${Date.now()}`, role: 'assistant', content: 'Opening your pre-ride checklist. Review your settings and tap START & RECORD RIDE when ready.', timestamp: new Date() };
+        addMessage(ackMsg);
+        safety.setPendingStartRide(true);
+        // Close Scout so the checklist can open on the Ride screen
+        setTimeout(() => closeScout(), 300);
+      }
+      return;
+    }
+
     // Debug trigger — simulate crash alert (dev only)
     if (__DEV__ && /simulate crash/i.test(msg)) {
       const userMsg: ScoutMessage = { id: `u_${Date.now()}`, role: 'user', content: msg, timestamp: new Date() };
