@@ -247,7 +247,7 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
           contentContainerStyle={styles.bikeChipContent}
           nestedScrollEnabled
         >
-          {bikes.map((bike) => (
+          {[...bikes].sort((a, b) => a.id === selectedBike ? -1 : b.id === selectedBike ? 1 : 0).map((bike) => (
             <Pressable
               key={bike.id}
               style={[

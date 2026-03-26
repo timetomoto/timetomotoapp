@@ -46,19 +46,6 @@ export default function GarageScreen() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({ maintenance: true });
 
   const selectedBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
-  const chipScrollRef = useRef<ScrollView>(null);
-
-  // Auto-scroll chip row to selected bike on mount / selection change
-  useEffect(() => {
-    if (!selectedBikeId || bikes.length <= 1) return;
-    const idx = bikes.findIndex((b) => b.id === selectedBikeId);
-    if (idx > 0) {
-      const chipWidth = 120;
-      const offset = Math.max(0, idx * chipWidth - 100);
-      // Longer delay on mount to ensure ScrollView is laid out
-      setTimeout(() => chipScrollRef.current?.scrollTo({ x: offset, animated: false }), 300);
-    }
-  }, [selectedBikeId, bikes.length]);
 
   // Load/save expanded state
   useEffect(() => {
@@ -214,13 +201,12 @@ export default function GarageScreen() {
           {/* Bike selector chips */}
           {bikes.length > 1 && (
             <ScrollView
-              ref={chipScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.chipRow}
               contentContainerStyle={styles.chipContent}
             >
-              {bikes.map((bike) => (
+              {[...bikes].sort((a, b) => a.id === selectedBikeId ? -1 : b.id === selectedBikeId ? 1 : 0).map((bike) => (
                 <Pressable
                   key={bike.id}
                   style={[
