@@ -650,10 +650,9 @@ export default function SpecificationsSection({ bike, onCountChange }: { bike: B
             style={[st.askScoutBtn, { borderColor: theme.red }]}
             onPress={() => {
               const label = [bike.year, bike.make, bike.model].filter(Boolean).join(' ');
-              // Select this bike so Scout context picks it up as active
-              useGarageStore.getState().selectBike(bike.id);
+              const nameHint = bike.nickname ? ` (${bike.nickname})` : '';
               useScoutStore.getState().openScout({
-                initialMessage: `Tell me about my ${label} and what I should know about it.`,
+                initialMessage: `Look up my ${label}${nameHint} using ask_garage and tell me its specs, maintenance history, and what I should know.`,
               });
             }}
           >
