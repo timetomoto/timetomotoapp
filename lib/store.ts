@@ -455,10 +455,15 @@ type MapStyleStore = {
   mapStyle: string;
   setMapStyle: (style: string) => void;
   loadSavedMapStyle: () => Promise<void>;
+  // Layer toggles — set by Scout tools, read by ride.tsx
+  pendingLayerToggle: { layer: string; on: boolean } | null;
+  setPendingLayerToggle: (toggle: { layer: string; on: boolean } | null) => void;
 };
 
 export const useMapStyleStore = create<MapStyleStore>()((set) => ({
   mapStyle: DEFAULT_MAP_STYLE,
+  pendingLayerToggle: null,
+  setPendingLayerToggle: (pendingLayerToggle) => set({ pendingLayerToggle }),
   setMapStyle: (mapStyle) => {
     set({ mapStyle });
     AsyncStorage.setItem(MAP_STYLE_KEY, mapStyle).catch(() => {});

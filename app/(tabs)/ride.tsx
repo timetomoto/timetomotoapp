@@ -1049,6 +1049,20 @@ export default function RideScreen() {
     }
   }, [pendingStartRide]);
 
+  // Scout layer toggle — watch for pending layer changes from Scout tools
+  const pendingLayerToggle = useMapStyleStore((s) => s.pendingLayerToggle);
+  useEffect(() => {
+    if (!pendingLayerToggle) return;
+    const { layer, on } = pendingLayerToggle;
+    useMapStyleStore.getState().setPendingLayerToggle(null);
+    switch (layer) {
+      case 'fuel': on ? handleToggleFuelStations() : setFuelStationsOn(false); break;
+      case 'food': on ? handleToggleFood() : setFoodOn(false); break;
+      case 'weather': setWeatherOn(on); break;
+      case 'construction': on ? handleToggleConstruction() : setConstructionOn(false); break;
+    }
+  }, [pendingLayerToggle]);
+
   // ── Ride guard: prevent starting a new ride/nav while one is active ──
   function guardRideStart(): boolean {
     if (isRecording || isNavigatingActive) {

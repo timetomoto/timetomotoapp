@@ -79,6 +79,10 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
   { name: 'trigger_emergency', description: 'Fire SMS to emergency contacts immediately.', parameters: { type: 'object', properties: {}, required: [] } },
   { name: 'checkin_now', description: 'Reset the check-in timer and cancel pending alert.', parameters: { type: 'object', properties: {}, required: [] } },
   { name: 'get_safety_status', description: 'Get current state of crash detection, live share, and check-in timer.', parameters: { type: 'object', properties: {}, required: [] } },
+
+  // ── Map Controls ──────────────────────────────────────────────────────
+  { name: 'set_map_style', description: 'Switch the map base layer. Options: satellite, outdoors, streets, dark.', parameters: { type: 'object', properties: { style: { type: 'string', description: 'Map style.', enum: ['satellite', 'outdoors', 'streets', 'dark'] } }, required: ['style'] } },
+  { name: 'toggle_map_layer', description: 'Turn a map overlay layer on or off. Layers: fuel (gas stations), food (restaurants), weather (radar), construction (road conditions).', parameters: { type: 'object', properties: { layer: { type: 'string', description: 'Layer to toggle.', enum: ['fuel', 'food', 'weather', 'construction'] }, on: { type: 'boolean', description: 'true to show, false to hide.' } }, required: ['layer', 'on'] } },
 ];
 
 /** Tool names that only apply during crash alerts */

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } from './store';
+import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore, useMapStyleStore } from './store';
 import { useNavigationStore } from './navigationStore';
 import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
@@ -1094,6 +1094,31 @@ export async function executeScoutTool(
         }
         parts.push(`Emergency contacts: ${ss.emergencyContacts.length}`);
         return parts.join('\n');
+      }
+
+      // ── Map Controls ─────────────────────────────────────────────────
+      case 'set_map_style': {
+        const styleMap: Record<string, string> = {
+          satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+          outdoors: 'mapbox://styles/mapbox/outdoors-v12',
+          streets: 'mapbox://styles/mapbox/streets-v12',
+          dark: 'mapbox://styles/mapbox/dark-v11',
+        };
+        const requested = (parameters.style as string).toLowerCase();
+        const url = styleMap[requested];
+        if (!url) return `Unknown map style "${parameters.style}". Options: satellite, outdoors, streets, dark.`;
+        useMapStyleStore.getState().setMapStyle(url);
+        return `Map switched to ${requested}.`;
+      }
+
+      case 'toggle_map_layer': {
+        const layer = (parameters.layer as string).toLowerCase();
+        const on = parameters.on as boolean;
+        const validLayers = ['fuel', 'food', 'weather', 'construction'];
+        if (!validLayers.includes(layer)) return `Unknown layer "${parameters.layer}". Options: fuel, food, weather, construction.`;
+        useMapStyleStore.getState().setPendingLayerToggle({ layer, on });
+        const label = layer === 'fuel' ? 'Gas stations' : layer === 'food' ? 'Restaurants' : layer === 'weather' ? 'Weather radar' : 'Road conditions';
+        return `${label} layer ${on ? 'turned on' : 'turned off'}.`;
       }
 
       default:
