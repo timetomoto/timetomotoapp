@@ -1203,9 +1203,28 @@ export default function RideScreen() {
   // Map style — respect theme for standard, always use correct style for others
   const activeMapStyle = globalMapStyleUrl;
 
-  // Weather tile URL — OpenWeatherMap precipitation overlay
-  const owmKey = process.env.EXPO_PUBLIC_OWM_API_KEY ?? '';
-  const weatherTileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${owmKey}`;
+  // Weather radar — Rainbow.ai precipitation tiles (real radar + ML, global, z0-12)
+  const rainbowKey = process.env.EXPO_PUBLIC_RAINBOW_API_KEY ?? '';
+  const [rainbowSnapshot, setRainbowSnapshot] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!weatherOn) return;
+    let cancelled = false;
+    const fetchSnapshot = async () => {
+      try {
+        const res = await fetch(`https://api.rainbow.ai/tiles/v1/snapshot?layer=precip&token=${rainbowKey}`);
+        const data = await res.json();
+        if (!cancelled && data) setRainbowSnapshot(typeof data === 'number' ? data : data.snapshot ?? data.value ?? null);
+      } catch {}
+    };
+    fetchSnapshot();
+    const interval = setInterval(fetchSnapshot, 600_000); // refresh every 10 min
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [weatherOn]);
+
+  const weatherTileUrl = rainbowSnapshot
+    ? `https://api.rainbow.ai/tiles/v1/precip/${rainbowSnapshot}/0/{z}/{x}/{y}?color=0&token=${rainbowKey}`
+    : '';
 
   const isNavigatingActive = navMode === 'navigating' || navMode === 'off_route' || navMode === 'recalculating';
 
@@ -1292,20 +1311,17 @@ export default function RideScreen() {
             pulsing={{ isEnabled: true }}
           />
 
-          {/* ── Weather tile overlay ── */}
-          {weatherOn && (
+          {/* ── Weather radar overlay — Rainbow.ai precipitation ── */}
+          {weatherOn && rainbowSnapshot && (
             <RasterSource
               id="weather-tiles"
               tileUrlTemplates={[weatherTileUrl]}
               tileSize={256}
-              minZoomLevel={0}
               maxZoomLevel={12}
             >
               <RasterLayer
                 id="weather-layer"
-                style={{ rasterOpacity: 0.85 }}
-                minZoomLevel={0}
-                maxZoomLevel={12}
+                style={{ rasterOpacity: 0.75 }}
               />
             </RasterSource>
           )}
