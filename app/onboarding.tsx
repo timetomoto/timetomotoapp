@@ -534,11 +534,11 @@ const s = StyleSheet.create({
   mockBubbleBotText: { fontSize: 14, lineHeight: 20 },
 
   // Screen 2
-  twoLineBlock: { alignItems: 'center', paddingVertical: 24 },
-  twoLineIcon: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  twoLineHeadline: { fontSize: 20, fontWeight: '700', textAlign: 'center', lineHeight: 28, marginBottom: 8 },
-  twoLineBody: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  divider: { width: 60, height: 1, marginVertical: 8 },
+  twoLineBlock: { alignItems: 'center', paddingVertical: 14 },
+  twoLineIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  twoLineHeadline: { fontSize: 18, fontWeight: '700', textAlign: 'center', lineHeight: 24, marginBottom: 6 },
+  twoLineBody: { fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  divider: { width: 60, height: 1, marginVertical: 4 },
 
   // Screen 3
   sectionDivider: { width: '100%', height: 1, marginVertical: 28 },
