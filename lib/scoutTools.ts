@@ -859,7 +859,16 @@ export async function executeScoutTool(
       }
 
       case 'find_nearby': {
-        const query = parameters.query as string;
+        let query = parameters.query as string;
+        // Normalize common rider phrases to POI-friendly search terms
+        const normalize: Record<string, string> = {
+          'gas': 'gas station', 'fuel': 'gas station', 'need gas': 'gas station', 'need fuel': 'gas station',
+          'coffee': 'coffee shop', 'food': 'restaurant', 'eat': 'restaurant', 'hungry': 'restaurant',
+          'rest': 'rest area', 'bathroom': 'rest area', 'restroom': 'rest area',
+          'park': 'parking', 'parking': 'motorcycle parking',
+        };
+        const lower = query.toLowerCase().trim();
+        if (normalize[lower]) query = normalize[lower];
         // Use current location, or fall back to route origin/midpoint
         const proximity = context.currentLocation ?? (() => {
           const ts = useTripPlannerStore.getState();
