@@ -1155,12 +1155,15 @@ export default function TripPlanner() {
         >
           <Feather name="layers" size={18} color={theme.textPrimary} />
         </Pressable>
-        {/* Full-screen toggle */}
+        {/* Full-screen toggle — green when active, muted when not */}
         <Pressable
-          style={[st.fullScreenBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          style={[st.fullScreenBtn, {
+            backgroundColor: fullScreen ? (theme.green ?? '#2E7D32') + 'CC' : theme.bgPanel,
+            borderColor: fullScreen ? (theme.green ?? '#2E7D32') : theme.border,
+          }]}
           onPress={fullScreen ? exitFullScreen : enterFullScreen}
         >
-          <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={theme.textPrimary} />
+          <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={fullScreen ? '#fff' : theme.textSecondary} />
         </Pressable>
         {/* Construction layer toggle */}
         <Pressable
