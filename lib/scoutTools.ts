@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore, useMapStyleStore } from './store';
+import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore, useMapStyleStore, MAP_STYLE_URLS } from './store';
 import { useNavigationStore } from './navigationStore';
 import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
@@ -1098,14 +1098,8 @@ export async function executeScoutTool(
 
       // ── Map Controls ─────────────────────────────────────────────────
       case 'set_map_style': {
-        const styleMap: Record<string, string> = {
-          satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-          outdoors: 'mapbox://styles/mapbox/outdoors-v12',
-          streets: 'mapbox://styles/mapbox/streets-v12',
-          dark: 'mapbox://styles/mapbox/dark-v11',
-        };
         const requested = (parameters.style as string).toLowerCase();
-        const url = styleMap[requested];
+        const url = MAP_STYLE_URLS[requested];
         if (!url) return `Unknown map style "${parameters.style}". Options: satellite, outdoors, streets, dark.`;
         useMapStyleStore.getState().setMapStyle(url);
         return `Map switched to ${requested}.`;
