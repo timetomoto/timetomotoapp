@@ -276,7 +276,14 @@ export async function executeScoutTool(
 
       // ── Conditions & Intelligence ───────────────────────────────────
       case 'get_weather_briefing': {
-        const geojson = tripStore.tripRouteGeojson;
+        // Check trip planner route first, then fall back to active navigation route
+        let geojson = tripStore.tripRouteGeojson;
+        if (!geojson?.coordinates || geojson.coordinates.length < 2) {
+          const nav = useNavigationStore.getState();
+          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
+            geojson = nav.activeRoute.geometry;
+          }
+        }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
           return 'No route set. Build a route first to check weather.';
         const { points, useCelsius } = await fetchRouteWeather(geojson.coordinates);
@@ -302,7 +309,13 @@ export async function executeScoutTool(
 
       case 'get_departure_suggestion': {
         const avoid = parameters.avoid as string;
-        const geojson = tripStore.tripRouteGeojson;
+        let geojson = tripStore.tripRouteGeojson;
+        if (!geojson?.coordinates || geojson.coordinates.length < 2) {
+          const nav = useNavigationStore.getState();
+          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
+            geojson = nav.activeRoute.geometry;
+          }
+        }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
           return 'No route set. Build a route first.';
         const { points, useCelsius } = await fetchRouteWeather(geojson.coordinates);
@@ -327,7 +340,13 @@ export async function executeScoutTool(
       }
 
       case 'get_road_conditions': {
-        const geojson = tripStore.tripRouteGeojson;
+        let geojson = tripStore.tripRouteGeojson;
+        if (!geojson?.coordinates || geojson.coordinates.length < 2) {
+          const nav = useNavigationStore.getState();
+          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
+            geojson = nav.activeRoute.geometry;
+          }
+        }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
           return 'No route set. Build a route first to check conditions.';
         const samples = sampleRouteCoordinates(geojson.coordinates, 30);
@@ -998,7 +1017,13 @@ export async function executeScoutTool(
       }
 
       case 'save_current_route': {
-        const geojson = tripStore.tripRouteGeojson;
+        let geojson = tripStore.tripRouteGeojson;
+        if (!geojson?.coordinates || geojson.coordinates.length < 2) {
+          const nav = useNavigationStore.getState();
+          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
+            geojson = nav.activeRoute.geometry;
+          }
+        }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
           return 'No route to save. Build a route first.';
         const origin = context.currentTrip.origin;

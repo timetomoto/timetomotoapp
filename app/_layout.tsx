@@ -118,14 +118,14 @@ function SafetyService() {
   // Lazy-init detector singleton
   if (!detectorRef.current) {
     detectorRef.current = new CrashDetector(() => setCrashDetected(true));
-    // Register voice hook so CrashAlertModal can call it when SMS fires
+  }
+
+  // ── Restore persisted safety defaults on mount ──
+  useEffect(() => {
+    // Register voice hook (must be in useEffect to avoid set-during-render warning)
     useSafetyStore.getState().setOnCrashAlertsSent(
       () => detectorRef.current?.onAlertsSent()
     );
-  }
-
-  // ── Restore persisted safety defaults + load contacts on mount ──
-  useEffect(() => {
     (async () => {
       const [crashVal, shareVal] = await Promise.all([
         AsyncStorage.getItem(SAFETY_CRASH_DETECTION_KEY),
@@ -134,10 +134,13 @@ function SafetyService() {
       if (crashVal === 'true') useSafetyStore.getState().setMonitoring(true);
       if (shareVal === 'true') useSafetyStore.getState().setShareActive(true);
     })();
-    // Always load emergency contacts so crash detection has them ready
-    const userId = useAuthStore.getState().user?.id ?? 'local';
-    useSafetyStore.getState().loadContacts(userId);
   }, []);
+
+  // ── Load emergency contacts once user is authenticated ──
+  useEffect(() => {
+    const userId = user?.id ?? 'local';
+    useSafetyStore.getState().loadContacts(userId);
+  }, [user?.id]);
 
   // ── Crash detector lifecycle ──
   useEffect(() => {

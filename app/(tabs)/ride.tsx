@@ -443,6 +443,7 @@ export default function RideScreen() {
   const [foodPlaces,     setFoodPlaces]     = useState<FoodPlace[]>([]);
   const [foodLoading,    setFoodLoading]    = useState(false);
   const [weatherOn,      setWeatherOn]      = useState(false);
+
   const [constructionOn, setConstructionOn] = useState(false);
   const [constructionLoading, setConstructionLoading] = useState(false);
   const [constructionIncidents, setConstructionIncidents] = useState<Array<{ id: string; title: string; description: string; lat: number; lng: number; severity: string }>>([]);
@@ -1302,7 +1303,7 @@ export default function RideScreen() {
             >
               <RasterLayer
                 id="weather-layer"
-                style={{ rasterOpacity: 0.6 }}
+                style={{ rasterOpacity: 0.85 }}
                 minZoomLevel={0}
                 maxZoomLevel={12}
               />

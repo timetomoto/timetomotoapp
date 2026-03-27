@@ -5,12 +5,15 @@
 - [ ] Apple Developer account — required for dev build, TestFlight, App Store
 - [x] Twilio secrets — configured in Supabase
 - [x] Onboarding flag — per-user key @ttm/onboarding_v1_${userId}
+- [x] Resend production key rotated + RESEND_API_KEY secret in Supabase
 
 ## DEV — P1 (High — Pre-Launch)
 
 - [ ] EAS build setup — eas.json, Apple Developer account link, push notification certificates
 - [ ] Social auth — Apple + Google Sign-In via Supabase Auth providers
+- [ ] send-welcome-email OAuth trigger — add when Google/Apple auth ships (currently only fires after email confirmation onboarding)
 - [ ] Subscription — single tier $4.99/month Apple IAP with 14-day trial
+- [ ] send-ride-summary Edge Function — create function, decide on map image generation (static Mapbox API), opt-in preference per user, trigger after ride save
 - [ ] Live Share viewer page — timetomoto.com/track/[token] (backend wired, needs web page)
 - [ ] Privacy Policy — host at timetomoto.com/privacy (Settings links ready)
 - [ ] Terms of Service — host at timetomoto.com/terms (Settings links ready)
@@ -18,6 +21,7 @@
 - [ ] Wake word — "Hey Scout" continuous listening during active ride (dev build required)
 - [ ] Hands-free Scout + live map — voice commands while watching Trip Planner map update in real-time (dev build session)
 - [ ] Bearing arrow for imported/GPX routes — directional arrow on TurnCard for routes without Mapbox steps (dev build session)
+- [ ] Pass contactEmail to send-crash-alert and send-checkin-alert — app currently only sends contactPhone, email is optional new field
 
 ## DEV — P2 (Medium — Quality)
 
@@ -47,9 +51,10 @@
 
 ## TESTING — Device Required
 
+- [ ] Welcome email — verify fires once after signup + onboarding, check inbox
 - [ ] Crash detection accelerometer — impact + 2s stillness fires modal
-- [ ] Crash SMS end to end — Twilio delivers to selected emergency contact
-- [ ] Check-in timer SMS — send-checkin-alert Edge Function delivers
+- [ ] Crash SMS + email end to end — Twilio SMS + Resend email to emergency contact
+- [ ] Check-in timer SMS + email — send-checkin-alert delivers both SMS and email
 - [ ] GPS lock — current location, navigation, turn-by-turn
 - [ ] Turn-by-turn voice — speakResponse at 800m/150m/30m thresholds
 - [ ] Background location — live share updates during ride
@@ -74,11 +79,12 @@
 - [ ] Firebase Analytics — project setup, plist, log key events
 - [ ] Remove __DEV__ developer section — app/settings.tsx
 - [ ] Remove "simulate crash" Scout command — dev-only but verify
-- [ ] API key rotation — Mapbox, HERE, OWM, Gemini, Supabase (do last)
+- [ ] API key rotation — Mapbox, HERE, OWM, Gemini, Supabase, Resend, Twilio, Anthropic (do last, see memory/project_key_rotation.md)
 - [ ] Open-Meteo commercial plan — $29/month before launch
 - [ ] App Store listing — screenshots, description, keywords, category
 - [ ] TestFlight beta — eas build --profile preview
 - [ ] App Store submission — eas build --profile production
+- [ ] TestFlight beta distribution to Break-In Crew — blocked by Apple Developer account
 - [ ] Scout — set daily quota to 50 for production
 - [ ] Remove EXPO_PUBLIC_TOMORROW_API_KEY from .env.local
 - [ ] Sweep console.error statements — keep only essential ones
@@ -226,3 +232,12 @@ Integrate GraphHopper or Kurviger API for motorcycle-optimized round trip genera
 - [x] update_bike — bidirectional matching + garage refresh
 - [x] 70+ Scout simulator tests passed
 - [x] 30+ bugs found and fixed during testing
+- [x] Light-theme email templates — 9 HTML templates in emails/light-theme/
+- [x] send-support-email — light-theme templates wired + deployed
+- [x] send-welcome-email Edge Function — created, deployed, onboarding trigger wired
+- [x] send-crash-alert — Resend email added alongside Twilio SMS, deployed
+- [x] send-checkin-alert — Resend email added alongside Twilio SMS, deployed
+- [x] delete-account — deletion confirmation email added, deployed
+- [x] welcome_email_sent duplicate guard — migration + profiles column
+- [x] Supabase Auth email templates — confirm signup + password reset (pasted into dashboard)
+- [x] Resend API key rotated after exposure
