@@ -454,7 +454,9 @@ const DEFAULT_MAP_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
 export const MAP_STYLE_URLS: Record<string, string> = {
   satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
   hybrid:    'mapbox://styles/mapbox/satellite-streets-v12',
+  terrain:   'mapbox://styles/mapbox/outdoors-v12',
   outdoors:  'mapbox://styles/mapbox/outdoors-v12',
+  standard:  'mapbox://styles/mapbox/streets-v12',
   streets:   'mapbox://styles/mapbox/streets-v12',
   dark:      'mapbox://styles/mapbox/dark-v11',
 };

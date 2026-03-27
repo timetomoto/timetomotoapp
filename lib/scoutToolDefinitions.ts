@@ -81,8 +81,8 @@ export const SCOUT_TOOL_DEFINITIONS: ToolDefinition[] = [
   { name: 'get_safety_status', description: 'Get current state of crash detection, live share, and check-in timer.', parameters: { type: 'object', properties: {}, required: [] } },
 
   // ── Map Controls ──────────────────────────────────────────────────────
-  { name: 'set_map_style', description: 'Switch the map base layer. Options: satellite (also called hybrid), outdoors, streets, dark. If the rider says "hybrid" use "satellite".', parameters: { type: 'object', properties: { style: { type: 'string', description: 'Map style.', enum: ['satellite', 'hybrid', 'outdoors', 'streets', 'dark'] } }, required: ['style'] } },
-  { name: 'toggle_map_layer', description: 'Turn a map overlay layer on or off. Layers: fuel (gas stations), food (restaurants), weather (radar), construction (road conditions).', parameters: { type: 'object', properties: { layer: { type: 'string', description: 'Layer to toggle.', enum: ['fuel', 'food', 'weather', 'construction'] }, on: { type: 'boolean', description: 'true to show, false to hide.' } }, required: ['layer', 'on'] } },
+  { name: 'set_map_style', description: 'Switch the map base layer. Options: satellite (also called hybrid), terrain (also called outdoors), standard (also called streets), dark. Always respond using the primary name (satellite, terrain, standard, dark).', parameters: { type: 'object', properties: { style: { type: 'string', description: 'Map style.', enum: ['satellite', 'hybrid', 'terrain', 'outdoors', 'standard', 'streets', 'dark'] } }, required: ['style'] } },
+  { name: 'toggle_map_layer', description: 'Turn a map overlay layer on or off. Layers: fuel (gas stations), food (restaurants/coffee), weather (radar), road conditions (construction/closures/hazards). Always respond using the primary name.', parameters: { type: 'object', properties: { layer: { type: 'string', description: 'Layer to toggle.', enum: ['fuel', 'food', 'weather', 'construction'] }, on: { type: 'boolean', description: 'true to show, false to hide.' } }, required: ['layer', 'on'] } },
 ];
 
 /** Tool names that only apply during crash alerts */

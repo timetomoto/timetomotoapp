@@ -76,9 +76,9 @@ export default function MapControlDrawer({
   ).current;
 
   const MAP_STYLE_OPTIONS: { key: MapStyleOption; label: string; icon: string }[] = [
-    { key: 'hybrid', label: 'Hybrid', icon: 'compass' },
-    { key: 'outdoors', label: 'Outdoors', icon: 'image' },
-    { key: 'streets', label: 'Streets', icon: 'map' },
+    { key: 'hybrid', label: 'Satellite', icon: 'compass' },
+    { key: 'outdoors', label: 'Terrain', icon: 'image' },
+    { key: 'streets', label: 'Standard', icon: 'map' },
     { key: 'dark', label: 'Dark', icon: 'moon' },
   ];
 
@@ -180,7 +180,7 @@ export default function MapControlDrawer({
                 ) : (
                   <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textSecondary} />
                 )}
-                <Text style={[s.rowLabel, { color: constructionOn ? theme.textPrimary : theme.textSecondary }]}>Construction</Text>
+                <Text style={[s.rowLabel, { color: constructionOn ? theme.textPrimary : theme.textSecondary }]}>Road Conditions</Text>
                 <View style={s.rowRight}>
                   <Switch
                     value={constructionOn}

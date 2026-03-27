@@ -1099,10 +1099,15 @@ export async function executeScoutTool(
       // ── Map Controls ─────────────────────────────────────────────────
       case 'set_map_style': {
         const requested = (parameters.style as string).toLowerCase();
-        const url = MAP_STYLE_URLS[requested];
-        if (!url) return `Unknown map style "${parameters.style}". Options: satellite, outdoors, streets, dark.`;
+        // Normalize aliases to internal keys
+        const aliasMap: Record<string, string> = { terrain: 'outdoors', standard: 'streets', satellite: 'hybrid' };
+        const key = aliasMap[requested] ?? requested;
+        const url = MAP_STYLE_URLS[key];
+        if (!url) return `Unknown map style "${parameters.style}". Options: satellite, terrain, standard, dark.`;
         useMapStyleStore.getState().setMapStyle(url);
-        return `Map switched to ${requested}.`;
+        // Respond with user-facing names
+        const displayName: Record<string, string> = { hybrid: 'satellite', outdoors: 'terrain', streets: 'standard', dark: 'dark' };
+        return `Map switched to ${displayName[key] ?? key}.`;
       }
 
       case 'toggle_map_layer': {
