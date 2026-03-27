@@ -363,6 +363,10 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
         <Feather name="play-circle" size={22} color={theme.white} />
         <Text style={styles.startBtnText}>START & RECORD RIDE</Text>
       </Pressable>
+
+      <Pressable onPress={onClose} style={styles.cancelBtn} hitSlop={12}>
+        <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+      </Pressable>
     </ScrollView>
       </View>
       </View>
@@ -416,4 +420,6 @@ const styles = StyleSheet.create({
   startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 8, paddingVertical: 18, marginTop: 2 },
   startBtnPressed: { opacity: 0.8 },
   startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.7 },
+  cancelBtn: { alignItems: 'center', paddingVertical: 14 },
+  cancelBtnText: { fontSize: 14, fontWeight: '600' },
 });
