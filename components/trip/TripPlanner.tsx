@@ -1158,8 +1158,8 @@ export default function TripPlanner() {
         {/* Full-screen toggle — green when active, muted when not */}
         <Pressable
           style={[st.fullScreenBtn, {
-            backgroundColor: fullScreen ? (theme.green ?? '#2E7D32') + 'CC' : theme.bgPanel,
-            borderColor: fullScreen ? (theme.green ?? '#2E7D32') : theme.border,
+            backgroundColor: fullScreen ? '#1E88E5CC' : theme.bgPanel,
+            borderColor: fullScreen ? '#1E88E5' : theme.border,
           }]}
           onPress={fullScreen ? exitFullScreen : enterFullScreen}
         >
@@ -1173,7 +1173,7 @@ export default function TripPlanner() {
         >
           {constructionLoading
             ? <ActivityIndicator size="small" color="#FF9800" />
-            : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textMuted} />
+            : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textPrimary} />
           }
         </Pressable>
         {/* Scout FAB removed — now in FloatingTabBar */}
