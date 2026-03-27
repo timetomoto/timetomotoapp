@@ -35,7 +35,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { useAuthStore, useGarageStore, useMapStyleStore, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
+import { useAuthStore, useGarageStore, useMapStyleStore, MAP_STYLE_URLS, useRoutesStore, useSafetyStore, useTripPlannerStore, useTabResetStore, bikeLabel } from '../../lib/store';
 import { useActiveBike } from '../../lib/useActiveBike';
 import { reverseGeocodeAddress } from '../../lib/geocode';
 import { useRouter } from 'expo-router';
@@ -92,12 +92,7 @@ if (_mapboxAvailable && Mapbox) {
 // ---------------------------------------------------------------------------
 type MapStyle = 'hybrid' | 'outdoors' | 'streets' | 'dark';
 
-const MAP_STYLES: Record<MapStyle, string> = {
-  hybrid:    'mapbox://styles/mapbox/satellite-streets-v12',
-  outdoors:  'mapbox://styles/mapbox/outdoors-v12',
-  streets:   'mapbox://styles/mapbox/streets-v12',
-  dark:      'mapbox://styles/mapbox/dark-v11',
-};
+const MAP_STYLES = MAP_STYLE_URLS as Record<MapStyle, string>;
 
 const AUSTIN = [-97.7431, 30.2672] as [number, number];
 
@@ -159,7 +154,7 @@ const WeatherLegend = memo(function WeatherLegend() {
 const wl = StyleSheet.create({
   panel: {
     position: 'absolute',
-    bottom: 103,
+    bottom: 153,
     left: 16,
     borderWidth: 1,
     borderRadius: 8,
@@ -1048,6 +1043,20 @@ export default function RideScreen() {
       setShowChecklist(true);
     }
   }, [pendingStartRide]);
+
+  // Scout layer toggle — watch for pending layer changes from Scout tools
+  const pendingLayerToggle = useMapStyleStore((s) => s.pendingLayerToggle);
+  useEffect(() => {
+    if (!pendingLayerToggle) return;
+    const { layer, on } = pendingLayerToggle;
+    useMapStyleStore.getState().setPendingLayerToggle(null);
+    switch (layer) {
+      case 'fuel': on ? handleToggleFuelStations() : setFuelStationsOn(false); break;
+      case 'food': on ? handleToggleFood() : setFoodOn(false); break;
+      case 'weather': setWeatherOn(on); break;
+      case 'construction': on ? handleToggleConstruction() : setConstructionOn(false); break;
+    }
+  }, [pendingLayerToggle]);
 
   // ── Ride guard: prevent starting a new ride/nav while one is active ──
   function guardRideStart(): boolean {

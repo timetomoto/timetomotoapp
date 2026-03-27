@@ -219,11 +219,15 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
       <View style={[styles.root, { backgroundColor: theme.bg }]}>
         {/* Drag handle */}
         <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
-        {/* Header row */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>BEFORE YOU RIDE</Text>
-          <Pressable onPress={onClose} hitSlop={8}>
-            <Feather name="x" size={22} color={theme.textPrimary} />
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: theme.border }]}>
+          <View style={{ width: 40 }} />
+          <View style={styles.headerCenter}>
+            <Feather name="shield" size={16} color={theme.red} />
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>BEFORE YOU RIDE</Text>
+          </View>
+          <Pressable onPress={onClose} style={{ width: 40, alignItems: 'flex-end' }} hitSlop={8}>
+            <Feather name="x" size={20} color={theme.textMuted} />
           </Pressable>
         </View>
       <ScrollView
@@ -359,6 +363,10 @@ export default function PreRideChecklist({ visible, onClose, onStart }: { visibl
         <Feather name="play-circle" size={22} color={theme.white} />
         <Text style={styles.startBtnText}>START & RECORD RIDE</Text>
       </Pressable>
+
+      <Pressable onPress={onClose} style={styles.cancelBtn} hitSlop={12}>
+        <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+      </Pressable>
     </ScrollView>
       </View>
       </View>
@@ -374,10 +382,11 @@ const SCREEN_H = Dimensions.get('window').height;
 
 const styles = StyleSheet.create({
   rootOuter: { flex: 1, justifyContent: 'flex-end' },
-  root: { height: SCREEN_H * 0.95, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+  root: { height: SCREEN_H * 0.92, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
   dragHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 12 },
-  headerTitle: { fontSize: 18, fontWeight: '700', flex: 1, textAlign: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 5, borderBottomWidth: 1 },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
   content: { padding: 14, paddingBottom: 160 },
   sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 20 },
   bikeChipRow: { marginBottom: 10 },
@@ -411,4 +420,6 @@ const styles = StyleSheet.create({
   startBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 8, paddingVertical: 18, marginTop: 2 },
   startBtnPressed: { opacity: 0.8 },
   startBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.7 },
+  cancelBtn: { alignItems: 'center', paddingVertical: 14 },
+  cancelBtnText: { fontSize: 14, fontWeight: '600' },
 });

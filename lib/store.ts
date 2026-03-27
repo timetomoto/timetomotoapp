@@ -451,14 +451,29 @@ export const useThemeStore = create<ThemeStore>()((set, get) => ({
 const MAP_STYLE_KEY = '@ttm/map_style_preference';
 const DEFAULT_MAP_STYLE = 'mapbox://styles/mapbox/satellite-streets-v12';
 
+export const MAP_STYLE_URLS: Record<string, string> = {
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
+  hybrid:    'mapbox://styles/mapbox/satellite-streets-v12',
+  terrain:   'mapbox://styles/mapbox/outdoors-v12',
+  outdoors:  'mapbox://styles/mapbox/outdoors-v12',
+  standard:  'mapbox://styles/mapbox/streets-v12',
+  streets:   'mapbox://styles/mapbox/streets-v12',
+  dark:      'mapbox://styles/mapbox/dark-v11',
+};
+
 type MapStyleStore = {
   mapStyle: string;
   setMapStyle: (style: string) => void;
   loadSavedMapStyle: () => Promise<void>;
+  // Layer toggles — set by Scout tools, read by ride.tsx
+  pendingLayerToggle: { layer: string; on: boolean } | null;
+  setPendingLayerToggle: (toggle: { layer: string; on: boolean } | null) => void;
 };
 
 export const useMapStyleStore = create<MapStyleStore>()((set) => ({
   mapStyle: DEFAULT_MAP_STYLE,
+  pendingLayerToggle: null,
+  setPendingLayerToggle: (pendingLayerToggle) => set({ pendingLayerToggle }),
   setMapStyle: (mapStyle) => {
     set({ mapStyle });
     AsyncStorage.setItem(MAP_STYLE_KEY, mapStyle).catch(() => {});

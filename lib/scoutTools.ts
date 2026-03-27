@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore } from './store';
+import { useTripPlannerStore, useRoutesStore, useGarageStore, useSafetyStore, useMapStyleStore, MAP_STYLE_URLS } from './store';
 import { useNavigationStore } from './navigationStore';
 import { calcDistance } from './gpx';
 import { geocodeLocation, reverseGeocode } from './geocode';
@@ -768,9 +768,7 @@ export async function executeScoutTool(
 
       case 'update_bike': {
         const bikeName = (parameters.bike_name as string).toLowerCase();
-        const match = garageStore.bikes.find(
-          (b) => b.nickname?.toLowerCase().includes(bikeName) || b.model?.toLowerCase().includes(bikeName) || b.make?.toLowerCase().includes(bikeName),
-        );
+        const match = findBikeByName(bikeName, garageStore.bikes);
         if (!match) return `No bike matching "${parameters.bike_name}" found in your garage.`;
 
         const updated = { ...match };
@@ -780,8 +778,9 @@ export async function executeScoutTool(
         if (parameters.make) updated.make = parameters.make as string;
         if (parameters.model) updated.model = parameters.model as string;
 
-        // Update store
+        // Update store + bump refresh so Garage UI re-renders
         garageStore.updateBike(updated);
+        garageStore.bumpGarageDataRefresh();
 
         // Persist to Supabase
         try {
@@ -859,7 +858,16 @@ export async function executeScoutTool(
       }
 
       case 'find_nearby': {
-        const query = parameters.query as string;
+        let query = parameters.query as string;
+        // Normalize common rider phrases to POI-friendly search terms
+        const normalize: Record<string, string> = {
+          'gas': 'gas station', 'fuel': 'gas station', 'need gas': 'gas station', 'need fuel': 'gas station',
+          'coffee': 'coffee shop', 'food': 'restaurant', 'eat': 'restaurant', 'hungry': 'restaurant',
+          'rest': 'rest area', 'bathroom': 'rest area', 'restroom': 'rest area',
+          'park': 'parking', 'parking': 'motorcycle parking',
+        };
+        const lower = query.toLowerCase().trim();
+        if (normalize[lower]) query = normalize[lower];
         // Use current location, or fall back to route origin/midpoint
         const proximity = context.currentLocation ?? (() => {
           const ts = useTripPlannerStore.getState();
@@ -1094,6 +1102,30 @@ export async function executeScoutTool(
         }
         parts.push(`Emergency contacts: ${ss.emergencyContacts.length}`);
         return parts.join('\n');
+      }
+
+      // ── Map Controls ─────────────────────────────────────────────────
+      case 'set_map_style': {
+        const requested = (parameters.style as string).toLowerCase();
+        // Normalize aliases to internal keys
+        const aliasMap: Record<string, string> = { terrain: 'outdoors', standard: 'streets', satellite: 'hybrid' };
+        const key = aliasMap[requested] ?? requested;
+        const url = MAP_STYLE_URLS[key];
+        if (!url) return `Unknown map style "${parameters.style}". Options: satellite, terrain, standard, dark.`;
+        useMapStyleStore.getState().setMapStyle(url);
+        // Respond with user-facing names
+        const displayName: Record<string, string> = { hybrid: 'satellite', outdoors: 'terrain', streets: 'standard', dark: 'dark' };
+        return `Map switched to ${displayName[key] ?? key}.`;
+      }
+
+      case 'toggle_map_layer': {
+        const layer = (parameters.layer as string).toLowerCase();
+        const on = parameters.on as boolean;
+        const validLayers = ['fuel', 'food', 'weather', 'construction'];
+        if (!validLayers.includes(layer)) return `Unknown layer "${parameters.layer}". Options: fuel, food, weather, construction.`;
+        useMapStyleStore.getState().setPendingLayerToggle({ layer, on });
+        const label = layer === 'fuel' ? 'Gas stations' : layer === 'food' ? 'Restaurants' : layer === 'weather' ? 'Weather radar' : 'Road conditions';
+        return `${label} layer ${on ? 'turned on' : 'turned off'}.`;
       }
 
       default:

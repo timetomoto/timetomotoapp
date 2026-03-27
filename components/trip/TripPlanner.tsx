@@ -274,6 +274,8 @@ export default function TripPlanner() {
   useEffect(() => {
     if (wasScoutOpenRef.current && !isScoutOpen) {
       fitRouteWhenReady();
+      // Reset panel scroll to top so it doesn't show mid-scroll from Scout waypoint adds
+      setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: false }), 100);
     }
     wasScoutOpenRef.current = isScoutOpen;
   }, [isScoutOpen]);
@@ -286,8 +288,8 @@ export default function TripPlanner() {
   const addStopRef = useRef<View>(null);
   useEffect(() => {
     const diff = waypoints.length - prevWaypointCount.current;
-    // Only scroll when exactly 1 stop was added (manual add, not bulk import)
-    if (diff === 1) {
+    // Only scroll when exactly 1 stop was added manually (not bulk import, not from Scout)
+    if (diff === 1 && !useScoutStore.getState().isScoutOpen) {
       if (waypoints.length >= MAX_WAYPOINTS) {
         setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: true }), 300);
       } else {
@@ -1130,7 +1132,7 @@ export default function TripPlanner() {
         )}
         {/* ── Layers button ── */}
         <Pressable
-          style={[st.layersBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          style={[st.layersBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
           onPress={() => {
             const options = [
               { label: 'Hybrid', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
@@ -1153,22 +1155,25 @@ export default function TripPlanner() {
         >
           <Feather name="layers" size={18} color={theme.textPrimary} />
         </Pressable>
-        {/* Full-screen toggle */}
+        {/* Full-screen toggle — green when active, muted when not */}
         <Pressable
-          style={[st.fullScreenBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          style={[st.fullScreenBtn, {
+            backgroundColor: fullScreen ? '#1E88E5CC' : theme.mapOverlayBg,
+            borderColor: fullScreen ? '#1E88E5' : theme.border,
+          }]}
           onPress={fullScreen ? exitFullScreen : enterFullScreen}
         >
-          <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={theme.textPrimary} />
+          <Feather name={fullScreen ? 'minimize-2' : 'maximize-2'} size={18} color={fullScreen ? '#fff' : theme.textSecondary} />
         </Pressable>
         {/* Construction layer toggle */}
         <Pressable
-          style={[st.constructionBtn, { backgroundColor: constructionOn ? 'rgba(255,152,0,0.15)' : theme.bgPanel, borderColor: constructionOn ? '#FF9800' : theme.border }]}
+          style={[st.constructionBtn, { backgroundColor: constructionOn ? 'rgba(255,152,0,0.15)' : theme.mapOverlayBg, borderColor: constructionOn ? '#FF9800' : theme.border }]}
           onPress={handleToggleConstruction}
           disabled={constructionLoading}
         >
           {constructionLoading
             ? <ActivityIndicator size="small" color="#FF9800" />
-            : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textMuted} />
+            : <Feather name="alert-triangle" size={16} color={constructionOn ? '#FF9800' : theme.textPrimary} />
           }
         </Pressable>
         {/* Scout FAB removed — now in FloatingTabBar */}

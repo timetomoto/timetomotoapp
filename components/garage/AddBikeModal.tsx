@@ -539,10 +539,14 @@ export default function AddBikeModal({ visible, onClose, bike: editBike, default
         <View style={[styles.handleBar, { backgroundColor: theme.border }]} />
 
         {/* Header */}
-        <View style={styles.headerRow}>
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{isEdit ? 'Edit Bike' : 'Add Bike'}</Text>
-          <Pressable onPress={handleClose} hitSlop={8}>
-            <Feather name="x" size={22} color={theme.textPrimary} />
+        <View style={[styles.headerRow, { borderBottomColor: theme.border }]}>
+          <View style={{ width: 40 }} />
+          <View style={styles.headerCenter}>
+            <Feather name={isEdit ? 'edit-2' : 'plus-circle'} size={16} color={theme.red} />
+            <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>{isEdit ? 'EDIT BIKE' : 'ADD BIKE'}</Text>
+          </View>
+          <Pressable onPress={handleClose} hitSlop={8} style={{ width: 40, alignItems: 'flex-end' }}>
+            <Feather name="x" size={20} color={theme.textMuted} />
           </Pressable>
         </View>
 
@@ -675,15 +679,16 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
   },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   scrollContent: {
     paddingHorizontal: 20,

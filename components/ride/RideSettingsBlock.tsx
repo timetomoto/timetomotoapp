@@ -292,7 +292,7 @@ export default function RideSettingsBlock({ onChange, onCloseModal }: Props) {
 // ---------------------------------------------------------------------------
 
 const s = StyleSheet.create({
-  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 20 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, marginBottom: 12, marginTop: 12 },
   card: { borderWidth: 1, borderRadius: 8, marginBottom: 10, overflow: 'hidden' },
   divider: { height: 1, marginHorizontal: 12 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14, minHeight: 53 },

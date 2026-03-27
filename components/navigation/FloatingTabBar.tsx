@@ -111,7 +111,7 @@ const s = StyleSheet.create({
   scoutPill: {
     position: 'absolute',
     left: -38,
-    bottom: 30,
+    bottom: 25,
     alignItems: 'center',
     gap: 4,
     paddingLeft: 47,
