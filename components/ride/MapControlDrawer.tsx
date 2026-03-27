@@ -98,7 +98,7 @@ export default function MapControlDrawer({
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             {/* Section: BASE MAPS */}
-            <Text style={[s.sectionHeader, { color: theme.textMuted }]}>BASE MAPS</Text>
+            <Text style={[s.sectionHeader, { color: theme.textMuted, marginTop: 40 }]}>BASE MAPS</Text>
             {MAP_STYLE_OPTIONS.map((opt) => {
               const active = mapStyle === opt.key;
               return (
