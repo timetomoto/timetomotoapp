@@ -89,6 +89,17 @@
 - [ ] Remove EXPO_PUBLIC_TOMORROW_API_KEY from .env.local
 - [ ] Sweep console.error statements — keep only essential ones
 
+## POST-LAUNCH — Apple CarPlay Integration
+
+- [ ] Apply for Apple CarPlay Navigation entitlement (MFi program — manual review, allow weeks)
+- [ ] Install `react-native-carplay` package (dev build required)
+- [ ] Build CarPlay map view with route display (CPMapTemplate)
+- [ ] Build CarPlay turn-by-turn navigation (CPNavigationSession)
+- [ ] Build CarPlay search/destination entry (CPListTemplate)
+- [ ] Build CarPlay route preview screen
+- [ ] Add CPTemplateApplicationSceneDelegate + Info.plist scene config
+- [ ] Test on physical CarPlay head unit or simulator
+
 ## POST-LAUNCH — Round Trip / Loop Route Generator
 
 ### Overview
