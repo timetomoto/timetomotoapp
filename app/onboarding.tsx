@@ -163,16 +163,14 @@ function Screen2() {
 }
 
 // ---------------------------------------------------------------------------
-// Screen 3 — Add your first bike + emergency contact
+// Screen 3 — Add your first bike
 // ---------------------------------------------------------------------------
 
 function Screen3() {
   const { theme } = useTheme();
   const { user } = useAuthStore();
   const { addBike } = useGarageStore();
-  const { saveContacts } = useSafetyStore();
 
-  // Bike form
   const [make, setMake]             = useState('');
   const [model, setModel]           = useState('');
   const [year, setYear]             = useState(String(new Date().getFullYear()));
@@ -181,13 +179,6 @@ function Screen3() {
   const [tankSize, setTankSize]     = useState('');
   const [bikeSaved, setBikeSaved]   = useState(false);
   const [bikeSaving, setBikeSaving] = useState(false);
-
-  // Contact form
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [contactName, setContactName]   = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactSaving, setContactSaving] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
 
   async function handleSaveBike() {
     if (!make.trim() || !model.trim()) return;
@@ -215,34 +206,7 @@ function Screen3() {
     setBikeSaving(false);
   }
 
-  async function handleAddContact() {
-    if (!contactName.trim() || !contactPhone.trim() || contacts.length >= 3) return;
-    setContactSaving(true);
-    Keyboard.dismiss();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const updated = [...contacts, { name: contactName.trim(), phone: contactPhone.trim() }];
-    const userId = user?.id ?? 'local';
-    await saveContacts(userId, updated);
-    setContacts(updated);
-    setContactName('');
-    setContactPhone('');
-    setContactSaving(false);
-  }
-
-  function handlePickerSelect(pickedName: string, pickedPhone: string) {
-    setContactName(pickedName);
-    setContactPhone(pickedPhone);
-    setShowPicker(false);
-  }
-
-  function handleRemoveContact(idx: number) {
-    const updated = contacts.filter((_, i) => i !== idx);
-    setContacts(updated);
-    saveContacts(user?.id ?? 'local', updated);
-  }
-
   const canSaveBike = make.trim().length > 0 && model.trim().length > 0 && !bikeSaving;
-  const canAddContact = contactName.trim().length > 0 && contactPhone.trim().length > 0 && !contactSaving && contacts.length < 3;
 
   return (
     <ScrollView
@@ -251,7 +215,9 @@ function Screen3() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Bike section */}
+      <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18', marginTop: 8 }]}>
+        <Feather name="tool" size={28} color={theme.red} />
+      </View>
       <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Add your first bike</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
         Specs, maintenance, and service intervals — unlocked when your bike is added.
@@ -284,14 +250,66 @@ function Screen3() {
           )}
         </Pressable>
       </View>
+    </ScrollView>
+  );
+}
 
-      {/* Divider */}
-      <View style={[s.sectionDivider, { backgroundColor: theme.border }]} />
+// ---------------------------------------------------------------------------
+// Screen 4 — Emergency contact
+// ---------------------------------------------------------------------------
 
-      {/* Emergency contact section */}
-      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Emergency contact</Text>
+function Screen4() {
+  const { theme } = useTheme();
+  const { user } = useAuthStore();
+  const { saveContacts } = useSafetyStore();
+
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [contactName, setContactName]   = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactSaving, setContactSaving] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+
+  async function handleAddContact() {
+    if (!contactName.trim() || !contactPhone.trim() || contacts.length >= 3) return;
+    setContactSaving(true);
+    Keyboard.dismiss();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const updated = [...contacts, { name: contactName.trim(), phone: contactPhone.trim() }];
+    const userId = user?.id ?? 'local';
+    await saveContacts(userId, updated);
+    setContacts(updated);
+    setContactName('');
+    setContactPhone('');
+    setContactSaving(false);
+  }
+
+  function handlePickerSelect(pickedName: string, pickedPhone: string) {
+    setContactName(pickedName);
+    setContactPhone(pickedPhone);
+    setShowPicker(false);
+  }
+
+  function handleRemoveContact(idx: number) {
+    const updated = contacts.filter((_, i) => i !== idx);
+    setContacts(updated);
+    saveContacts(user?.id ?? 'local', updated);
+  }
+
+  const canAddContact = contactName.trim().length > 0 && contactPhone.trim().length > 0 && !contactSaving && contacts.length < 3;
+
+  return (
+    <ScrollView
+      style={{ width: SCREEN_W }}
+      contentContainerStyle={s.scrollScreen}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={[s.twoLineIcon, { backgroundColor: theme.red + '18', marginTop: 8 }]}>
+        <Feather name="shield" size={28} color={theme.red} />
+      </View>
+      <Text style={[s.screenTitle, { color: theme.textPrimary }]}>Stay safe out there</Text>
       <Text style={[s.screenBody, { color: theme.textSecondary }]}>
-        Who should we notify if crash detection triggers?
+        Add a trusted contact who'll be notified if crash detection triggers.
       </Text>
 
       <View style={s.form}>
@@ -341,7 +359,7 @@ function Screen3() {
 // Onboarding container
 // ---------------------------------------------------------------------------
 
-const SCREENS = [Screen1, Screen2, Screen3];
+const SCREENS = [Screen1, Screen2, Screen3, Screen4];
 
 export default function OnboardingScreen() {
   const { theme } = useTheme();

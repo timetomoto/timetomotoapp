@@ -47,6 +47,10 @@ export const SELECTED_BIKE_KEY = 'ttm_selected_bike_id';
 export const SAFETY_CRASH_DETECTION_KEY = 'ttm_safety_crash_detection';
 export const SAFETY_LIVE_SHARE_KEY = 'ttm_safety_live_share';
 
+// Onboarding nudges — dismissed one-time banners
+export const NUDGE_ADD_BIKE_KEY = 'ttm_nudge_add_bike_dismissed';
+export const NUDGE_ADD_CONTACT_KEY = 'ttm_nudge_add_contact_dismissed';
+
 // Scout
 export const SCOUT_QUOTA_PREFIX = 'ttm_scout_quota';
 export const scoutQuotaKey = (userId: string) => `${SCOUT_QUOTA_PREFIX}_${userId}`;
