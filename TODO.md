@@ -79,15 +79,17 @@
 - [ ] Firebase Analytics — project setup, plist, log key events
 - [ ] Remove __DEV__ developer section — app/settings.tsx
 - [ ] Remove "simulate crash" Scout command — dev-only but verify
-- [ ] API key rotation — Mapbox, HERE, OWM, Gemini, Supabase, Resend, Twilio, Anthropic (do last, see memory/project_key_rotation.md)
+- [ ] API key rotation — Mapbox, HERE, Gemini, Rainbow.ai, API Ninjas, Supabase, Resend, Twilio, Anthropic (do last, see memory/project_key_rotation.md)
 - [ ] Open-Meteo commercial plan — $29/month before launch
+- [ ] Remove unused env vars from .env.local — EXPO_PUBLIC_OWM_API_KEY, EXPO_PUBLIC_TOMORROW_API_KEY, EXPO_PUBLIC_YOUTUBE_API_KEY, EXPO_PUBLIC_WINDY_API_KEY
 - [ ] App Store listing — screenshots, description, keywords, category
 - [ ] TestFlight beta — eas build --profile preview
 - [ ] App Store submission — eas build --profile production
 - [ ] TestFlight beta distribution to Break-In Crew — blocked by Apple Developer account
 - [ ] Scout — set daily quota to 50 for production
-- [ ] Remove EXPO_PUBLIC_TOMORROW_API_KEY from .env.local
 - [ ] Sweep console.error statements — keep only essential ones
+- [ ] Email notification preferences page on website — timetomoto.com/account/notifications (for ride-summary opt-in, unsubscribe link)
+- [ ] Monitor Rainbow.ai tile usage — 30K free/month, $0.20/1K after
 
 ## POST-LAUNCH — Apple CarPlay Integration
 
@@ -241,3 +243,12 @@ Integrate GraphHopper or Kurviger API for motorcycle-optimized round trip genera
 - [x] welcome_email_sent duplicate guard — migration + profiles column
 - [x] Supabase Auth email templates — confirm signup + password reset (pasted into dashboard)
 - [x] Resend API key rotated after exposure
+- [x] Weather radar — Rainbow.ai doppler tiles replacing OWM forecast tiles
+- [x] Scout nav-route awareness — weather, road conditions, departure, save route fall back to active navigation route
+- [x] Emergency contacts reload on auth — fixes empty contacts after fresh install
+- [x] Fix set-during-render warning in SafetyService
+- [x] Perf: batch GPS point recording (every 5 points instead of spread per tick)
+- [x] Perf: memoize liveTrackGeoJson + overlayGeoJson with useMemo
+- [x] Remove TxDOT ArcGIS — HERE covers all regions
+- [x] Expo SDK 55 package updates
+- [x] Clean up unused dark-theme email templates
