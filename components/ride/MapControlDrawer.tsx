@@ -141,7 +141,7 @@ export default function MapControlDrawer({
               ) : (
                 <Feather name="droplet" size={16} color={fuelOn ? '#FFD600' : theme.textSecondary} />
               )}
-              <Text style={[s.rowLabel, { color: fuelOn ? theme.textPrimary : theme.textSecondary }]}>Fuel Stations</Text>
+              <Text style={[s.rowLabel, { color: fuelOn ? theme.textPrimary : theme.textSecondary }]}>Gas Stations</Text>
               <View style={s.rowRight}>
                 <Switch
                   value={fuelOn}
