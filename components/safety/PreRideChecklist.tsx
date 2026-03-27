@@ -378,9 +378,9 @@ const SCREEN_H = Dimensions.get('window').height;
 
 const styles = StyleSheet.create({
   rootOuter: { flex: 1, justifyContent: 'flex-end' },
-  root: { height: SCREEN_H * 0.95, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+  root: { height: SCREEN_H * 0.95, marginTop: 15, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
   dragHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 8, marginBottom: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 5, borderBottomWidth: 1 },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
   content: { padding: 14, paddingBottom: 160 },
