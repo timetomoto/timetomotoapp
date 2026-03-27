@@ -768,9 +768,7 @@ export async function executeScoutTool(
 
       case 'update_bike': {
         const bikeName = (parameters.bike_name as string).toLowerCase();
-        const match = garageStore.bikes.find(
-          (b) => b.nickname?.toLowerCase().includes(bikeName) || b.model?.toLowerCase().includes(bikeName) || b.make?.toLowerCase().includes(bikeName),
-        );
+        const match = findBikeByName(bikeName, garageStore.bikes);
         if (!match) return `No bike matching "${parameters.bike_name}" found in your garage.`;
 
         const updated = { ...match };
@@ -780,8 +778,9 @@ export async function executeScoutTool(
         if (parameters.make) updated.make = parameters.make as string;
         if (parameters.model) updated.model = parameters.model as string;
 
-        // Update store
+        // Update store + bump refresh so Garage UI re-renders
         garageStore.updateBike(updated);
+        garageStore.bumpGarageDataRefresh();
 
         // Persist to Supabase
         try {
