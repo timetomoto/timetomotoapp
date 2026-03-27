@@ -91,14 +91,21 @@ export default function MapControlDrawer({
             <View style={[s.handle, { backgroundColor: theme.border }]} />
           </View>
 
-          {/* Close button */}
-          <Pressable onPress={onClose} style={s.closeBtn}>
-            <Feather name="x" size={20} color={theme.textMuted} />
-          </Pressable>
+          {/* Header */}
+          <View style={[s.panelHeader, { borderBottomColor: theme.border }]}>
+            <View style={{ width: 40 }} />
+            <View style={s.panelHeaderCenter}>
+              <Feather name="layers" size={16} color={theme.red} />
+              <Text style={[s.panelHeaderTitle, { color: theme.textPrimary }]}>BASE MAPS & LAYERS</Text>
+            </View>
+            <Pressable onPress={onClose} style={{ width: 40, alignItems: 'flex-end' }} hitSlop={12}>
+              <Feather name="x" size={20} color={theme.textMuted} />
+            </Pressable>
+          </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
             {/* Section: BASE MAPS */}
-            <Text style={[s.sectionHeader, { color: theme.textMuted, marginTop: 40 }]}>BASE MAPS</Text>
+            <Text style={[s.sectionHeader, { color: theme.textMuted, marginTop: 16 }]}>BASE MAPS</Text>
             {MAP_STYLE_OPTIONS.map((opt) => {
               const active = mapStyle === opt.key;
               return (
@@ -222,13 +229,16 @@ const s = StyleSheet.create({
     marginTop: 10,
     marginBottom: 8,
   },
-  closeBtn: {
-    position: 'absolute',
-    top: 12,
-    right: 16,
-    zIndex: 10,
-    padding: 4,
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
   },
+  panelHeaderCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  panelHeaderTitle: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
   sectionHeader: {
     fontSize: 10,
     fontWeight: '700',
