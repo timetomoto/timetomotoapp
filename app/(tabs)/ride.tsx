@@ -1189,16 +1189,17 @@ export default function RideScreen() {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
-  // Live track GeoJSON
-  const liveTrackGeoJson =
-    isRecording && recordedPoints.length >= 2
-      ? routeGeoJson(recordedPoints)
-      : null;
+  // Live track GeoJSON — memoized to avoid rebuilding on every render
+  const liveTrackGeoJson = useMemo(
+    () => isRecording && recordedPoints.length >= 2 ? routeGeoJson(recordedPoints) : null,
+    [isRecording, recordedPoints],
+  );
 
-  // Overlay GeoJSON (imported/navigating route)
-  const overlayGeoJson = overlayPoints && overlayPoints.length >= 2
-    ? routeGeoJson(overlayPoints)
-    : null;
+  // Overlay GeoJSON (imported/navigating route) — memoized
+  const overlayGeoJson = useMemo(
+    () => overlayPoints && overlayPoints.length >= 2 ? routeGeoJson(overlayPoints) : null,
+    [overlayPoints],
+  );
 
   // Map style — respect theme for standard, always use correct style for others
   const activeMapStyle = globalMapStyleUrl;

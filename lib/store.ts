@@ -67,6 +67,7 @@ interface SafetyState {
   clearCheckIn: () => void;
   setRidePaused: (v: boolean) => void;
   addRecordedPoint: (p: TrackPoint) => void;
+  addRecordedPointsBatch: (batch: TrackPoint[]) => void;
   clearRecordedPoints: () => void;
   setCrashDetectionOverride: (v: boolean) => void;
   setLocationSharingOverride: (v: boolean) => void;
@@ -79,7 +80,7 @@ interface SafetyState {
   saveContacts: (userId: string, contacts: EmergencyContact[]) => Promise<string | null>;
 }
 
-export const useSafetyStore = create<SafetyState>((set) => ({
+export const useSafetyStore = create<SafetyState>((set, get) => ({
   isMonitoring: false,
   isRecording: false,
   emergencyContacts: [],
@@ -136,8 +137,16 @@ export const useSafetyStore = create<SafetyState>((set) => ({
 
   setRidePaused: (isRidePaused) => set({ isRidePaused }),
 
-  addRecordedPoint: (p) =>
-    set((s) => ({ recordedPoints: [...s.recordedPoints, p] })),
+  addRecordedPoint: (p) => {
+    // Mutate the array in place and only trigger a store update every 5 points
+    // to avoid O(n) spread on every GPS tick during long rides
+    const pts = get().recordedPoints;
+    pts.push(p);
+    if (pts.length % 5 === 0) set({ recordedPoints: [...pts] });
+  },
+
+  addRecordedPointsBatch: (batch) =>
+    set((s) => ({ recordedPoints: [...s.recordedPoints, ...batch] })),
 
   clearRecordedPoints: () => set({ recordedPoints: [] }),
 

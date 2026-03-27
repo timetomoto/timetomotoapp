@@ -280,8 +280,8 @@ export async function executeScoutTool(
         let geojson = tripStore.tripRouteGeojson;
         if (!geojson?.coordinates || geojson.coordinates.length < 2) {
           const nav = useNavigationStore.getState();
-          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
-            geojson = nav.activeRoute.geometry;
+          if ((nav.activeRoute?.geometry?.coordinates?.length ?? 0) >= 2) {
+            geojson = nav.activeRoute!.geometry;
           }
         }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
@@ -312,8 +312,8 @@ export async function executeScoutTool(
         let geojson = tripStore.tripRouteGeojson;
         if (!geojson?.coordinates || geojson.coordinates.length < 2) {
           const nav = useNavigationStore.getState();
-          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
-            geojson = nav.activeRoute.geometry;
+          if ((nav.activeRoute?.geometry?.coordinates?.length ?? 0) >= 2) {
+            geojson = nav.activeRoute!.geometry;
           }
         }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
@@ -343,8 +343,8 @@ export async function executeScoutTool(
         let geojson = tripStore.tripRouteGeojson;
         if (!geojson?.coordinates || geojson.coordinates.length < 2) {
           const nav = useNavigationStore.getState();
-          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
-            geojson = nav.activeRoute.geometry;
+          if ((nav.activeRoute?.geometry?.coordinates?.length ?? 0) >= 2) {
+            geojson = nav.activeRoute!.geometry;
           }
         }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
@@ -1020,8 +1020,8 @@ export async function executeScoutTool(
         let geojson = tripStore.tripRouteGeojson;
         if (!geojson?.coordinates || geojson.coordinates.length < 2) {
           const nav = useNavigationStore.getState();
-          if (nav.activeRoute?.geometry?.coordinates?.length >= 2) {
-            geojson = nav.activeRoute.geometry;
+          if ((nav.activeRoute?.geometry?.coordinates?.length ?? 0) >= 2) {
+            geojson = nav.activeRoute!.geometry;
           }
         }
         if (!geojson?.coordinates || geojson.coordinates.length < 2)
