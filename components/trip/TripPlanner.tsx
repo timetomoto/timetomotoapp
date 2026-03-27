@@ -1132,7 +1132,7 @@ export default function TripPlanner() {
         )}
         {/* ── Layers button ── */}
         <Pressable
-          style={[st.layersBtn, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}
+          style={[st.layersBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
           onPress={() => {
             const options = [
               { label: 'Hybrid', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
@@ -1158,7 +1158,7 @@ export default function TripPlanner() {
         {/* Full-screen toggle — green when active, muted when not */}
         <Pressable
           style={[st.fullScreenBtn, {
-            backgroundColor: fullScreen ? '#1E88E5CC' : theme.bgPanel,
+            backgroundColor: fullScreen ? '#1E88E5CC' : theme.mapOverlayBg,
             borderColor: fullScreen ? '#1E88E5' : theme.border,
           }]}
           onPress={fullScreen ? exitFullScreen : enterFullScreen}
@@ -1167,7 +1167,7 @@ export default function TripPlanner() {
         </Pressable>
         {/* Construction layer toggle */}
         <Pressable
-          style={[st.constructionBtn, { backgroundColor: constructionOn ? 'rgba(255,152,0,0.15)' : theme.bgPanel, borderColor: constructionOn ? '#FF9800' : theme.border }]}
+          style={[st.constructionBtn, { backgroundColor: constructionOn ? 'rgba(255,152,0,0.15)' : theme.mapOverlayBg, borderColor: constructionOn ? '#FF9800' : theme.border }]}
           onPress={handleToggleConstruction}
           disabled={constructionLoading}
         >
