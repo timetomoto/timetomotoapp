@@ -1,0 +1,53 @@
+<!-- TIME TO MOTO — Internal Support Notification -->
+<!-- Sent to keith@timetomoto.com when a support request comes in -->
+<!-- Variables: {{name}}, {{email}}, {{phone}}, {{timestamp}}, {{appVersion}}, {{deviceInfo}}, {{description}} -->
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background-color:#0D0D0D;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0D0D0D;">
+    <tr><td align="center" style="padding:0;">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <!-- Header -->
+        <tr><td style="background-color:#D32F2F;padding:20px 32px;">
+          <span style="color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:2px;">TIME TO MOTO</span>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="background-color:#141414;padding:40px 32px;">
+          <h1 style="color:#FFFFFF;font-size:24px;font-weight:700;margin:0 0 16px 0;">New Support Request</h1>
+          <table cellpadding="8" style="border-collapse:collapse;width:100%;">
+            <tr>
+              <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">Name</td>
+              <td style="color:#E8E4DC;padding:6px 0;font-size:14px;">{{name}}</td>
+            </tr>
+            <tr>
+              <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">Email</td>
+              <td style="color:#E8E4DC;padding:6px 0;font-size:14px;"><a href="mailto:{{email}}" style="color:#D32F2F;text-decoration:none;">{{email}}</a></td>
+            </tr>
+            <tr>
+              <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">Phone</td>
+              <td style="color:#E8E4DC;padding:6px 0;font-size:14px;">{{phone}}</td>
+            </tr>
+            <tr>
+              <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">Submitted</td>
+              <td style="color:#E8E4DC;padding:6px 0;font-size:14px;">{{timestamp}}</td>
+            </tr>
+            <tr>
+              <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">App</td>
+              <td style="color:#E8E4DC;padding:6px 0;font-size:14px;">{{appVersion}} / {{deviceInfo}}</td>
+            </tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #242424;margin:16px 0;"/>
+          <h2 style="color:#FFFFFF;font-size:18px;font-weight:700;margin:0 0 8px 0;">Message</h2>
+          <p style="color:#E8E4DC;font-size:15px;white-space:pre-wrap;line-height:22px;margin:0;">{{description}}</p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background-color:#0D0D0D;padding:24px 32px;border-top:1px solid #242424;">
+          <p style="color:#999999;font-size:12px;margin:0;">Reply directly to the sender at <a href="mailto:{{email}}" style="color:#D32F2F;text-decoration:none;">{{email}}</a></p>
+          <p style="color:#666666;font-size:11px;margin:8px 0 0 0;">Time to Moto — Internal Notification</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

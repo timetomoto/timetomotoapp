@@ -379,6 +379,18 @@ export default function OnboardingScreen() {
     await AsyncStorage.setItem(key, 'done');
     await AsyncStorage.setItem(ONBOARDING_KEY, 'done');
     setOnboardingDone(true);
+
+    // Fire welcome email (once per user — edge function guards against duplicates)
+    if (user?.id && user?.email) {
+      supabase.functions.invoke('send-welcome-email', {
+        body: {
+          user_id: user.id,
+          email: user.email,
+          first_name: user.user_metadata?.first_name ?? '',
+        },
+      }).catch(() => {}); // fire-and-forget — don't block navigation
+    }
+
     router.replace('/(tabs)/ride');
   }
 
