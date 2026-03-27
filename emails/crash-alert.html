@@ -1,0 +1,44 @@
+<!-- TIME TO MOTO — Crash Alert (Email version) -->
+<!-- Sent to emergency contact when crash is detected -->
+<!-- Variables: {{riderName}}, {{mapsUrl}}, {{timestamp}} -->
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background-color:#0D0D0D;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0D0D0D;">
+    <tr><td align="center" style="padding:0;">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <!-- Header — urgent red -->
+        <tr><td style="background-color:#D32F2F;padding:20px 32px;">
+          <span style="color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:2px;">TIME TO MOTO</span>
+          <span style="color:#FFFFFF;font-size:13px;font-weight:700;float:right;padding-top:3px;letter-spacing:1px;">SAFETY ALERT</span>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="background-color:#141414;padding:40px 32px;">
+          <h1 style="color:#D32F2F;font-size:24px;font-weight:700;margin:0 0 16px 0;">Possible Crash Detected</h1>
+          <div style="color:#E8E4DC;font-size:15px;line-height:24px;">
+            <p style="margin:0 0 16px 0;"><strong style="color:#FFFFFF;">{{riderName}}</strong> may have been in a crash. Their phone detected a sudden impact and they have not responded.</p>
+            <table cellpadding="8" style="border-collapse:collapse;width:100%;margin:0 0 16px 0;">
+              <tr>
+                <td style="color:#999999;padding:6px 12px 6px 0;vertical-align:top;font-size:14px;">Time</td>
+                <td style="color:#E8E4DC;padding:6px 0;font-size:14px;">{{timestamp}}</td>
+              </tr>
+            </table>
+            <p style="margin:0 0 8px 0;">Their last known location is below. Please try to contact them.</p>
+          </div>
+          <table cellpadding="0" cellspacing="0" style="margin:20px 0 0 0;">
+            <tr><td style="background-color:#D32F2F;border-radius:8px;">
+              <a href="{{mapsUrl}}" style="display:inline-block;padding:14px 32px;color:#FFFFFF;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.5px;">VIEW LOCATION ON MAP</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background-color:#0D0D0D;padding:24px 32px;border-top:1px solid #242424;">
+          <p style="color:#999999;font-size:12px;margin:0;">This is an automated safety alert from Time to Moto.</p>
+          <p style="color:#666666;font-size:11px;margin:8px 0 0 0;">If this was sent in error, {{riderName}} can dismiss it from the app.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
