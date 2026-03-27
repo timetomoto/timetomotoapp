@@ -99,10 +99,13 @@ function FormModal({ visible, bikeId, editing, onSave, onClose }: FormModalProps
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
         <View style={[fm.sheet, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
           <View style={[fm.handle, { backgroundColor: theme.border }]} />
-          <View style={fm.header}>
-            <View style={{ width: 20 }} />
-            <Text style={[fm.heading, { color: theme.textPrimary, flex: 1, textAlign: 'center' }]}>{editing ? 'Edit Modification' : 'Add Modification'}</Text>
-            <Pressable onPress={onClose} hitSlop={8}><Feather name="x" size={20} color={theme.textSecondary} /></Pressable>
+          <View style={[fm.header, { borderBottomColor: theme.border }]}>
+            <View style={{ width: 40 }} />
+            <View style={fm.headerCenter}>
+              <Feather name={editing ? 'edit-2' : 'plus-circle'} size={16} color={theme.red} />
+              <Text style={[fm.heading, { color: theme.textPrimary }]}>{editing ? 'EDIT MODIFICATION' : 'ADD MODIFICATION'}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={8} style={{ width: 40, alignItems: 'flex-end' }}><Feather name="x" size={20} color={theme.textMuted} /></Pressable>
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <Text style={[fm.label, { color: theme.textSecondary }]}>TITLE</Text>
@@ -293,8 +296,9 @@ const fm = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
   sheet: { flex: 1, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: 1, padding: 20, paddingBottom: 40 },
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  heading: { fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, marginBottom: 16 },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  heading: { fontSize: 15, fontWeight: '800', letterSpacing: 1.2 },
   label: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginTop: 16, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15 },
   textArea: { minHeight: 72, textAlignVertical: 'top' },
