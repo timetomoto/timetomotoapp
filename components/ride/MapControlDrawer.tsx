@@ -76,7 +76,7 @@ export default function MapControlDrawer({
   ).current;
 
   const MAP_STYLE_OPTIONS: { key: MapStyleOption; label: string; icon: string }[] = [
-    { key: 'hybrid', label: 'Satellite', icon: 'compass' },
+    { key: 'hybrid', label: 'Satellite', icon: 'globe' },
     { key: 'outdoors', label: 'Terrain', icon: 'image' },
     { key: 'streets', label: 'Standard', icon: 'map' },
     { key: 'dark', label: 'Dark', icon: 'moon' },
