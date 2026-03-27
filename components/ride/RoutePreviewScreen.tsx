@@ -216,9 +216,12 @@ export default function RoutePreviewScreen({
         {/* Header */}
         <View style={[st.header, { paddingTop: 8, borderBottomColor: theme.border }]}>
           <View style={{ width: 40 }} />
-          <Text style={[st.headerTitle, { color: theme.textPrimary }]}>Start Ride</Text>
+          <View style={st.headerCenter}>
+            <Feather name="navigation" size={16} color={theme.red} />
+            <Text style={[st.headerTitle, { color: theme.textPrimary }]}>START RIDE</Text>
+          </View>
           <Pressable onPress={onCancel} hitSlop={8} style={{ width: 40, alignItems: 'flex-end' }}>
-            <Feather name="x" size={22} color={theme.textSecondary} />
+            <Feather name="x" size={20} color={theme.textMuted} />
           </Pressable>
         </View>
 
@@ -443,9 +446,11 @@ const st = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
 
   body: {
