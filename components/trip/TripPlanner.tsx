@@ -274,6 +274,8 @@ export default function TripPlanner() {
   useEffect(() => {
     if (wasScoutOpenRef.current && !isScoutOpen) {
       fitRouteWhenReady();
+      // Reset panel scroll to top so it doesn't show mid-scroll from Scout waypoint adds
+      setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: false }), 100);
     }
     wasScoutOpenRef.current = isScoutOpen;
   }, [isScoutOpen]);
@@ -286,8 +288,8 @@ export default function TripPlanner() {
   const addStopRef = useRef<View>(null);
   useEffect(() => {
     const diff = waypoints.length - prevWaypointCount.current;
-    // Only scroll when exactly 1 stop was added (manual add, not bulk import)
-    if (diff === 1) {
+    // Only scroll when exactly 1 stop was added manually (not bulk import, not from Scout)
+    if (diff === 1 && !useScoutStore.getState().isScoutOpen) {
       if (waypoints.length >= MAX_WAYPOINTS) {
         setTimeout(() => panelScrollRef.current?.scrollTo({ y: 0, animated: true }), 300);
       } else {
