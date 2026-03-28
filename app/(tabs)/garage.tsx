@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -40,6 +42,8 @@ export default function GarageScreen() {
   const [showAddBike, setShowAddBike] = useState(false);
   const [editingBike, setEditingBike] = useState<typeof bikes[0] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
+  const pdfCancelRef = useRef(false);
   const garageReset = useTabResetStore((s) => s.garageReset);
 
   // Collapsible sections — default: maintenance expanded, rest collapsed
@@ -283,9 +287,16 @@ export default function GarageScreen() {
                     style={[styles.removeBtn, { borderColor: theme.border }]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      exportBikePdf(selectedBike, user?.id, bikePhotoUri ?? null).catch((e) => {
-                        Alert.alert('Export failed', e.message ?? 'Could not generate PDF.');
-                      });
+                      setPdfExporting(true);
+                      pdfCancelRef.current = false;
+                      exportBikePdf(selectedBike, user?.id, bikePhotoUri ?? null)
+                        .then(() => setPdfExporting(false))
+                        .catch((e) => {
+                          setPdfExporting(false);
+                          if (!pdfCancelRef.current) {
+                            Alert.alert('Export failed', e.message ?? 'Could not generate PDF.');
+                          }
+                        });
                     }}
                     accessibilityLabel="Export bike PDF"
                   >
@@ -372,6 +383,26 @@ export default function GarageScreen() {
 
       {/* Hamburger menu */}
       <HamburgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      {/* PDF export loading overlay */}
+      <Modal visible={pdfExporting} transparent animationType="fade">
+        <View style={styles.pdfOverlay}>
+          <View style={[styles.pdfCard, { backgroundColor: theme.bgPanel, borderColor: theme.border }]}>
+            <ActivityIndicator size="large" color={theme.red} />
+            <Text style={[styles.pdfText, { color: theme.textPrimary }]}>Generating PDF…</Text>
+            <Text style={[styles.pdfSubtext, { color: theme.textMuted }]}>Fetching bike data</Text>
+            <Pressable
+              style={[styles.pdfCancel, { borderColor: theme.border }]}
+              onPress={() => {
+                pdfCancelRef.current = true;
+                setPdfExporting(false);
+              }}
+            >
+              <Text style={{ color: theme.textSecondary, fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -623,5 +654,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
+  },
+  pdfOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdfCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 32,
+    alignItems: 'center',
+    gap: 12,
+    width: 240,
+  },
+  pdfText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  pdfSubtext: {
+    fontSize: 12,
+  },
+  pdfCancel: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });
