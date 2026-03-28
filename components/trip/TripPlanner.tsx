@@ -1135,9 +1135,9 @@ export default function TripPlanner() {
           style={[st.layersBtn, { backgroundColor: theme.mapOverlayBg, borderColor: theme.border }]}
           onPress={() => {
             const options = [
-              { label: 'Hybrid', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
-              { label: 'Outdoors', url: 'mapbox://styles/mapbox/outdoors-v12' },
-              { label: 'Streets', url: 'mapbox://styles/mapbox/streets-v12' },
+              { label: 'Satellite', url: 'mapbox://styles/mapbox/satellite-streets-v12' },
+              { label: 'Terrain', url: 'mapbox://styles/mapbox/outdoors-v12' },
+              { label: 'Standard', url: 'mapbox://styles/mapbox/streets-v12' },
               { label: 'Dark', url: 'mapbox://styles/mapbox/dark-v11' },
             ];
             if (Platform.OS === 'ios') {
