@@ -288,12 +288,13 @@ export default function GarageScreen() {
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       setPdfExporting(true);
-                      pdfCancelRef.current = false;
-                      exportBikePdf(selectedBike, user?.id, bikePhotoUri ?? null)
+                      const signal = { cancelled: false };
+                      pdfCancelRef.current = signal as any;
+                      exportBikePdf(selectedBike, user?.id, bikePhotoUri ?? null, signal)
                         .then(() => setPdfExporting(false))
                         .catch((e) => {
                           setPdfExporting(false);
-                          if (!pdfCancelRef.current) {
+                          if (e?.message !== 'cancelled') {
                             Alert.alert('Export failed', e.message ?? 'Could not generate PDF.');
                           }
                         });
@@ -394,7 +395,9 @@ export default function GarageScreen() {
             <Pressable
               style={[styles.pdfCancel, { borderColor: theme.border }]}
               onPress={() => {
-                pdfCancelRef.current = true;
+                if (pdfCancelRef.current && typeof pdfCancelRef.current === 'object') {
+                  (pdfCancelRef.current as any).cancelled = true;
+                }
                 setPdfExporting(false);
               }}
             >

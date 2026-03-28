@@ -41,6 +41,7 @@
 - [ ] Scout — load_saved_route should extract intermediate waypoints as markers
 - [ ] Scout — "I can't" phrasing (Gemini says "I can't" instead of offering alternatives per personality rules)
 - [ ] Scout quota bypass — configure with Supabase user ID before launch
+- [ ] Scout — export_bike_pdf tool ("print my bike", "export my DuelFort PDF")
 
 ## DEV — P4 (Nice to Have)
 

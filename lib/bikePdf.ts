@@ -204,9 +204,17 @@ ${sections.length > 0 ? sections.join('\n') : '<p style="color:#999; font-style:
 // Export function
 // ---------------------------------------------------------------------------
 
-export async function exportBikePdf(bike: Bike, userId: string | undefined, photoUri: string | null): Promise<void> {
+export async function exportBikePdf(
+  bike: Bike,
+  userId: string | undefined,
+  photoUri: string | null,
+  signal?: { cancelled: boolean },
+): Promise<void> {
+  const check = () => { if (signal?.cancelled) throw new Error('cancelled'); };
+
   // Get rider name
   const { data: { user } } = await supabase.auth.getUser();
+  check();
   const riderName = user?.user_metadata?.first_name
     || user?.user_metadata?.name?.split(' ')[0]
     || user?.email?.split('@')[0]
@@ -220,6 +228,7 @@ export async function exportBikePdf(bike: Bike, userId: string | undefined, phot
   if (!useServiceBulletinsStore.getState().results[bulletinKey] && year && make && model) {
     await useServiceBulletinsStore.getState().fetchBulletins(year, make, model).catch(() => {});
   }
+  check();
 
   // Collect all data in parallel — fetch fresh if cache is empty
   const [maintenance, modifications, cachedIntervals] = await Promise.all([
@@ -227,6 +236,7 @@ export async function exportBikePdf(bike: Bike, userId: string | undefined, phot
     loadModifications(bike.id, userId),
     loadServiceIntervals(bike.id),
   ]);
+  check();
 
   // If intervals cache is empty and bike has year/make/model, fetch from Gemini
   let intervals = cachedIntervals;
@@ -244,6 +254,7 @@ export async function exportBikePdf(bike: Bike, userId: string | undefined, phot
       }
     } catch {}
   }
+  check();
 
   const bulletins = loadBulletins(year, make, model);
 
@@ -260,6 +271,8 @@ export async function exportBikePdf(bike: Bike, userId: string | undefined, phot
     totalComplaints: bulletins.total,
   });
 
+  check();
   const { uri } = await Print.printToFileAsync({ html });
+  check();
   await Sharing.shareAsync(uri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf' });
 }
