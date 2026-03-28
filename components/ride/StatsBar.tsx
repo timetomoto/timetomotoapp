@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSafetyStore } from '../../lib/store';
+import { useSafetyStore, useMapStyleStore } from '../../lib/store';
 import { useTheme } from '../../lib/useTheme';
 
 type Stat = { value: string; label: string; customValue?: () => React.ReactNode };
@@ -19,6 +19,8 @@ export default function StatsBar({ stats }: StatsBarProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { isRecording, isRidePaused } = useSafetyStore();
+  const mapStyleUrl = useMapStyleStore((s) => s.mapStyle);
+  const isDarkMap = mapStyleUrl.includes('satellite') || mapStyleUrl.includes('dark');
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -58,10 +60,10 @@ export default function StatsBar({ stats }: StatsBarProps) {
       />
       {stats.map((stat, i) => (
         <View key={stat.label} style={styles.itemWrap}>
-          {i > 0 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+          {i > 0 && <View style={[styles.divider, { backgroundColor: isDarkMap ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)' }]} />}
           <View style={styles.item}>
-            {stat.customValue ? stat.customValue() : <Text style={[styles.value, { color: theme.textPrimary }]}>{stat.value}</Text>}
-            <Text style={[styles.label, { color: theme.textSecondary }]}>{stat.label}</Text>
+            {stat.customValue ? stat.customValue() : <Text style={[styles.value, isDarkMap ? styles.lightText : styles.darkText]}>{stat.value}</Text>}
+            <Text style={[styles.label, isDarkMap ? styles.lightText : styles.darkText]}>{stat.label}</Text>
           </View>
         </View>
       ))}
@@ -112,5 +114,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 0.5,
     marginTop: 2,
+  },
+  lightText: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  darkText: {
+    color: '#111111',
+    textShadowColor: 'rgba(255,255,255,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

@@ -24,6 +24,7 @@ import { useScoutStore } from '../../lib/scoutStore';
 import { BikeCardSkeleton } from '../../components/common/SkeletonLoader';
 import { useTheme } from '../../lib/useTheme';
 import { fetchWikimediaBikePhoto, clearWikiPhotoCache } from '../../lib/bikePhoto';
+import { exportBikePdf } from '../../lib/bikePdf';
 import MotorcycleIcon from '../../components/icons/MotorcycleIcon';
 import HamburgerButton from '../../components/navigation/HamburgerButton';
 import HamburgerMenu from '../../components/navigation/HamburgerMenu';
@@ -277,6 +278,18 @@ export default function GarageScreen() {
                     accessibilityLabel="Edit bike"
                   >
                     <Feather name="edit-2" size={16} color={theme.textSecondary} />
+                  </Pressable>
+                  <Pressable
+                    style={[styles.removeBtn, { borderColor: theme.border }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      exportBikePdf(selectedBike, user?.id, bikePhotoUri ?? null).catch((e) => {
+                        Alert.alert('Export failed', e.message ?? 'Could not generate PDF.');
+                      });
+                    }}
+                    accessibilityLabel="Export bike PDF"
+                  >
+                    <Feather name="file-text" size={16} color={theme.textSecondary} />
                   </Pressable>
                   <Pressable
                     style={[styles.removeBtn, { borderColor: theme.border }]}

@@ -356,6 +356,7 @@ export default function RideScreen() {
   const clearRecordedPoints = useSafetyStore((s) => s.clearRecordedPoints);
   const lastKnownLocation = useSafetyStore((s) => s.lastKnownLocation);
   const isMonitoring = useSafetyStore((s) => s.isMonitoring);
+  const emergencyContacts = useSafetyStore((s) => s.emergencyContacts);
   const setMonitoring = useSafetyStore((s) => s.setMonitoring);
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1495,7 +1496,7 @@ export default function RideScreen() {
         <Pressable
           style={[
             styles.crashToggle,
-            { backgroundColor: isMonitoring ? theme.green + 'CC' : theme.mapOverlayBg, borderColor: isMonitoring ? theme.green : theme.border },
+            { backgroundColor: isMonitoring ? theme.green + 'CC' : theme.mapOverlayBg, borderColor: isMonitoring ? theme.green : theme.border, height: 48 },
           ]}
           onPress={() => setMonitoring(!isMonitoring)}
         >
@@ -1507,6 +1508,11 @@ export default function RideScreen() {
             {selectedBike && (
               <Text style={[styles.crashToggleBike, { color: isMonitoring ? theme.white : theme.textSecondary }]}>
                 {bikeLabel(selectedBike).length > 13 ? bikeLabel(selectedBike).slice(0, 13) + '…' : bikeLabel(selectedBike)}
+              </Text>
+            )}
+            {emergencyContacts.length > 0 && (
+              <Text style={[styles.crashToggleNotify, { color: isMonitoring ? theme.white + 'BB' : theme.textMuted }]}>
+                Notify: {emergencyContacts.slice(0, 2).map((c) => c.name.split(' ')[0]).join(', ')}
               </Text>
             )}
           </View>
@@ -1597,16 +1603,23 @@ export default function RideScreen() {
               {
                 value: '',
                 label: 'TIME',
-                customValue: () => (
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 25, fontWeight: '700', color: theme.textPrimary, letterSpacing: 1 }}>
-                      {hStr}:{mStr}
-                    </Text>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary, marginBottom: 5, marginLeft: 2 }}>
-                      :{sStr}
-                    </Text>
-                  </View>
-                ),
+                customValue: () => {
+                  const isDarkMap = mapStyle === 'hybrid' || mapStyle === 'dark';
+                  const textColor = isDarkMap ? '#FFFFFF' : '#111111';
+                  const shadow = isDarkMap
+                    ? { textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }
+                    : { textShadowColor: 'rgba(255,255,255,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 };
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+                      <Text style={{ fontSize: 25, fontWeight: '700', color: textColor, letterSpacing: 1, ...shadow }}>
+                        {hStr}:{mStr}
+                      </Text>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: textColor, marginBottom: 5, marginLeft: 2, ...shadow }}>
+                        :{sStr}
+                      </Text>
+                    </View>
+                  );
+                },
               },
             ];
           })()} />
@@ -2000,6 +2013,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     letterSpacing: 0.2,
+    marginTop: 1,
+  },
+  crashToggleNotify: {
+    fontSize: 8,
+    fontWeight: '500',
+    letterSpacing: 0.1,
     marginTop: 1,
   },
 
