@@ -70,25 +70,90 @@ function buildHtml(opts: {
   const title = `${riderName}'s Moto: ${bike.nickname || bikeLabel(bike)}`;
   const bikeDesc = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
 
-  const specRows = specs ? [
-    specs.engineDisplacement && ['Engine', escHtml(specs.engineDisplacement)],
-    specs.engineType && ['Engine Type', escHtml(specs.engineType)],
-    specs.wetWeightLbs && ['Weight', `${specs.wetWeightLbs} lbs`],
-    specs.seatHeight && ['Seat Height', escHtml(specs.seatHeight)],
-    specs.fuelCapacityGal && ['Fuel Capacity', `${specs.fuelCapacityGal} gal`],
-    specs.fuelType && ['Fuel Type', escHtml(specs.fuelType)],
-    specs.oilType && ['Oil Type', escHtml(specs.oilType)],
-    specs.oilCapacityQt && ['Oil Capacity', `${specs.oilCapacityQt} qt`],
-    specs.tireFrontSize && ['Front Tire', escHtml(specs.tireFrontSize)],
-    specs.tireRearSize && ['Rear Tire', escHtml(specs.tireRearSize)],
-    specs.tirePressureFrontPsi && ['Front PSI', `${specs.tirePressureFrontPsi}`],
-    specs.tirePressureRearPsi && ['Rear PSI', `${specs.tirePressureRearPsi}`],
-    specs.maxLoadLbs && ['Max Load', `${specs.maxLoadLbs} lbs`],
-    specs.groundClearance && ['Ground Clearance', escHtml(specs.groundClearance)],
-    specs.overallLength && ['Length', escHtml(specs.overallLength)],
-    specs.overallWidth && ['Width', escHtml(specs.overallWidth)],
-    specs.overallHeight && ['Height', escHtml(specs.overallHeight)],
-  ].filter(Boolean) as [string, string][] : [];
+  // Build spec rows from both bike-level fields and specs object
+  const specRows: [string, string][] = [];
+  if (bike.bike_type) specRows.push(['Type', escHtml(bike.bike_type)]);
+  if (specs?.engineDisplacement) specRows.push(['Engine', escHtml(specs.engineDisplacement)]);
+  if (specs?.engineType) specRows.push(['Engine Type', escHtml(specs.engineType)]);
+  if (specs?.wetWeightLbs) specRows.push(['Weight', `${specs.wetWeightLbs} lbs`]);
+  if (specs?.seatHeight) specRows.push(['Seat Height', escHtml(specs.seatHeight)]);
+  const fuelCap = specs?.fuelCapacityGal ?? bike.tank_gallons ?? bike.fuelCapacity;
+  const fuelUnit = bike.fuelCapacityUnit === 'liters' ? 'L' : 'gal';
+  if (fuelCap) specRows.push(['Fuel Capacity', `${fuelCap} ${fuelUnit}`]);
+  if (specs?.fuelType) specRows.push(['Fuel Type', escHtml(specs.fuelType)]);
+  if (bike.avg_mpg) specRows.push(['Avg MPG', `${bike.avg_mpg}`]);
+  if (specs?.oilType) specRows.push(['Oil Type', escHtml(specs.oilType)]);
+  if (specs?.oilCapacityQt) specRows.push(['Oil Capacity', `${specs.oilCapacityQt} qt`]);
+  if (specs?.tireFrontSize) specRows.push(['Front Tire', escHtml(specs.tireFrontSize)]);
+  if (specs?.tireRearSize) specRows.push(['Rear Tire', escHtml(specs.tireRearSize)]);
+  if (specs?.tirePressureFrontPsi) specRows.push(['Front PSI', `${specs.tirePressureFrontPsi}`]);
+  if (specs?.tirePressureRearPsi) specRows.push(['Rear PSI', `${specs.tirePressureRearPsi}`]);
+  if (specs?.maxLoadLbs) specRows.push(['Max Load', `${specs.maxLoadLbs} lbs`]);
+  if (specs?.groundClearance) specRows.push(['Ground Clearance', escHtml(specs.groundClearance)]);
+  if (specs?.overallLength) specRows.push(['Length', escHtml(specs.overallLength)]);
+  if (specs?.overallWidth) specRows.push(['Width', escHtml(specs.overallWidth)]);
+  if (specs?.overallHeight) specRows.push(['Height', escHtml(specs.overallHeight)]);
+
+  // Build sections array — only include sections that have data
+  const sections: string[] = [];
+
+  if (specRows.length > 0) {
+    sections.push(`
+<h2>Specifications</h2>
+<table>
+${specRows.map(([label, val]) => `<tr><td class="label-col">${label}</td><td>${val}</td></tr>`).join('\n')}
+</table>
+${specs?.specsSource ? `<p class="muted">Source: ${specs.specsSource}</p>` : ''}`);
+  }
+
+  if (intervals.items.length > 0) {
+    sections.push(`
+<h2>Service Intervals</h2>
+${intervals.assumption ? `<p class="muted">${escHtml(intervals.assumption)}</p>` : ''}
+<table>
+<tr><th>Item</th><th>Interval</th><th>Notes</th></tr>
+${intervals.items.map((si) => `<tr><td>${escHtml(si.item)}</td><td>${escHtml(si.interval)}</td><td class="muted">${escHtml(si.notes)}</td></tr>`).join('\n')}
+</table>`);
+  }
+
+  if (maintenance.length > 0) {
+    sections.push(`
+<h2>Maintenance Log (${maintenance.length})</h2>
+<table>
+<tr><th>Date</th><th>Service</th><th>Mileage</th><th>Cost</th><th>Notes</th></tr>
+${maintenance.map((m) => `<tr><td>${formatDate(m.date)}</td><td>${escHtml(m.title)}</td><td>${m.mileage ? m.mileage.toLocaleString() : '—'}</td><td class="cost">${formatCost(m.cost)}</td><td class="muted">${escHtml(m.notes)}</td></tr>`).join('\n')}
+</table>`);
+  }
+
+  if (modifications.length > 0) {
+    sections.push(`
+<h2>Modifications (${modifications.length})</h2>
+<table>
+<tr><th>Date</th><th>Modification</th><th>Brand</th><th>Category</th><th>Cost</th><th>Notes</th></tr>
+${modifications.map((m) => `<tr><td>${formatDate(m.dateInstalled)}</td><td>${escHtml(m.title)}</td><td>${escHtml(m.brand)}</td><td>${escHtml(m.category)}</td><td class="cost">${formatCost(m.cost)}</td><td class="muted">${escHtml(m.notes)}</td></tr>`).join('\n')}
+</table>`);
+  }
+
+  if (recalls.length > 0) {
+    sections.push(`
+<h2>NHTSA Recalls (${recalls.length})</h2>
+${recalls.map((r) => `
+<div class="recall">
+  <div class="recall-title">${escHtml(r.Component)} — ${escHtml(r.NHTSACampaignNumber)}</div>
+  <div>${escHtml(r.Summary)}</div>
+  ${r.Remedy ? `<div class="muted" style="margin-top:4px;">Remedy: ${escHtml(r.Remedy)}</div>` : ''}
+</div>`).join('\n')}`);
+  }
+
+  if (complaints.length > 0) {
+    sections.push(`
+<h2>NHTSA Complaints${totalComplaints > complaints.length ? ` (${complaints.length} of ${totalComplaints})` : ` (${complaints.length})`}</h2>
+${complaints.map((c) => `
+<div class="complaint">
+  <strong>${escHtml(c.components)}</strong> · ${formatDate(c.dateOfIncident)}${c.crash ? ' · 🚨 Crash' : ''}${c.fire ? ' · 🔥 Fire' : ''}
+  <div style="margin-top:3px;">${escHtml(c.summary)}</div>
+</div>`).join('\n')}`);
+  }
 
   return `<!DOCTYPE html>
 <html>
@@ -112,71 +177,16 @@ function buildHtml(opts: {
   .complaint { background: #F5F5F5; padding: 8px 12px; margin-bottom: 6px; border-radius: 4px; font-size: 11px; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 10px; }
   .footer-logo { font-size: 14px; font-weight: 800; color: #C62828; letter-spacing: 1px; }
-  .empty { color: #999; font-style: italic; font-size: 12px; }
 </style>
 </head>
 <body>
 
 <h1>${escHtml(title)}</h1>
-<p class="subtitle">${escHtml(bikeDesc)}${bike.odometer ? ` · ${bike.odometer.toLocaleString()} miles` : ''}</p>
+<p class="subtitle">${escHtml(bikeDesc)}${bike.odometer ? ` · ${bike.odometer.toLocaleString()} miles` : ''}${bike.bike_type ? ` · ${escHtml(bike.bike_type)}` : ''}</p>
 
 ${photoUri ? `<img class="photo" src="${photoUri}" />` : ''}
 
-<!-- SPECIFICATIONS -->
-<h2>Specifications</h2>
-${specRows.length > 0 ? `
-<table>
-${specRows.map(([label, val]) => `<tr><td class="label-col">${label}</td><td>${val}</td></tr>`).join('\n')}
-</table>
-${specs?.specsSource ? `<p class="muted">Source: ${specs.specsSource}</p>` : ''}
-` : '<p class="empty">No specifications on file.</p>'}
-
-<!-- SERVICE INTERVALS -->
-<h2>Service Intervals</h2>
-${intervals.items.length > 0 ? `
-${intervals.assumption ? `<p class="muted">${escHtml(intervals.assumption)}</p>` : ''}
-<table>
-<tr><th>Item</th><th>Interval</th><th>Notes</th></tr>
-${intervals.items.map((si) => `<tr><td>${escHtml(si.item)}</td><td>${escHtml(si.interval)}</td><td class="muted">${escHtml(si.notes)}</td></tr>`).join('\n')}
-</table>
-` : '<p class="empty">No service intervals on file. Ask Scout to look them up.</p>'}
-
-<!-- MAINTENANCE LOG -->
-<h2>Maintenance Log</h2>
-${maintenance.length > 0 ? `
-<table>
-<tr><th>Date</th><th>Service</th><th>Mileage</th><th>Cost</th><th>Notes</th></tr>
-${maintenance.map((m) => `<tr><td>${formatDate(m.date)}</td><td>${escHtml(m.title)}</td><td>${m.mileage ? m.mileage.toLocaleString() : '—'}</td><td class="cost">${formatCost(m.cost)}</td><td class="muted">${escHtml(m.notes)}</td></tr>`).join('\n')}
-</table>
-` : '<p class="empty">No maintenance records.</p>'}
-
-<!-- MODIFICATIONS -->
-<h2>Modifications</h2>
-${modifications.length > 0 ? `
-<table>
-<tr><th>Date</th><th>Modification</th><th>Brand</th><th>Category</th><th>Cost</th><th>Notes</th></tr>
-${modifications.map((m) => `<tr><td>${formatDate(m.dateInstalled)}</td><td>${escHtml(m.title)}</td><td>${escHtml(m.brand)}</td><td>${escHtml(m.category)}</td><td class="cost">${formatCost(m.cost)}</td><td class="muted">${escHtml(m.notes)}</td></tr>`).join('\n')}
-</table>
-` : '<p class="empty">No modifications recorded.</p>'}
-
-<!-- NHTSA RECALLS -->
-<h2>NHTSA Recalls</h2>
-${recalls.length > 0 ? recalls.map((r) => `
-<div class="recall">
-  <div class="recall-title">${escHtml(r.Component)} — ${escHtml(r.NHTSACampaignNumber)}</div>
-  <div>${escHtml(r.Summary)}</div>
-  ${r.Remedy ? `<div class="muted" style="margin-top:4px;">Remedy: ${escHtml(r.Remedy)}</div>` : ''}
-</div>
-`).join('\n') : '<p class="empty">No recalls found for this vehicle.</p>'}
-
-<!-- NHTSA COMPLAINTS -->
-<h2>NHTSA Complaints${totalComplaints > complaints.length ? ` (showing ${complaints.length} of ${totalComplaints})` : ''}</h2>
-${complaints.length > 0 ? complaints.map((c) => `
-<div class="complaint">
-  <strong>${escHtml(c.components)}</strong> · ${formatDate(c.dateOfIncident)}${c.crash ? ' · 🚨 Crash' : ''}${c.fire ? ' · 🔥 Fire' : ''}
-  <div style="margin-top:3px;">${escHtml(c.summary)}</div>
-</div>
-`).join('\n') : '<p class="empty">No complaints found for this vehicle.</p>'}
+${sections.length > 0 ? sections.join('\n') : '<p style="color:#999; font-style:italic;">No data on file for this bike yet.</p>'}
 
 <!-- FOOTER -->
 <div class="footer">
