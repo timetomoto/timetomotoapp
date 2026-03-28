@@ -112,7 +112,8 @@ export async function executeScoutTool(
         const pos = parameters.position != null ? parameters.position : waypoints.length;
         waypoints.splice(pos, 0, wp);
         tripStore.setTripWaypoints(waypoints);
-        return `Added waypoint "${wp.name}" at position ${pos + 1}.`;
+        const totalStops = waypoints.length;
+        return `Added waypoint "${wp.name}" (geocoded as "${place.name}") at position ${pos + 1}. There are now ${totalStops} stop(s). Always tell the rider the specific place name. Only suggest reordering if there are 2+ stops.`;
       }
 
       case 'remove_waypoint': {
@@ -125,6 +126,25 @@ export async function executeScoutTool(
         const removed = waypoints.splice(idx, 1)[0];
         tripStore.setTripWaypoints(waypoints);
         return `Removed waypoint "${removed.name}".`;
+      }
+
+      case 'replace_waypoint': {
+        const oldQuery = (parameters.old_query as string).toLowerCase();
+        const liveWps = useTripPlannerStore.getState().tripWaypoints as TripStop[];
+        const waypoints = [...liveWps];
+        const idx = waypoints.findIndex(
+          (w) => w.name.toLowerCase().includes(oldQuery) || oldQuery.includes(w.name.toLowerCase()),
+        );
+        if (idx < 0) return `No waypoint matching "${parameters.old_query}" found.`;
+        const removed = waypoints[idx];
+        // Geocode the replacement
+        const proximity = { lat: removed.lat, lng: removed.lng };
+        const results = await geocodeLocation(parameters.new_query, proximity);
+        if (results.length === 0) return `Could not find "${parameters.new_query}". Try a more specific place name.`;
+        const place = results[0];
+        waypoints[idx] = { name: parameters.label || place.name, lat: place.lat, lng: place.lng };
+        tripStore.setTripWaypoints(waypoints);
+        return `Replaced "${removed.name}" with "${place.name}" at position ${idx + 1}. There are ${waypoints.length} stop(s). Always tell the rider the specific new place name. Only suggest reordering if there are 2+ stops.`;
       }
 
       case 'reorder_waypoints': {

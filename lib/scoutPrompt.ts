@@ -103,7 +103,7 @@ export function buildScoutSystemPrompt(ctx: ScoutContext): string {
   if (trip.origin) tripParts.push(`origin: ${trip.origin.name}`);
   if (trip.destination) tripParts.push(`destination: ${trip.destination.name}`);
   if (trip.waypoints.length > 0)
-    tripParts.push(`waypoints: [${trip.waypoints.map((w) => w.name).join(', ')}]`);
+    tripParts.push(`waypoints (${trip.waypoints.length}): [${trip.waypoints.map((w, i) => `#${i + 1} "${w.name}"`).join(', ')}]`);
   else
     tripParts.push('waypoints: none');
   if (trip.departureDate) tripParts.push(`departure: ${trip.departureDate}${trip.departureTime ? ` ${trip.departureTime}` : ''}`);
