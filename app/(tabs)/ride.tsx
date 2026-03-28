@@ -335,7 +335,7 @@ export default function RideScreen() {
   const setGlobalMapStyle = useMapStyleStore((s) => s.setMapStyle);
 
   // Derive local MapStyle key from store URL
-  const mapStyle: MapStyle = Object.entries(MAP_STYLES).find(([, url]) => url === globalMapStyleUrl)?.[0] as MapStyle ?? 'hybrid';
+  const mapStyle: MapStyle = (['hybrid', 'outdoors', 'streets', 'dark'] as MapStyle[]).find((k) => MAP_STYLES[k] === globalMapStyleUrl) ?? 'hybrid';
   const user = useAuthStore((s) => s.user);
   const addRoute = useRoutesStore((s) => s.addRoute);
   const pendingNavigateRoute = useRoutesStore((s) => s.pendingNavigateRoute);

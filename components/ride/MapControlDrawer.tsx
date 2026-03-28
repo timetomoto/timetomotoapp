@@ -85,7 +85,7 @@ export default function MapControlDrawer({
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: theme.bgPanel }}>
-        <View style={[s.panel, { flex: 1, paddingBottom: insets.bottom + 40 }]}>
+        <View style={[s.panel, { flex: 1, paddingBottom: insets.bottom + 16 }]}>
           {/* Drag handle */}
           <View {...panResponder.panHandlers}>
             <View style={[s.handle, { backgroundColor: theme.border }]} />
