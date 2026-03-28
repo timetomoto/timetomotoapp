@@ -5,7 +5,8 @@ import { supabase } from './supabase';
 import type { Bike } from './store';
 import { bikeLabel } from './store';
 import { loadMaintenance, loadModifications } from './garage';
-import { useServiceBulletinsStore, type NHTSARecall, type NHTSAComplaint } from './serviceBulletinsStore';
+import { fetchServiceIntervals as fetchIntervalsFromGemini } from '../components/garage/ServiceIntervalsSection';
+import { useServiceBulletinsStore, type NHTSARecall, type NHTSAComplaint, type BulletinResult } from './serviceBulletinsStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -211,18 +212,40 @@ export async function exportBikePdf(bike: Bike, userId: string | undefined, phot
     || user?.email?.split('@')[0]
     || 'Rider';
 
-  // Collect all data in parallel
-  const [maintenance, modifications, intervals] = await Promise.all([
+  // Trigger bulletins fetch if not cached — this populates the store
+  const year = String(bike.year ?? '');
+  const make = bike.make ?? '';
+  const model = bike.model ?? '';
+  const bulletinKey = `${year}_${make}_${model}`;
+  if (!useServiceBulletinsStore.getState().results[bulletinKey] && year && make && model) {
+    await useServiceBulletinsStore.getState().fetchBulletins(year, make, model).catch(() => {});
+  }
+
+  // Collect all data in parallel — fetch fresh if cache is empty
+  const [maintenance, modifications, cachedIntervals] = await Promise.all([
     loadMaintenance(bike.id, userId),
     loadModifications(bike.id, userId),
     loadServiceIntervals(bike.id),
   ]);
 
-  const bulletins = loadBulletins(
-    String(bike.year ?? ''),
-    bike.make ?? '',
-    bike.model ?? '',
-  );
+  // If intervals cache is empty and bike has year/make/model, fetch from Gemini
+  let intervals = cachedIntervals;
+  if (intervals.items.length === 0 && year && make && model) {
+    try {
+      const fresh = await fetchIntervalsFromGemini(bike);
+      if (fresh.items.length > 0) {
+        intervals = fresh;
+        // Cache for next time
+        await AsyncStorage.setItem(`ttm_service_intervals_${bike.id}`, JSON.stringify({
+          bikeKey: `${year}_${make}_${model}`,
+          ...fresh,
+          fetchedAt: new Date().toISOString(),
+        }));
+      }
+    } catch {}
+  }
+
+  const bulletins = loadBulletins(year, make, model);
 
   const html = buildHtml({
     riderName,

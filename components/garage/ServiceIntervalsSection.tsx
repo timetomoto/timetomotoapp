@@ -39,7 +39,7 @@ function cacheKey(bikeId: string) {
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 
-async function fetchServiceIntervals(bike: Bike): Promise<{ assumption?: string; items: ServiceItem[] }> {
+export async function fetchServiceIntervals(bike: Bike): Promise<{ assumption?: string; items: ServiceItem[] }> {
   const bikeDesc = `${bike.year ?? ''} ${bike.make ?? ''} ${bike.model ?? ''}`.trim();
 
   const prompt = `You are a motorcycle service expert. Provide service intervals for a ${bikeDesc}.
